@@ -1,0 +1,24 @@
+/* Home (search and results) and recipe detail pages. Owner: Person 2. */
+
+.hero {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.search-form {
+  display: flex;
+  gap: var(--space-1);
+  max-width: 600px;
+  margin: var(--space-2) auto;
+}
+
+.search-form input {
+  flex: 1;
+  padding: 12px 14px;
+  font: inherit;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+}
+
+/* TODO (Person 2): category chips, cuisine filter, "Clear filters" button,
+   recipe detail layout (photo + ingredients left, steps right on desktop). */

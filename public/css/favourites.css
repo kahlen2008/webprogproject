@@ -1,0 +1,11 @@
+/* Favourites page. Owner: Person 3. */
+
+.favourites-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+/* TODO (Person 3): heart button (outline and filled), fade-out when a card is removed. */

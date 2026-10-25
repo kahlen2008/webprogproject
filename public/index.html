@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Recipes | Recipe Planner</title>
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/recipes.css">
+</head>
+<body>
+  <header id="navbar" class="navbar"></header>
+
+  <main class="container">
+    <section class="hero">
+      <h1>Find your next meal</h1>
+      <form id="search-form" class="search-form" role="search">
+        <label for="query" class="visually-hidden">Search recipes</label>
+        <input id="query" name="query" type="search" placeholder="Search recipes, e.g. pasta" required>
+        <button class="btn" type="submit">Search</button>
+      </form>
+      <!-- TODO (Person 2): category chips and cuisine filter go here -->
+    </section>
+
+    <p id="results-message" aria-live="polite"></p>
+    <ul id="results" class="card-grid"></ul>
+  </main>
+
+  <script type="module" src="js/navbar.js"></script>
+  <script type="module" src="js/recipes.js"></script>
+</body>
+</html>

@@ -1,0 +1,22 @@
+/* Login, signup and profile pages. Owner: Person 1. */
+
+.auth-card {
+  max-width: 400px;
+  margin: var(--space-4) auto;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: var(--space-3);
+}
+
+.auth-card h1 {
+  margin-top: 0;
+}
+
+.auth-switch {
+  text-align: center;
+  margin-top: var(--space-2);
+}
+
+/* TODO (Person 1): "or" divider, Google button, show/hide password, diet chips for profile. */
