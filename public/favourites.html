@@ -3,21 +3,54 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Favourites | Recipe Planner</title>
+  <title>My Favourites | RecipePlan</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/favourites.css">
 </head>
-<body>
-  <header id="navbar" class="navbar"></header>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
+  <header id="navbar" class="w-full"></header>
 
-  <main class="container">
-    <h1>Your favourites</h1>
-    <div class="favourites-toolbar">
-      <!-- TODO (Person 3): sort dropdown and category filter -->
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10 space-y-6">
+    <div class="flex items-center justify-between">
+      <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">My Favourites</h1>
     </div>
-    <p id="favourites-message" aria-live="polite"></p>
-    <ul id="favourites-list" class="card-grid"></ul>
+
+    <div id="favourites-message" aria-live="polite"></div>
+    <ul id="favourites-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0"></ul>
   </main>
 
   <script type="module" src="js/navbar.js"></script>

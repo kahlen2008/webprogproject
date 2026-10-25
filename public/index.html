@@ -3,27 +3,163 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recipes | Recipe Planner</title>
+  <title>RecipePlan — Find Recipes, Plan Meals, Eat Better</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/recipes.css">
 </head>
-<body>
-  <header id="navbar" class="navbar"></header>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
+  <header id="navbar" class="w-full"></header>
 
-  <main class="container">
-    <section class="hero">
-      <h1>Find your next meal</h1>
-      <form id="search-form" class="search-form" role="search">
-        <label for="query" class="visually-hidden">Search recipes</label>
-        <input id="query" name="query" type="search" placeholder="Search recipes, e.g. pasta" required>
-        <button class="btn" type="submit">Search</button>
-      </form>
-      <!-- TODO (Person 2): category chips and cuisine filter go here -->
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+    <!-- Hero Section -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 pb-6">
+      <div class="lg:col-span-7 space-y-6">
+        <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-stone-900 tracking-tight leading-[1.15]">
+          Find recipes. Plan meals.<br>
+          <span class="text-[#ca5c2e]">Eat better.</span>
+        </h1>
+        <p class="text-stone-600 text-base sm:text-lg max-w-xl font-normal leading-relaxed">
+          Discover thousands of delicious recipes and plan your weekly meals with ease.
+        </p>
+
+        <!-- Search Form -->
+        <form id="search-form" class="relative max-w-xl flex items-center bg-white rounded-full shadow-sm border border-[#e8ded4] p-1.5 focus-within:ring-2 focus-within:ring-[#ca5c2e]/40 focus-within:border-[#ca5c2e] transition" role="search">
+          <label for="query" class="visually-hidden">Search for a recipe, ingredient or cuisine</label>
+          <input 
+            id="query" 
+            name="query" 
+            type="search" 
+            placeholder="Search for a recipe, ingredient or cuisine..." 
+            class="w-full pl-5 pr-4 py-2.5 bg-transparent border-none text-stone-800 placeholder-stone-400 text-sm sm:text-base focus:outline-none"
+            required
+          >
+          <button 
+            type="submit" 
+            class="flex-shrink-0 w-11 h-11 bg-[#ca5c2e] hover:bg-[#b34d23] text-white rounded-full flex items-center justify-center transition shadow-sm"
+            aria-label="Search"
+          >
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+        </form>
+      </div>
+
+      <!-- Hero Featured Dish Image -->
+      <div class="lg:col-span-5 flex justify-center lg:justify-end">
+        <div class="relative w-72 sm:w-80 lg:w-96 aspect-square rounded-full overflow-hidden shadow-2xl border-4 border-white ring-8 ring-[#ca5c2e]/10 group">
+          <img 
+            src="https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=800&q=80" 
+            alt="Delicious Spaghetti Carbonara garnished with fresh herbs"
+            class="w-full h-full object-cover group-hover:scale-105 transition duration-700"
+          >
+        </div>
+      </div>
     </section>
 
-    <p id="results-message" aria-live="polite"></p>
-    <ul id="results" class="card-grid"></ul>
+    <!-- Popular Categories -->
+    <section class="space-y-4">
+      <h2 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">Popular Categories</h2>
+      <div class="grid grid-cols-3 sm:grid-cols-6 gap-4 sm:gap-6 pt-2">
+        <!-- Category: Chicken -->
+        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Chicken">
+          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
+            <img src="https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=300&q=80" alt="Chicken" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Chicken</span>
+        </button>
+
+        <!-- Category: Beef -->
+        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Beef">
+          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
+            <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=300&q=80" alt="Beef" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Beef</span>
+        </button>
+
+        <!-- Category: Pasta -->
+        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Pasta">
+          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
+            <img src="https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=300&q=80" alt="Pasta" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Pasta</span>
+        </button>
+
+        <!-- Category: Vegetarian -->
+        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Vegetarian">
+          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
+            <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80" alt="Vegetarian" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Vegetarian</span>
+        </button>
+
+        <!-- Category: Dessert -->
+        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Dessert">
+          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
+            <img src="https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80" alt="Dessert" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Dessert</span>
+        </button>
+
+        <!-- Category: Seafood -->
+        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Seafood">
+          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
+            <img src="https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=300&q=80" alt="Seafood" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Seafood</span>
+        </button>
+      </div>
+    </section>
+
+    <!-- Latest Recipes Section -->
+    <section class="space-y-6 pt-4">
+      <div class="flex items-center justify-between">
+        <h2 id="recipes-section-title" class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">Latest Recipes</h2>
+        <button id="view-more-btn" type="button" class="text-sm font-semibold text-[#ca5c2e] hover:text-[#b34d23] hover:underline flex items-center gap-1">
+          View more <span>&rarr;</span>
+        </button>
+      </div>
+
+      <p id="results-message" class="text-sm font-medium text-stone-500 min-h-[1.5rem]" aria-live="polite"></p>
+      
+      <!-- Recipe Cards Grid (matches 4 columns in mockup) -->
+      <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0"></ul>
+    </section>
   </main>
 
   <script type="module" src="js/navbar.js"></script>

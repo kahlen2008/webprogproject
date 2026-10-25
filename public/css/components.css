@@ -221,15 +221,14 @@
 /* ---------- Messages ---------- */
 .toast {
   position: fixed;
-  left: 50%;
-  bottom: var(--space-3);
-  transform: translateX(-50%);
+  top: var(--space-3);
+  right: var(--space-3);
   background: var(--color-text);
   color: #ffffff;
   padding: 12px var(--space-3);
   border-radius: var(--radius);
   box-shadow: var(--shadow);
-  z-index: 20;
+  z-index: 50;
 }
 
 .empty-state {

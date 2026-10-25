@@ -3,16 +3,66 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Recipe | Recipe Planner</title>
+  <title>Recipe Details | RecipePlan</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/recipes.css">
 </head>
-<body>
-  <header id="navbar" class="navbar"></header>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
+  <header id="navbar" class="w-full"></header>
 
-  <main class="container">
-    <article id="recipe-detail" aria-live="polite"></article>
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-6 md:py-8 space-y-4">
+    <!-- Back Button -->
+    <div>
+      <a 
+        href="index.html" 
+        id="back-to-recipes-btn" 
+        class="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-[#ca5c2e] transition group focus:outline-none"
+        onclick="if (window.history.length > 1) { window.history.back(); return false; }"
+      >
+        <span class="w-8 h-8 rounded-full bg-white border border-[#efe6dc] flex items-center justify-center group-hover:border-[#ca5c2e] group-hover:bg-[#fbf2ec] transition shadow-xs">
+          <svg class="w-4 h-4 text-stone-600 group-hover:text-[#ca5c2e] transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </span>
+        <span>Back to recipes</span>
+      </a>
+    </div>
+
+    <article id="recipe-detail" aria-live="polite" class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 md:p-10"></article>
   </main>
 
   <script type="module" src="js/navbar.js"></script>

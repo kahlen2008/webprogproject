@@ -3,32 +3,156 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Log in | Recipe Planner</title>
+  <title>Log in | RecipePlan</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/auth.css">
 </head>
-<body>
-  <header id="navbar" class="navbar"></header>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased relative overflow-x-hidden">
+  
+  <!-- Subtle decorative background botanical elements matching mockup -->
+  <div class="absolute inset-0 pointer-events-none opacity-40 select-none overflow-hidden">
+    <svg class="absolute -left-12 top-20 w-64 h-64 text-[#ca5c2e]/10" viewBox="0 0 100 100" fill="currentColor">
+      <path d="M50 0 C60 30 90 40 100 50 C70 60 60 90 50 100 C40 70 10 60 0 50 C30 40 40 10 50 0 Z"></path>
+    </svg>
+    <svg class="absolute -right-16 top-1/3 w-80 h-80 text-[#ca5c2e]/10" viewBox="0 0 100 100" fill="currentColor">
+      <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="4" fill="none"></circle>
+      <path d="M50 10 Q70 50 50 90 Q30 50 50 10 Z"></path>
+    </svg>
+    <svg class="absolute left-10 bottom-10 w-48 h-48 text-[#ca5c2e]/10" viewBox="0 0 100 100" fill="currentColor">
+      <path d="M10 50 Q50 10 90 50 Q50 90 10 50 Z"></path>
+    </svg>
+  </div>
 
-  <main class="container">
-    <section class="auth-card">
-      <h1>Log in</h1>
-      <form id="login-form" novalidate>
-        <div class="form-field">
-          <label for="email">Email</label>
-          <input id="email" name="email" type="email" autocomplete="email" required>
+  <header id="navbar" class="w-full relative z-10"></header>
+
+  <main class="flex-1 flex items-center justify-center px-4 py-12 relative z-10">
+    <div class="max-w-md w-full bg-white rounded-3xl border border-[#ede3d8] p-8 sm:p-10 shadow-sm space-y-6">
+      
+      <!-- Card Header -->
+      <div class="text-center space-y-1.5">
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">Welcome back</h1>
+        <p class="text-sm text-stone-500 font-normal">Log in to continue to RecipePlan</p>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form" class="space-y-4" novalidate>
+        <div class="space-y-1.5">
+          <label for="email" class="block text-xs font-semibold text-stone-700">Email</label>
+          <input 
+            id="email" 
+            name="email" 
+            type="email" 
+            autocomplete="email" 
+            placeholder="you@example.com"
+            class="w-full px-4 py-2.5 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition"
+            required
+          >
         </div>
-        <div class="form-field">
-          <label for="password">Password</label>
-          <input id="password" name="password" type="password" autocomplete="current-password" required>
+
+        <div class="space-y-1.5">
+          <label for="password" class="block text-xs font-semibold text-stone-700">Password</label>
+          <div class="relative">
+            <input 
+              id="password" 
+              name="password" 
+              type="password" 
+              autocomplete="current-password" 
+              placeholder="Enter your password"
+              class="w-full px-4 py-2.5 pr-11 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition"
+              required
+            >
+            <button 
+              type="button" 
+              id="toggle-password-btn" 
+              class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 focus:outline-none"
+              aria-label="Toggle password visibility"
+            >
+              <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
+          <div class="flex justify-end pt-1">
+            <button type="button" id="forgot-password-link" class="text-xs font-medium text-stone-500 hover:text-[#ca5c2e] transition focus:outline-none">Forgot password?</button>
+          </div>
         </div>
-        <p class="form-error" role="alert"></p>
-        <button class="btn btn-block" type="submit">Log in</button>
-        <!-- TODO (Person 1): "or" divider and "Continue with Google" button, forgot password link -->
+
+        <p class="form-error text-xs text-red-600 font-medium" role="alert"></p>
+
+        <button 
+          type="submit" 
+          class="w-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-semibold py-3 rounded-xl transition shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40"
+        >
+          Log In
+        </button>
+
+        <!-- OR Divider -->
+        <div class="relative flex items-center justify-center my-4">
+          <div class="border-t border-stone-200 w-full"></div>
+          <span class="bg-white px-3 text-xs text-stone-400 font-medium select-none">or</span>
+          <div class="border-t border-stone-200 w-full"></div>
+        </div>
+
+        <!-- Continue with Google Button -->
+        <button 
+          type="button" 
+          id="google-login-btn" 
+          class="w-full bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 font-semibold py-2.5 px-4 rounded-xl transition shadow-xs text-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-stone-300"
+        >
+          <svg class="w-4 h-4" viewBox="0 0 24 24">
+            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+          </svg>
+          Continue with Google
+        </button>
       </form>
-      <p class="auth-switch">New here? <a href="signup.html">Create an account</a></p>
-    </section>
+
+      <!-- Footer Switch -->
+      <div class="text-center pt-2">
+        <p class="text-xs text-stone-600">
+          Don't have an account? 
+          <a href="signup.html" class="font-semibold text-[#ca5c2e] hover:underline">Sign up</a>
+        </p>
+      </div>
+
+    </div>
   </main>
 
   <script type="module" src="js/navbar.js"></script>

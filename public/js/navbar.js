@@ -1,7 +1,7 @@
-// Navbar that changes when the user logs in or out. Owner: Person 1.
-// Every page has <header id="navbar" class="navbar"></header> and loads this file.
+// Navbar that changes when the user logs in or out.
+// Supports both Firebase Auth and local demo user state.
 
-import { onAuthChange, logout } from "./auth.js";
+import { onAuthChange, logout, getCurrentUser } from "./auth.js";
 
 const LINKS = [
   ["index.html", "Recipes"],
@@ -10,53 +10,210 @@ const LINKS = [
 ];
 
 function currentPage() {
-  return window.location.pathname.split("/").pop() || "index.html";
+  const path = window.location.pathname.split("/").pop();
+  return path || "index.html";
 }
 
-function render(user) {
+export function renderNavbar(user) {
   const host = document.getElementById("navbar");
   if (!host) return;
 
-  const page = currentPage();
-  const links = LINKS.map(
-    ([href, label]) => `<a href="${href}"${page === href ? ' aria-current="page"' : ""}>${label}</a>`
-  ).join("");
+  // Check demo user from localStorage if Firebase auth has not set one
+  let activeUser = user;
+  if (!activeUser) {
+    try {
+      const stored = localStorage.getItem("recipeplan_user");
+      if (stored) {
+        activeUser = JSON.parse(stored);
+      }
+    } catch (e) {}
+  }
 
-  const account = user
-    ? `<span class="navbar-user">
-         <a href="profile.html" id="navbar-name"></a>
-         <button class="btn btn-secondary" id="logout-button" type="button">Log out</button>
-       </span>`
-    : `<a href="login.html">Login</a><a class="btn" href="signup.html">Sign up</a>`;
+  const page = currentPage();
+  const linksHtml = LINKS.map(([href, label]) => {
+    const isCurrent = page === href || (href === "index.html" && page === "");
+    return `<a href="${href}" class="relative py-1 text-sm font-semibold transition-colors duration-200 ${
+      isCurrent
+        ? "text-[#ca5c2e]"
+        : "text-stone-600 hover:text-[#ca5c2e]"
+    }" ${isCurrent ? 'aria-current="page"' : ""}>
+      ${label}
+      ${isCurrent ? '<span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ca5c2e] rounded-full transition-all duration-300"></span>' : ''}
+    </a>`;
+  }).join("");
+
+  const logoSvg = `
+    <svg class="w-6 h-6 text-[#ca5c2e]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2"></path>
+      <path d="M15 2v18"></path>
+      <path d="M6 2v7a3 3 0 0 0 6 0V2"></path>
+      <path d="M9 2v18"></path>
+    </svg>`;
+
+  const searchSvg = `
+    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>`;
+
+  const chevronDownSvg = `
+    <svg class="w-4 h-4 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="6 9 12 15 18 9"></polyline>
+    </svg>`;
+
+  const menuSvg = `
+    <svg class="w-6 h-6 text-stone-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="3" y1="12" x2="21" y2="12"></line>
+      <line x1="3" y1="6" x2="21" y2="6"></line>
+      <line x1="3" y1="18" x2="21" y2="18"></line>
+    </svg>`;
+
+  let userDisplayHtml = "";
+  if (activeUser) {
+    const displayName = activeUser.displayName || activeUser.email?.split("@")[0] || "User";
+    const avatarUrl = activeUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ca5c2e&color=fff`;
+
+    userDisplayHtml = `
+      <div class="relative group">
+        <button id="user-menu-btn" type="button" class="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full hover:bg-stone-100 transition focus:outline-none" aria-haspopup="true">
+          <img class="w-8 h-8 rounded-full object-cover border border-stone-200" src="${avatarUrl}" alt="${displayName}">
+          <span class="text-sm font-semibold text-stone-800 hidden sm:inline" id="navbar-name">${displayName}</span>
+          ${chevronDownSvg}
+        </button>
+        <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-lg border border-stone-100 py-2 z-50 transition-all">
+          <div class="px-4 py-2 border-b border-stone-100">
+            <p class="text-xs text-stone-400">Signed in as</p>
+            <p class="text-sm font-semibold text-stone-800 truncate">${activeUser.email || displayName}</p>
+          </div>
+          <a href="profile.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
+            Profile Settings
+          </a>
+          <a href="favourites.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
+            My Favourites
+          </a>
+          <a href="planner.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
+            Meal Planner
+          </a>
+          <div class="border-t border-stone-100 my-1"></div>
+          <button id="logout-button" type="button" class="w-full text-left flex items-center gap-2 px-4 py-2 text-sm text-red-600 hover:bg-red-50">
+            Log out
+          </button>
+        </div>
+      </div>
+    `;
+  } else {
+    userDisplayHtml = `
+      <div class="flex items-center gap-3">
+        <a href="login.html" class="text-sm font-semibold text-stone-700 hover:text-[#ca5c2e] px-2 py-1.5 transition">Login</a>
+        <a href="signup.html" class="text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b34d23] px-4 py-2 rounded-xl transition shadow-sm">Sign Up</a>
+      </div>
+    `;
+  }
 
   host.innerHTML = `
-    <div class="container navbar-inner">
-      <a class="navbar-logo" href="index.html">Recipe Planner</a>
-      <button class="navbar-menu-button" id="menu-button" type="button" aria-expanded="false" aria-controls="navbar-links">Menu</button>
-      <nav class="navbar-links" id="navbar-links" aria-label="Main">${links}${account}</nav>
-    </div>`;
+    <div class="w-full bg-[#fcf9f5]/90 backdrop-blur-md sticky top-0 z-40 border-b border-[#ede4da]">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+        
+        <!-- Brand Logo -->
+        <a href="index.html" class="flex items-center gap-2 text-xl tracking-tight select-none">
+          ${logoSvg}
+          <span class="font-normal text-stone-800">Recipe</span><span class="font-extrabold text-stone-900 -ml-1">Plan</span>
+        </a>
 
-  if (user) {
-    // textContent (not innerHTML) so a strange display name cannot inject HTML.
-    document.getElementById("navbar-name").textContent = user.displayName || user.email;
-    document.getElementById("logout-button").addEventListener("click", async () => {
-      await logout();
-      window.location.href = "index.html";
+        <!-- Desktop Navigation Links -->
+        <nav class="hidden md:flex items-center gap-8" aria-label="Main">
+          ${linksHtml}
+        </nav>
+
+        <!-- Right Side: Search & Account -->
+        <div class="flex items-center gap-4">
+          <a href="index.html" class="text-stone-500 hover:text-[#ca5c2e] p-1.5 rounded-full hover:bg-stone-100 transition" title="Search Recipes" aria-label="Search">
+            ${searchSvg}
+          </a>
+
+          ${userDisplayHtml}
+
+          <!-- Mobile Hamburger Toggle -->
+          <button id="menu-button" type="button" class="md:hidden p-1.5 rounded-xl hover:bg-stone-100 text-stone-700" aria-label="Open Menu">
+            ${menuSvg}
+          </button>
+        </div>
+      </div>
+
+      <!-- Mobile Dropdown Navigation -->
+      <div id="mobile-menu" class="hidden md:hidden border-t border-[#ede4da] bg-[#fcf9f5] px-4 pt-3 pb-5 space-y-3">
+        <nav class="flex flex-col space-y-2">
+          <a href="index.html" class="px-3 py-2 rounded-xl text-base font-medium ${page === "index.html" || page === "" ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">Recipes</a>
+          <a href="favourites.html" class="px-3 py-2 rounded-xl text-base font-medium ${page === "favourites.html" ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">Favourites</a>
+          <a href="planner.html" class="px-3 py-2 rounded-xl text-base font-medium ${page === "planner.html" ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">Planner</a>
+          ${activeUser ? '<a href="profile.html" class="px-3 py-2 rounded-xl text-base font-medium text-stone-700 hover:bg-stone-100">Profile Settings</a>' : ""}
+        </nav>
+      </div>
+    </div>
+  `;
+
+  // Setup event listeners
+  const menuBtn = document.getElementById("menu-button");
+  const mobileMenu = document.getElementById("mobile-menu");
+  if (menuBtn && mobileMenu) {
+    menuBtn.addEventListener("click", () => {
+      mobileMenu.classList.toggle("hidden");
     });
   }
 
-  const menuButton = document.getElementById("menu-button");
-  const menu = document.getElementById("navbar-links");
-  menuButton.addEventListener("click", () => {
-    const open = menu.classList.toggle("open");
-    menuButton.setAttribute("aria-expanded", String(open));
-  });
+  const userMenuBtn = document.getElementById("user-menu-btn");
+  const userDropdown = document.getElementById("user-dropdown");
+  if (userMenuBtn && userDropdown) {
+    userMenuBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      userDropdown.classList.toggle("hidden");
+    });
+    document.addEventListener("click", () => {
+      userDropdown.classList.add("hidden");
+    });
+  }
+
+  const logoutBtn = document.getElementById("logout-button");
+  if (logoutBtn) {
+    logoutBtn.addEventListener("click", async () => {
+      try {
+        await logout();
+      } catch (err) {}
+      localStorage.removeItem("recipeplan_user");
+      window.location.href = "index.html";
+    });
+  }
 }
 
-// Show the logged-out navbar immediately, then update once Firebase knows who the user is.
-render(null);
+// Initial render with potential demo fallback
+renderNavbar(null);
+
 try {
-  onAuthChange(render);
+  onAuthChange((user) => {
+    renderNavbar(user);
+  });
 } catch (error) {
-  console.error("Could not check login state. Is firebase-config.js filled in?", error);
+  // Graceful fallback for offline / mock testing
+  renderNavbar(null);
 }
+
+// Smooth page-to-page navigation transition
+document.addEventListener("click", (e) => {
+  const link = e.target.closest("a");
+  if (!link || !link.href || link.target || link.getAttribute("href")?.startsWith("#")) return;
+  const url = new URL(link.href, window.location.href);
+  if (url.origin === window.location.origin && url.pathname !== window.location.pathname) {
+    // If native cross-document view transitions are supported, the browser performs a smooth cross-fade natively.
+    // In other browsers, provide a quick gentle exit transition.
+    if (!("startViewTransition" in document)) {
+      const main = document.querySelector("main");
+      if (main) {
+        e.preventDefault();
+        main.classList.add("page-exit");
+        setTimeout(() => {
+          window.location.href = link.href;
+        }, 120);
+      }
+    }
+  }
+});

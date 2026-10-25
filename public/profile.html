@@ -3,23 +3,309 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Profile | Recipe Planner</title>
+  <title>Profile | RecipePlan</title>
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
   <link rel="stylesheet" href="css/base.css">
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/auth.css">
 </head>
-<body>
-  <header id="navbar" class="navbar"></header>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
+  <header id="navbar" class="w-full"></header>
 
-  <main class="container">
-    <section class="auth-card">
-      <h1>Your profile</h1>
-      <!-- TODO (Person 1): redirect to login.html if logged out, show name and email,
-           dietary preference chips, Save button, confirmation toast.
-           Data: users/{uid} (displayName, diets, allergies). -->
-    </section>
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
+      
+      <!-- Left Sidebar: Profile Summary & Vertical Navigation Menu -->
+      <aside class="md:col-span-4 bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 flex flex-col items-center text-center">
+        <!-- User Avatar -->
+        <div class="relative w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md ring-4 ring-[#ca5c2e]/10">
+          <img 
+            id="profile-sidebar-avatar" 
+            src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=180&h=180&q=80" 
+            alt="Profile Avatar"
+            class="w-full h-full object-cover"
+          >
+        </div>
+
+        <h2 id="profile-sidebar-name" class="mt-4 text-xl font-extrabold text-stone-900 tracking-tight">User</h2>
+        <p id="profile-sidebar-email" class="text-xs text-stone-500 font-medium mt-0.5"></p>
+
+        <!-- Vertical Navigation Menu -->
+        <nav class="w-full mt-8 space-y-1.5" aria-label="Profile navigation">
+          <button type="button" data-tab="profile" class="profile-nav-tab w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold bg-[#fbf2ec] text-[#ca5c2e] transition text-left focus:outline-none">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+              <circle cx="12" cy="7" r="4"></circle>
+            </svg>
+            Profile
+          </button>
+
+          <button type="button" data-tab="diets" class="profile-nav-tab w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-stone-50 transition text-left focus:outline-none">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M9 11l3 3L22 4"></path>
+              <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+            </svg>
+            Diet Preferences
+          </button>
+
+          <button type="button" data-tab="allergies" class="profile-nav-tab w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-stone-50 transition text-left focus:outline-none">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+            </svg>
+            Allergies
+          </button>
+
+          <button type="button" data-tab="password" class="profile-nav-tab w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-stone-600 hover:bg-stone-50 transition text-left focus:outline-none">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Change Password
+          </button>
+
+          <div class="pt-4 border-t border-stone-100 space-y-1">
+            <button id="profile-logout-btn" type="button" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-stone-600 hover:text-stone-900 hover:bg-stone-50 rounded-xl transition text-left">
+              <svg class="w-4 h-4 flex-shrink-0 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                <polyline points="16 17 21 12 16 7"></polyline>
+                <line x1="21" y1="12" x2="9" y2="12"></line>
+              </svg>
+              Log Out
+            </button>
+            <button id="profile-delete-btn" type="button" class="w-full flex items-center gap-3 px-3 py-2 text-sm font-medium text-red-500 hover:text-red-700 hover:bg-red-50/60 rounded-xl transition text-left">
+              <svg class="w-4 h-4 flex-shrink-0 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+              </svg>
+              Delete Account
+            </button>
+          </div>
+        </nav>
+      </aside>
+
+      <!-- Right Main Card: Profile Information, Diet Preferences, Allergies & Password -->
+      <section class="md:col-span-8 bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 md:p-10 min-h-[460px]">
+        
+        <!-- TAB PANEL 1: Profile Information -->
+        <div id="tab-panel-profile" class="tab-panel active space-y-8">
+          <div class="space-y-6">
+            <div>
+              <h1 class="text-xl font-bold text-stone-900 tracking-tight">Profile Information</h1>
+              <p class="text-xs text-stone-500 mt-0.5">Manage your personal details and account settings.</p>
+            </div>
+            
+            <div class="space-y-4 max-w-md">
+              <div class="space-y-1.5">
+                <label for="display-name-input" class="block text-xs font-semibold text-stone-700">Display Name</label>
+                <input 
+                  id="display-name-input" 
+                  type="text" 
+                  placeholder="Your name"
+                  class="w-full px-4 py-2.5 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 text-sm focus:outline-none transition"
+                >
+              </div>
+
+              <div>
+                <button 
+                  id="save-name-btn" 
+                  type="button" 
+                  class="bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <hr class="border-[#ede4da]">
+
+          <!-- Danger Zone: Delete Account -->
+          <div class="p-5 rounded-2xl bg-red-50/70 border border-red-100 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h3 class="text-sm font-bold text-red-900">Delete Account</h3>
+              <p class="text-xs text-red-600 mt-0.5">Permanently remove your account, profile, favourites, and meal plans. This cannot be undone.</p>
+            </div>
+            <button 
+              id="main-delete-account-btn" 
+              type="button" 
+              class="px-4 py-2 bg-white hover:bg-red-600 border border-red-200 hover:border-red-600 text-red-600 hover:text-white rounded-xl text-xs font-semibold shadow-xs transition focus:outline-none whitespace-nowrap self-start sm:self-center"
+            >
+              Delete Account
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB PANEL 2: Diet Preferences -->
+        <div id="tab-panel-diets" class="tab-panel space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-stone-900 tracking-tight">Diet Preferences</h2>
+            <p class="text-xs text-stone-500 mt-0.5">Select diets you follow to receive tailored meal suggestions.</p>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-w-xl">
+            <label class="flex items-center gap-3 p-3.5 rounded-2xl border border-stone-200 hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] cursor-pointer transition select-none">
+              <input type="checkbox" name="diet-pref" value="Vegetarian" class="w-4 h-4 rounded border-stone-300 text-[#ca5c2e] focus:ring-[#ca5c2e] accent-[#ca5c2e]">
+              <div>
+                <span class="text-sm font-semibold text-stone-800">Vegetarian</span>
+                <p class="text-[11px] text-stone-500">Plant-based, no meat or seafood</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3.5 rounded-2xl border border-stone-200 hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] cursor-pointer transition select-none">
+              <input type="checkbox" name="diet-pref" value="Vegan" class="w-4 h-4 rounded border-stone-300 text-[#ca5c2e] focus:ring-[#ca5c2e] accent-[#ca5c2e]">
+              <div>
+                <span class="text-sm font-semibold text-stone-800">Vegan</span>
+                <p class="text-[11px] text-stone-500">100% plant foods, no animal products</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3.5 rounded-2xl border border-stone-200 hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] cursor-pointer transition select-none">
+              <input type="checkbox" name="diet-pref" value="Gluten Free" class="w-4 h-4 rounded border-stone-300 text-[#ca5c2e] focus:ring-[#ca5c2e] accent-[#ca5c2e]">
+              <div>
+                <span class="text-sm font-semibold text-stone-800">Gluten Free</span>
+                <p class="text-[11px] text-stone-500">Free from wheat, barley, rye</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3.5 rounded-2xl border border-stone-200 hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] cursor-pointer transition select-none">
+              <input type="checkbox" name="diet-pref" value="Dairy Free" class="w-4 h-4 rounded border-stone-300 text-[#ca5c2e] focus:ring-[#ca5c2e] accent-[#ca5c2e]">
+              <div>
+                <span class="text-sm font-semibold text-stone-800">Dairy Free</span>
+                <p class="text-[11px] text-stone-500">No milk, butter, cheese, or lactose</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3.5 rounded-2xl border border-stone-200 hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] cursor-pointer transition select-none">
+              <input type="checkbox" name="diet-pref" value="Low Carb" class="w-4 h-4 rounded border-stone-300 text-[#ca5c2e] focus:ring-[#ca5c2e] accent-[#ca5c2e]">
+              <div>
+                <span class="text-sm font-semibold text-stone-800">Low Carb</span>
+                <p class="text-[11px] text-stone-500">Reduced sugars & starchy carbs</p>
+              </div>
+            </label>
+            <label class="flex items-center gap-3 p-3.5 rounded-2xl border border-stone-200 hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] cursor-pointer transition select-none">
+              <input type="checkbox" name="diet-pref" value="Halal" class="w-4 h-4 rounded border-stone-300 text-[#ca5c2e] focus:ring-[#ca5c2e] accent-[#ca5c2e]">
+              <div>
+                <span class="text-sm font-semibold text-stone-800">Halal</span>
+                <p class="text-[11px] text-stone-500">Permissible Islamic dietary standards</p>
+              </div>
+            </label>
+          </div>
+
+          <div>
+            <button 
+              id="save-diets-btn" 
+              type="button" 
+              class="bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+            >
+              Save Diet Preferences
+            </button>
+          </div>
+        </div>
+
+        <!-- TAB PANEL 3: Allergies -->
+        <div id="tab-panel-allergies" class="tab-panel space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-stone-900 tracking-tight">Food Allergies</h2>
+            <p class="text-xs text-stone-500 mt-0.5">Specify ingredients you cannot eat. Recipes with these items will be flagged or avoided.</p>
+          </div>
+
+          <div class="space-y-5 max-w-lg">
+            <div class="flex items-center gap-2">
+              <input 
+                id="allergy-input" 
+                type="text" 
+                placeholder="Type an allergy (e.g. Peanuts, Shellfish)..." 
+                class="flex-1 px-4 py-2.5 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 text-sm focus:outline-none transition"
+              >
+              <button 
+                id="add-allergy-btn" 
+                type="button" 
+                class="bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl transition shadow-sm"
+              >
+                Add
+              </button>
+            </div>
+
+            <!-- Quick Suggestions -->
+            <div class="space-y-2 pt-1">
+              <p class="text-xs font-semibold text-stone-500">Popular suggestions:</p>
+              <div class="flex flex-wrap gap-1.5" id="allergy-suggestions">
+                <button type="button" class="allergy-suggest-btn text-xs px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] text-stone-600 transition" data-allergy="Peanuts">+ Peanuts</button>
+                <button type="button" class="allergy-suggest-btn text-xs px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] text-stone-600 transition" data-allergy="Shellfish">+ Shellfish</button>
+                <button type="button" class="allergy-suggest-btn text-xs px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] text-stone-600 transition" data-allergy="Tree Nuts">+ Tree Nuts</button>
+                <button type="button" class="allergy-suggest-btn text-xs px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] text-stone-600 transition" data-allergy="Dairy">+ Dairy</button>
+                <button type="button" class="allergy-suggest-btn text-xs px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] text-stone-600 transition" data-allergy="Eggs">+ Eggs</button>
+                <button type="button" class="allergy-suggest-btn text-xs px-2.5 py-1 rounded-lg bg-stone-100 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] text-stone-600 transition" data-allergy="Soy">+ Soy</button>
+              </div>
+            </div>
+
+            <!-- Allergy Pill Badges -->
+            <div class="pt-4 border-t border-stone-100 space-y-2">
+              <p class="text-xs font-semibold text-stone-700">Your registered allergies:</p>
+              <div id="allergies-tags" class="flex flex-wrap items-center gap-2">
+                <!-- Rendered dynamically via js/profile.js -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB PANEL 4: Change Password -->
+        <div id="tab-panel-password" class="tab-panel space-y-6">
+          <div>
+            <h2 class="text-xl font-bold text-stone-900 tracking-tight">Change Password</h2>
+            <p class="text-xs text-stone-500 mt-0.5">Ensure your account uses a secure password or request an email reset link.</p>
+          </div>
+
+          <div class="space-y-4 max-w-md">
+            <div class="p-5 rounded-2xl bg-[#faf6f0] border border-[#ede4da] space-y-3">
+              <h3 class="text-xs font-bold uppercase tracking-wider text-[#ca5c2e]">Email Password Reset</h3>
+              <p class="text-xs text-stone-600">We will send a secure password reset link to your registered email address.</p>
+              <button 
+                id="profile-send-reset-btn" 
+                type="button" 
+                class="bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-xs sm:text-sm font-semibold px-4 py-2.5 rounded-xl transition shadow-sm inline-flex items-center gap-2"
+              >
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+                Send Password Reset Email
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </section>
+    </div>
   </main>
 
   <script type="module" src="js/navbar.js"></script>
+  <script type="module" src="js/profile.js"></script>
 </body>
 </html>
