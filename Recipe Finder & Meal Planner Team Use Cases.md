@@ -39,7 +39,7 @@ This is what four people can finish in five weeks (Oct 26 to Nov 29, 2026). Item
 - **Onboarding and profile:** a two-step diet and allergy setup after sign-up, editable later on the profile page.
 - **Recipe discovery:** search by name, filter by category and cuisine, and a recipe page with ingredients, instructions and a serving size scaler, using TheMealDB data.
 - **Diet and allergy warnings:** badges and banners based on ingredient names, on recipe cards, the recipe page, favourites and the planner.
-- **Favourites:** saved per user in Firestore and synced across devices.
+- **Favourites:** saved per user in Firestore and synced across devices, plus star ratings and comments on each recipe that every logged-in user can read.
 - **Meal planner and shopping list:** a weekly plan (seven days, breakfast, lunch and dinner) saved per user, plus one combined shopping list with checkboxes and a print view.
 - **Interface:** responsive Tailwind design for phone, tablet and desktop, with loading, empty and error states and basic accessibility.
 - **Deployment:** live on Firebase Hosting, with security rules that keep each user's data private.
@@ -49,10 +49,12 @@ This is what four people can finish in five weeks (Oct 26 to Nov 29, 2026). Item
 - Adding or uploading our own recipes. All recipes come from TheMealDB.
 - Nutrition, calorie or cost calculations.
 - Ordering groceries or connecting to shops.
-- Sharing plans or following other users. Star ratings are optional.
+- Sharing plans or following other users, and moderation tools for comments.
 - Guaranteed allergen safety or medical advice. Warnings are keyword matches on ingredient names.
 - A native mobile app, offline mode, other languages or an admin dashboard.
 - Photo uploads, so Firebase Storage is not used.
+
+* **Extra features for later:** a "Fill my week" button that auto-plans meals that are safe for the user, substitution suggestions for flagged ingredients, searching by the ingredients you already have, a step-by-step cooking mode, and dark mode.
 
 **Constraints**
 
@@ -86,6 +88,7 @@ recipeplan/
     │   ├── recipes.js          search, filters, detail page (Person 2)
     │   ├── ui.js               shared Tailwind class sets and components (Person 2)
     │   ├── favourites.js       (Person 3)
+    │   ├── ratings.js          star ratings and comments (Person 3)
     │   ├── planner.js          (Person 4)
     │   └── utils.js            small shared helpers (anyone, tell the team)
     └── images/             logo, icons, empty-state pictures
@@ -159,7 +162,7 @@ users/{uid}/shoppingList/current     (Person 4)
   checked       array of string      ["chicken", "soy sauce"]  ingredient names ticked off
   updatedAt     timestamp
 
-recipes/{recipeId}/ratings/{uid}     (Person 2, optional)
+recipes/{recipeId}/ratings/{uid}     (Person 3)
   stars         number               1 to 5
   comment       string
   displayName   string               copied from the user's profile
@@ -174,7 +177,7 @@ The main design choices:
 - **Rating document id = user id.** Each user can have only one rating per recipe, and they can edit it instead of adding another.
 - **Use `serverTimestamp()` for `createdAt`, `addedAt` and `updatedAt`**, so times do not depend on a user's device clock.
 
-One rule to add for the optional ratings, next to the existing `users/{userId}` rule in `firestore.rules`. Ratings are readable by anyone, but writable only by their own author:
+One rule to add for ratings and comments, next to the existing `users/{userId}` rule in `firestore.rules`. Ratings are readable by anyone, but writable only by their own author:
 
 ```
 match /recipes/{recipeId}/ratings/{uid} {
@@ -261,7 +264,7 @@ Person 1 owns everything about who the user is, from the login screens to the Fi
 Person 2 owns how users find recipes, from the search bar to the data fetched from TheMealDB.
 
 - **Frontend:** Homepage, search bar, filters (category, ingredient, diet), recipe cards, recipe detail page, and the serving size scaler.
-- **Backend:** The API layer that fetches from TheMealDB, with error handling and caching in `sessionStorage`. For a Firestore piece, add user ratings or comments stored per recipe.
+- **Backend:** The API layer that fetches from TheMealDB, with error handling and caching in `sessionStorage`.
 - **Extra:** Owns the shared design system (the Tailwind class choices and the components in js/ui.js: buttons, cards, forms) so the whole site looks consistent.
 
 **Happy path**
@@ -276,7 +279,7 @@ Person 2 owns how users find recipes, from the search bar to the data fetched fr
 
 - **Must:** Search by name. Filter by category. Cards show image, name and category. Detail page lists ingredients (combine TheMealDB's `strIngredient1` to `strIngredient20` fields into one array) and numbered instructions. Loading, empty ("No recipes found") and error states. Responsive grid.
 - **Should:** Cuisine filter, serving size scaler (scale only amounts that start with a number, and leave values like "a pinch" unchanged), and `sessionStorage` caching of API responses.
-- **Nice to have:** A "Surprise me" random recipe button, and star ratings stored in Firestore per recipe.
+- **Nice to have:** A "Surprise me" random recipe button, and a space on the recipe page where Person 3's ratings and comments appear.
 - **Hand-off:** Agree the recipe object shape in week 1 (id, name, image, category, area, ingredients, instructions) and document it at the top of `api.js`.
 
 **UI/UX**
@@ -286,12 +289,12 @@ Person 2 owns how users find recipes, from the search bar to the data fetched fr
 - Recipe page: on desktop, photo and ingredients on the left and numbered steps on the right. On phones everything stacks in one column.
 - Search keeps the typed text and active filters visible, and shows a clear "Clear filters" button.
 
-## Person 3: Favourites
+## Person 3: Favourites, ratings and comments
 
-Person 3 owns saving and revisiting recipes, with Firestore keeping favourites in sync across devices.
+Person 3 owns saving and revisiting recipes, with Firestore keeping favourites in sync across devices. Person 3 also owns star ratings and comments on recipes, the only place where users see each other's input.
 
-- **Frontend:** A heart/favourite button on every recipe card, a favourites page, sorting and filtering of favourites, and empty states.
-- **Backend:** Firestore CRUD at `users/{uid}/favourites/{recipeId}`, real-time updates with `onSnapshot`, and syncing the button state when the user logs in.
+- **Frontend:** A heart/favourite button on every recipe card, a favourites page, sorting and filtering of favourites, empty states, and on the recipe page a star rating, a comment box and a list of reviews with the average rating.
+- **Backend:** Firestore CRUD at `users/{uid}/favourites/{recipeId}`, real-time updates with `onSnapshot`, syncing the button state when the user logs in, and ratings and comments at recipes/{recipeId}/ratings/{uid} (one per user, editable, readable by everyone).
 - **Extra:** Owns QA and testing, including checking with two accounts that users can't see each other's data.
 
 **Happy path**
@@ -316,6 +319,15 @@ Person 3 owns saving and revisiting recipes, with Firestore keeping favourites i
 - The favourites page reuses the shared recipe card, with a sort dropdown at the top right.
 - The empty state is a friendly picture, a short sentence and a primary button.
 - Removing a favourite offers a brief "Undo" in the toast instead of a confirmation dialog.
+
+**Ratings and comments**
+
+- **Happy path:** On a recipe page, a logged-in user clicks 1 to 5 stars, writes an optional comment and submits. Their review appears at the top of the list, the average rating and review count update, and they can edit or delete their review later.
+- **Must:** One review per user per recipe (the document id is the user's id). Stars are required and comments are limited to 300 characters. The recipe page shows the average rating, the review count and a list of reviews with display name and date. Only logged-in users can post. Loading, empty and error states.
+- **Should:** Edit and delete your own review, newest reviews first, and the average rating shown on recipe cards. Person 3 writes the rule for ratings (readable by everyone, writable only by the author) and asks Person 1 to merge it into `firestore.rules`.
+- **Nice to have:** Sort reviews by rating, and a "your rating" badge on the favourites page.
+- **UI/UX:** Five clickable stars that also work with the keyboard (radio buttons styled as stars), filled in amber on hover and selection. The average shows as a number with stars, for example 4.3 (12 reviews). Each review is a small card with name, date, stars and comment. The empty state says "No reviews yet. Be the first."
+- **Privacy:** A review shows only the user's display name, never their email, diet or allergies.
 
 ## Person 4: Meal planner and shopping list
 
@@ -368,12 +380,12 @@ Three decisions in the first few days keep the four slices from colliding.
 
 The plan runs from Monday Oct 26 to Sunday Nov 29, 2026. Each row lists what every person should have finished by the end of that week, and the last column says what must be true before the team moves on. Features freeze on Nov 15, so weeks 4 and 5 are only for fixing, testing and deploying.
 
-| Week | Person 1: Accounts | Person 2: Recipes and design | Person 3: Favourites and QA | Person 4: Planner and deployment | Team checkpoint (end of week) |
+| Week | Person 1: Accounts | Person 2: Recipes and design | Person 3: Favourites, ratings and QA | Person 4: Planner and deployment | Team checkpoint (end of week) |
 | --- | --- | --- | --- | --- | --- |
 | **Week 1**, Oct 26 to Nov 1: set up and foundations | Create the Firebase project, enable Email/Password and Google sign-in, create Firestore, and add teammates as editors. Fill in firebase-config.js. Build signup and login with email and password, and a navbar that shows logged-in or logged-out state. Write the first firestore.rules. | Add the Tailwind script to every page. Build js/ui.js (button, recipe card, form field, toast, loading skeleton). Write api.js with search, recipe lookup and categories, and agree the recipe object. The home page shows search results with loading, empty and error states. | Study Firestore reads and writes. Create favourites.js with the five agreed function names, stubbed. Add the heart button to the recipe card using a fake user until login works. Draft the manual test checklist. | Create the GitHub repo with main and dev branches, and the README. Run firebase init and the first deploy of a hello page, and check the web.app domain is authorised in Firebase Auth. Define the meal plan data shape. Build the empty planner.html layout. | Everyone can run the site locally and has pushed to the dev branch. The first deploy is live. The recipe object and function names are agreed. |
-| **Week 2**, Nov 2 to Nov 8: core happy paths | Google sign-in, creating the users/{uid} document for first-time users. Onboarding page with step 1 diet and step 2 allergies saved to Firestore, with the onboardingDone redirect rules. First version of js/preferences.js (getPreferences and checkRecipe), handed over by Nov 8. Logged-out users are redirected away from protected pages. | Category chips and cuisine filter with a Clear filters button. recipe.html shows photo, ingredients, numbered instructions and video link. Responsive card grid (one, two and three columns). sessionStorage caching of API results. | addFavourite, removeFavourite and isFavourite working against Firestore. Heart button on recipe cards and the recipe page, showing the correct state on page load. favourites.html lists saved recipes. Logged-out users get a login prompt. | addToPlan, removeFromPlan and getPlan working against Firestore. An Add to meal plan dialog (day and meal). The desktop planner grid shows recipe thumbnails in the right slots, and a recipe can be removed from a slot. | A new user can sign up, set preferences, search, save a favourite and add a recipe to the plan, end to end. Every page is merged into dev, and a tested version of dev is merged into main. |
-| **Week 3**, Nov 9 to Nov 15: finish features, then freeze | Profile page to edit diets and allergies. Password reset and live form validation with friendly error messages. Loading states on buttons. Tune the allergen keyword lists in preferences.js. | Serving size scaler. Allergen badge on cards and warning banner on the recipe page using preferences.js. Hide-allergens toggle. Diet chips pre-selected from the profile. | Real-time favourites with onSnapshot. Sorting and filtering. Empty state and an Undo toast. Save ingredientNames with each favourite and show allergen badges on the favourites page. | Shopping list that merges duplicate ingredients, with checkboxes saved in Firestore. Move recipes between slots (drag and drop if time allows). Confirm message when adding a recipe that contains an allergen. Phone layout with day tabs. | **Feature freeze on Nov 15.** Every Must item is on main. After this date only fixes are allowed, no new features. |
-| **Week 4**, Nov 16 to Nov 22: integration and bug fixes | Review firestore.rules and test that one user cannot read another user's data. Fix redirect and onboarding bugs. Check the forms with keyboard only and make sure every input has a label. | Make styles consistent across all pages. Check loading, empty and error states on every screen, including when TheMealDB is unreachable. Fix responsive layout problems found in testing. | Run the full manual test checklist with two accounts and log every bug. Test on a phone and in Chrome, Firefox and Safari. Retest fixes. | Print styles for the shopping list (print:hidden on the navbar and buttons). Redeploy at least twice this week to catch problems that only appear in production. Update the README. | The full flow works on the live site. Every bug from testing is fixed or written down as a known issue. |
-| **Week 5**, Nov 23 to Nov 29: polish, deploy and present | Final pass on login and sign-up. Create demo accounts (one with allergies set, one empty). Write up accounts and security for your report or presentation. | Visual polish. Final accessibility check: alt text, colour contrast and visible focus. Write up recipes and design. | Final run of the test checklist and sign-off. Write up favourites and testing. Prepare the favourites part of the demo. | Final deployment by Nov 25, then no more code changes. Finish the README and the demo script. Record a backup screen recording of the demo in case the network fails. | The final site is live, the demo has been rehearsed at least once, and everything is submitted before the module deadline (add the date here). |
+| **Week 2**, Nov 2 to Nov 8: core happy paths | Google sign-in, creating the users/{uid} document for first-time users. Onboarding page with step 1 diet and step 2 allergies saved to Firestore, with the onboardingDone redirect rules. First version of js/preferences.js (getPreferences and checkRecipe), handed over by Nov 8. Logged-out users are redirected away from protected pages. | Category chips and cuisine filter with a Clear filters button. recipe.html shows photo, ingredients, numbered instructions and video link. Responsive card grid (one, two and three columns). sessionStorage caching of API results. | addFavourite, removeFavourite and isFavourite working against Firestore. Heart button on recipe cards and the recipe page, showing the correct state on page load. favourites.html lists saved recipes. Logged-out users get a login prompt. Design the ratings data (recipes/{recipeId}/ratings/{uid}) and write the Firestore rule for it, then hand the rule to Person 1 to merge into firestore.rules. | addToPlan, removeFromPlan and getPlan working against Firestore. An Add to meal plan dialog (day and meal). The desktop planner grid shows recipe thumbnails in the right slots, and a recipe can be removed from a slot. | A new user can sign up, set preferences, search, save a favourite and add a recipe to the plan, end to end. Every page is merged into dev, and a tested version of dev is merged into main. |
+| **Week 3**, Nov 9 to Nov 15: finish features, then freeze | Profile page to edit diets and allergies. Password reset and live form validation with friendly error messages. Loading states on buttons. Tune the allergen keyword lists in preferences.js. | Serving size scaler. Allergen badge on cards and warning banner on the recipe page using preferences.js. Hide-allergens toggle. Diet chips pre-selected from the profile. | Real-time favourites with onSnapshot. Sorting and filtering. Empty state and an Undo toast. Save ingredientNames with each favourite and show allergen badges on the favourites page. Star rating and comment form, average rating and review list on the recipe page, saved to Firestore (ratings.js). | Shopping list that merges duplicate ingredients, with checkboxes saved in Firestore. Move recipes between slots (drag and drop if time allows). Confirm message when adding a recipe that contains an allergen. Phone layout with day tabs. | **Feature freeze on Nov 15.** Every Must item is on main. After this date only fixes are allowed, no new features. |
+| **Week 4**, Nov 16 to Nov 22: integration and bug fixes | Review firestore.rules and test that one user cannot read another user's data. Fix redirect and onboarding bugs. Check the forms with keyboard only and make sure every input has a label. | Make styles consistent across all pages. Check loading, empty and error states on every screen, including when TheMealDB is unreachable. Fix responsive layout problems found in testing. | Run the full manual test checklist with two accounts and log every bug, including ratings: one review per user, editing, and logged-out users cannot post. Test on a phone and in Chrome, Firefox and Safari. Retest fixes. | Print styles for the shopping list (print:hidden on the navbar and buttons). Redeploy at least twice this week to catch problems that only appear in production. Update the README. | The full flow works on the live site. Every bug from testing is fixed or written down as a known issue. |
+| **Week 5**, Nov 23 to Nov 29: polish, deploy and present | Final pass on login and sign-up. Create demo accounts (one with allergies set, one empty). Write up accounts and security for your report or presentation. | Visual polish. Final accessibility check: alt text, colour contrast and visible focus. Write up recipes and design. | Final run of the test checklist and sign-off. Write up favourites, ratings and testing. Prepare the favourites and ratings part of the demo. | Final deployment by Nov 25, then no more code changes. Finish the README and the demo script. Record a backup screen recording of the demo in case the network fails. | The final site is live, the demo has been rehearsed at least once, and everything is submitted before the module deadline (add the date here). |
 
 Persons 1 and 2 start first because Persons 3 and 4 depend on auth and the recipe data shape. Deploy to Firebase Hosting early in the final week so there is time to fix anything that only breaks in production.
