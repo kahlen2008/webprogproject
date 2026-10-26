@@ -44,9 +44,9 @@
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
   <header id="navbar" class="w-full sticky top-0 z-40"></header>
 
-  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
+  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col justify-center space-y-10 sm:space-y-12">
     <!-- Hero Section -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center pt-2 pb-6">
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
       <div class="lg:col-span-7 space-y-6">
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-stone-900 tracking-tight leading-[1.15]">
           Find recipes. Plan meals.<br>
@@ -56,33 +56,35 @@
           Discover thousands of delicious recipes and plan your weekly meals with ease.
         </p>
 
-        <!-- Search Form -->
-        <form id="search-form" class="relative max-w-xl flex items-center bg-white rounded-full shadow-sm border border-[#e8ded4] p-1.5 focus-within:ring-2 focus-within:ring-[#ca5c2e]/40 focus-within:border-[#ca5c2e] transition" role="search">
-          <label for="query" class="visually-hidden">Search for a recipe, ingredient or cuisine</label>
-          <input 
-            id="query" 
-            name="query" 
-            type="search" 
-            placeholder="Search for a recipe, ingredient or cuisine..." 
-            class="w-full pl-5 pr-4 py-2.5 bg-transparent border-none text-stone-800 placeholder-stone-400 text-sm sm:text-base focus:outline-none"
-            required
-          >
-          <button 
-            type="submit" 
-            class="flex-shrink-0 w-11 h-11 bg-[#ca5c2e] hover:bg-[#b34d23] text-white rounded-full flex items-center justify-center transition shadow-sm"
-            aria-label="Search"
-          >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-          </button>
-        </form>
+        <!-- Search Form Container with Animated Rotating Placeholder -->
+        <div class="relative max-w-xl">
+          <form id="search-form" class="relative flex items-center bg-white rounded-full shadow-sm border border-[#e8ded4] p-1.5 focus-within:ring-2 focus-within:ring-[#ca5c2e]/40 focus-within:border-[#ca5c2e] transition" role="search">
+            <label for="query" class="visually-hidden">Search for a recipe, ingredient or cuisine</label>
+            <input 
+              id="query" 
+              name="query" 
+              type="search" 
+              placeholder="Search for a recipe, ingredient or cuisine..." 
+              class="w-full pl-5 pr-4 py-2.5 bg-transparent border-none text-stone-800 placeholder-stone-400 text-sm sm:text-base focus:outline-none"
+            >
+            <button 
+              type="submit" 
+              id="search-btn"
+              class="flex-shrink-0 w-11 h-11 bg-[#ca5c2e] hover:bg-[#b34d23] text-white rounded-full flex items-center justify-center transition shadow-sm active:scale-95"
+              aria-label="Search"
+            >
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"></circle>
+                <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+              </svg>
+            </button>
+          </form>
+        </div>
       </div>
 
       <!-- Hero Featured Dish Image -->
       <div class="lg:col-span-5 flex justify-center lg:justify-end">
-        <div class="relative w-72 sm:w-80 lg:w-96 aspect-square rounded-full overflow-hidden shadow-2xl border-4 border-white ring-8 ring-[#ca5c2e]/10 group">
+        <div class="relative w-64 sm:w-72 lg:w-88 aspect-square rounded-full overflow-hidden shadow-xl border-4 border-white ring-6 ring-[#ca5c2e]/10 group">
           <img 
             src="images/pasta-hero.jpg" 
             alt="Delicious artisan Italian pasta with roasted cherry tomatoes and fresh basil"
@@ -92,83 +94,75 @@
       </div>
     </section>
 
-    <!-- Popular Categories -->
+    <!-- Quick Access Feature Pillars -->
     <section class="space-y-4">
-      <h2 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">Popular Categories</h2>
-      <div class="grid grid-cols-3 sm:grid-cols-6 gap-4 sm:gap-6 pt-2">
-        <!-- Category: Chicken -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Chicken">
-          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=300&q=80" alt="Chicken" class="w-full h-full object-cover">
-          </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Chicken</span>
-        </button>
-
-        <!-- Category: Beef -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Beef">
-          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=300&q=80" alt="Beef" class="w-full h-full object-cover">
-          </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Beef</span>
-        </button>
-
-        <!-- Category: Pasta -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Pasta">
-          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="images/pasta-hero.jpg" alt="Pasta" class="w-full h-full object-cover">
-          </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Pasta</span>
-        </button>
-
-        <!-- Category: Vegetarian -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Vegetarian">
-          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80" alt="Vegetarian" class="w-full h-full object-cover">
-          </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Vegetarian</span>
-        </button>
-
-        <!-- Category: Dessert -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Dessert">
-          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80" alt="Dessert" class="w-full h-full object-cover">
-          </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Dessert</span>
-        </button>
-
-        <!-- Category: Seafood -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Seafood">
-          <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=300&q=80" alt="Seafood" class="w-full h-full object-cover">
-          </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Seafood</span>
-        </button>
-      </div>
-    </section>
-
-    <!-- Latest Recipes Section -->
-    <section id="recipes-section" class="space-y-4 pt-2 scroll-mt-20">
-      <div class="flex flex-wrap items-center justify-between gap-3">
-        <h2 id="recipes-section-title" class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">Latest Recipes</h2>
-        <div class="flex items-center gap-4">
-          <label id="hide-flagged-wrap" class="hidden items-center gap-2 text-xs sm:text-sm font-medium text-stone-600 cursor-pointer select-none">
-            <input id="hide-flagged-toggle" type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] focus:ring-[#ca5c2e] border-stone-300">
-            <span>Hide allergen recipes</span>
-          </label>
-          <button id="view-more-btn" type="button" class="text-sm font-semibold text-[#ca5c2e] hover:text-[#b34d23] hover:underline flex items-center gap-1">
-            View more <span>&rarr;</span>
-          </button>
-        </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs font-semibold tracking-wider uppercase text-stone-600">How RecipePlan works</span>
+        <span class="h-px bg-[#ede4da] flex-1"></span>
       </div>
 
-      <p id="results-message" class="hidden text-sm font-medium text-stone-500" aria-live="polite"></p>
-      
-      <!-- Recipe Cards Grid (matches 4 columns in mockup) -->
-      <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0"></ul>
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Pillar 1: Explore Recipes -->
+        <a href="recipes.html" class="p-6 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-4">
+          <div class="space-y-3">
+            <div class="w-11 h-11 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+              </svg>
+            </div>
+            <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Explore Recipes</h2>
+            <p class="text-sm text-stone-600 leading-relaxed">
+              Browse hundreds of curated meals categorised by cuisine and dietary suitability with step-by-step instructions.
+            </p>
+          </div>
+          <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] group-hover:translate-x-1 transition">
+            Browse catalogue &rarr;
+          </span>
+        </a>
+
+        <!-- Pillar 2: Meal Planner -->
+        <a href="planner.html" class="p-6 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-4">
+          <div class="space-y-3">
+            <div class="w-11 h-11 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+              </svg>
+            </div>
+            <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Weekly Planner</h2>
+            <p class="text-sm text-stone-600 leading-relaxed">
+              Plan your week effortlessly across breakfast, lunch, and dinner with automatic nutrition totals and smart grocery lists.
+            </p>
+          </div>
+          <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] group-hover:translate-x-1 transition">
+            Open planner &rarr;
+          </span>
+        </a>
+
+        <!-- Pillar 3: Dietary Safeguards -->
+        <a href="profile.html" class="p-6 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-4">
+          <div class="space-y-3">
+            <div class="w-11 h-11 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
+              </svg>
+            </div>
+            <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Allergy Safeguards</h2>
+            <p class="text-sm text-stone-600 leading-relaxed">
+              Set your dietary preferences once to automatically flag and filter out meals containing allergens like peanuts, gluten, or dairy.
+            </p>
+          </div>
+          <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] group-hover:translate-x-1 transition">
+            Customise profile &rarr;
+          </span>
+        </a>
+      </div>
     </section>
   </main>
 
+  <!-- Global Footer (rendered by js/navbar.js) -->
+  <footer id="site-footer"></footer>
+
   <script type="module" src="js/navbar.js"></script>
-  <script type="module" src="js/recipes.js"></script>
+  <script type="module" src="js/search-cta.js"></script>
 </body>
 </html>

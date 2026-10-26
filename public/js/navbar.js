@@ -4,7 +4,8 @@
 import { onAuthChange, logout, getCurrentUser } from "./auth.js";
 
 const LINKS = [
-  ["index.html", "Recipes"],
+  ["index.html", "Home"],
+  ["recipes.html", "Recipes"],
   ["favourites.html", "Favourites"],
   ["planner.html", "Planner"],
 ];
@@ -135,9 +136,10 @@ export function renderNavbar(user) {
       <!-- Mobile Dropdown Navigation -->
       <div id="mobile-menu" class="hidden md:hidden border-t border-[#ede4da] bg-[#fcf9f5] px-4 pt-3 pb-5 space-y-3">
         <nav class="flex flex-col space-y-2">
-          <a href="index.html" class="px-3 py-2 rounded-xl text-base font-medium ${page === "index.html" || page === "" ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">Recipes</a>
-          <a href="favourites.html" class="px-3 py-2 rounded-xl text-base font-medium ${page === "favourites.html" ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">Favourites</a>
-          <a href="planner.html" class="px-3 py-2 rounded-xl text-base font-medium ${page === "planner.html" ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">Planner</a>
+          ${LINKS.map(([href, label]) => {
+            const active = page === href || (href === "index.html" && page === "");
+            return `<a href="${href}" class="px-3 py-2 rounded-xl text-base font-medium ${active ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">${label}</a>`;
+          }).join("")}
           ${activeUser ? '<a href="profile.html" class="px-3 py-2 rounded-xl text-base font-medium text-stone-700 hover:bg-stone-100">Profile Settings</a>' : ""}
         </nav>
       </div>
@@ -176,6 +178,43 @@ export function renderNavbar(user) {
     });
   }
 }
+
+// Shared site footer, rendered once on every page that loads this script.
+// Pages can place <footer id="site-footer"></footer> where it should go;
+// otherwise it is appended after <main>.
+export function renderFooter() {
+  let host = document.getElementById("site-footer");
+  if (!host) {
+    host = document.createElement("footer");
+    host.id = "site-footer";
+    const main = document.querySelector("main");
+    if (main) main.after(host);
+    else document.body.appendChild(host);
+  }
+
+  host.className = "mt-auto border-t border-[#ede4da] bg-[#faf7f2] py-4 sm:py-5 text-xs text-stone-500";
+  const year = new Date().getFullYear();
+  const links = [
+    ["recipes.html", "Browse Recipes"],
+    ["planner.html", "Meal Planner"],
+    ["terms.html", "Terms"],
+    ["privacy.html", "Privacy"],
+  ];
+  const page = currentPage();
+
+  host.innerHTML = `
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3 text-center">
+      <p>&copy; ${year} RecipePlan. Eat better, cook smarter.</p>
+      <nav class="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 font-medium" aria-label="Footer">
+        ${links
+          .map(([href, label]) => `<a href="${href}" class="${page === href ? "text-[#ca5c2e]" : "text-stone-600 hover:text-[#ca5c2e]"} transition" ${page === href ? 'aria-current="page"' : ""}>${label}</a>`)
+          .join("")}
+      </nav>
+    </div>
+  `;
+}
+
+renderFooter();
 
 // Initial render with potential demo fallback
 renderNavbar(null);
