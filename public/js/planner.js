@@ -1,8 +1,9 @@
 // Weekly Meal planner and shopping list logic matching RecipePlan mockup.
 // Owner: Person 4.
 
-import { showToast } from "./utils.js";
+import { showToast, toTitleCase } from "./utils.js";
 import { getFavourites } from "./favourites.js";
+import { confirmIfFlagged } from "./preferences.js";
 
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const MEALS = ["Breakfast", "Lunch", "Dinner"];
@@ -53,7 +54,8 @@ export async function savePlan(plan) {
   } catch (e) {}
 }
 
-export async function addToPlan(day, meal, recipe) {
+export async function addToPlan(day, meal, recipe, skipConfirm = false) {
+  if (!skipConfirm && !(await confirmIfFlagged(recipe))) return false;
   const plan = await getPlan();
   if (!plan[day]) plan[day] = {};
   plan[day][meal] = {
@@ -63,6 +65,7 @@ export async function addToPlan(day, meal, recipe) {
   };
   await savePlan(plan);
   renderPlannerTable();
+  return true;
 }
 
 export async function removeFromPlan(day, meal) {
@@ -128,7 +131,7 @@ export async function renderPlannerTable() {
           <td class="py-2.5 px-3 align-middle">
             <div class="inline-flex items-center gap-2.5 bg-white border border-[#efe6dc] rounded-xl p-1.5 pr-3 shadow-xs group max-w-[210px]">
               <img src="${item.image || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=80&q=80"}" alt="${item.name}" class="w-9 h-9 rounded-lg object-cover flex-shrink-0">
-              <span class="text-xs font-semibold text-stone-800 truncate leading-tight">${item.name}</span>
+              <span class="text-xs font-semibold text-stone-800 truncate leading-tight">${toTitleCase(item.name)}</span>
               <button type="button" class="remove-plan-item text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition ml-auto flex-shrink-0 text-base leading-none" data-day="${day}" data-meal="${meal}" title="Remove meal">&times;</button>
             </div>
           </td>
@@ -165,8 +168,10 @@ export async function renderPlannerTable() {
         name: "Chef's Special Salad",
         image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=150&q=80"
       };
-      await addToPlan(day, meal, sample);
-      showToast(`Added "${sample.name}" to ${day} ${meal}`);
+      const added = await addToPlan(day, meal, sample);
+      if (added) {
+        showToast(`Added "${toTitleCase(sample.name)}" to ${day} ${meal}`);
+      }
     });
   });
 }

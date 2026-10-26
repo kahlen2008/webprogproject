@@ -18,6 +18,8 @@ export function renderNavbar(user) {
   const host = document.getElementById("navbar");
   if (!host) return;
 
+  host.classList.add("sticky", "top-0", "z-40");
+
   // Check demo user from localStorage if Firebase auth has not set one
   let activeUser = user;
   if (!activeUser) {
@@ -111,7 +113,7 @@ export function renderNavbar(user) {
   }
 
   host.innerHTML = `
-    <div class="w-full bg-[#fcf9f5]/90 backdrop-blur-md sticky top-0 z-40 border-b border-[#ede4da]">
+    <div class="w-full bg-[#fcf9f5]/90 backdrop-blur-md border-b border-[#ede4da]">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         <!-- Brand Logo -->

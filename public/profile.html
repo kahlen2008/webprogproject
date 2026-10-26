@@ -42,7 +42,7 @@
   <link rel="stylesheet" href="css/auth.css">
 </head>
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
-  <header id="navbar" class="w-full"></header>
+  <header id="navbar" class="w-full sticky top-0 z-40"></header>
 
   <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10">
     <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
@@ -50,17 +50,17 @@
       <!-- Left Sidebar: Profile Summary & Vertical Navigation Menu -->
       <aside class="md:col-span-4 bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 flex flex-col items-center text-center">
         <!-- User Avatar -->
-        <div class="relative w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md ring-4 ring-[#ca5c2e]/10">
+        <div class="relative w-24 h-24 rounded-full overflow-hidden border-2 border-white shadow-md ring-4 ring-[#ca5c2e]/10 bg-[#fbf2ec] flex items-center justify-center">
           <img 
             id="profile-sidebar-avatar" 
-            src="https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?auto=format&fit=crop&w=180&h=180&q=80" 
+            src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ca5c2e'%3E%3Cpath d='M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z'/%3E%3C/svg%3E" 
             alt="Profile Avatar"
             class="w-full h-full object-cover"
           >
         </div>
 
-        <h2 id="profile-sidebar-name" class="mt-4 text-xl font-extrabold text-stone-900 tracking-tight">User</h2>
-        <p id="profile-sidebar-email" class="text-xs text-stone-500 font-medium mt-0.5"></p>
+        <h2 id="profile-sidebar-name" class="mt-4 text-xl font-extrabold text-stone-900 tracking-tight min-h-[1.75rem]"></h2>
+        <p id="profile-sidebar-email" class="text-xs text-stone-500 font-medium mt-0.5 min-h-[1rem]"></p>
 
         <!-- Vertical Navigation Menu -->
         <nav class="w-full mt-8 space-y-1.5" aria-label="Profile navigation">

@@ -15,6 +15,12 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { showToast } from "./utils.js";
+import { needsOnboarding } from "./preferences.js";
+
+// Where to send someone right after they sign up or log in.
+function postAuthDestination() {
+  return needsOnboarding() ? "onboarding.html" : "index.html";
+}
 
 // Returns the logged-in user, or null.
 export function getCurrentUser() {
@@ -54,6 +60,8 @@ export async function signup(name, email, password) {
       email: email,
       diets: [],
       allergies: [],
+      onboardingComplete: false,
+      onboardingStep: 1,
       createdAt: serverTimestamp(),
     });
     const userObj = {
@@ -68,7 +76,9 @@ export async function signup(name, email, password) {
       email: email,
       photoURL: userObj.photoURL,
       diets: [],
-      allergies: []
+      allergies: [],
+      onboardingComplete: false,
+      onboardingStep: 1
     }));
     return credential.user;
   } catch (err) {
@@ -137,6 +147,8 @@ export async function loginWithGoogle() {
           email: credential.user.email,
           diets: [],
           allergies: [],
+          onboardingComplete: false,
+          onboardingStep: 1,
           createdAt: serverTimestamp(),
         });
         localStorage.setItem("recipeplan_profile", JSON.stringify({
@@ -144,7 +156,9 @@ export async function loginWithGoogle() {
           email: credential.user.email,
           photoURL: userObj.photoURL,
           diets: [],
-          allergies: []
+          allergies: [],
+          onboardingComplete: false,
+          onboardingStep: 1
         }));
       } else {
         localStorage.setItem("recipeplan_profile", JSON.stringify({
@@ -237,7 +251,7 @@ if (loginForm) {
     showFormError(loginForm, "");
     try {
       await login(loginForm.email.value, loginForm.password.value);
-      window.location.href = "index.html";
+      window.location.href = postAuthDestination();
     } catch (error) {
       showFormError(loginForm, friendlyAuthError(error));
     }
@@ -251,7 +265,7 @@ if (signupForm) {
     showFormError(signupForm, "");
     try {
       await signup(signupForm.name.value, signupForm.email.value, signupForm.password.value);
-      window.location.href = "index.html";
+      window.location.href = "onboarding.html";
     } catch (error) {
       showFormError(signupForm, friendlyAuthError(error));
     }
@@ -269,7 +283,7 @@ if (googleLoginBtn) {
   googleLoginBtn.addEventListener("click", async () => {
     try {
       await loginWithGoogle();
-      window.location.href = "index.html";
+      window.location.href = postAuthDestination();
     } catch (error) {
       if (loginForm) showFormError(loginForm, friendlyAuthError(error));
     }
@@ -281,7 +295,7 @@ if (googleSignupBtn) {
   googleSignupBtn.addEventListener("click", async () => {
     try {
       await loginWithGoogle();
-      window.location.href = "index.html";
+      window.location.href = postAuthDestination();
     } catch (error) {
       if (signupForm) showFormError(signupForm, friendlyAuthError(error));
     }

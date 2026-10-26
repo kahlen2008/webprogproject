@@ -2,12 +2,11 @@
    Owner: Person 2. Build once here, reuse on every page. */
 
 /* ---------- Navbar ---------- */
+#navbar,
 .navbar {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 40;
 }
 
 .navbar-inner {
@@ -218,10 +217,10 @@
   margin-top: 4px;
 }
 
-/* ---------- Messages ---------- */
-.toast {
+.toast,
+.custom-toast {
   position: fixed;
-  top: var(--space-3);
+  top: 5rem;
   right: var(--space-3);
   background: var(--color-text);
   color: #ffffff;

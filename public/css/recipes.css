@@ -20,5 +20,14 @@
   border-radius: var(--radius);
 }
 
-/* TODO (Person 2): category chips, cuisine filter, "Clear filters" button,
-   recipe detail layout (photo + ingredients left, steps right on desktop). */
+/* Active Category Chip state (stays active on click) */
+.category-chip.active > div {
+  transform: scale(1.08);
+  border-color: #ca5c2e !important;
+  box-shadow: 0 0 0 4px rgba(202, 92, 46, 0.25), 0 10px 20px -5px rgba(202, 92, 46, 0.2) !important;
+}
+
+.category-chip.active > span {
+  color: #ca5c2e !important;
+  font-weight: 700 !important;
+}

@@ -92,6 +92,7 @@ body {
   background: var(--color-bg);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-wrap: pretty;
 }
 
 main {
@@ -131,6 +132,19 @@ h1, h2, h3, h4, h5, h6 {
   font-family: var(--font-heading);
   letter-spacing: -0.015em;
   color: #1c1917;
+  text-wrap: balance;
+}
+
+p, li, dd, dt, figcaption, blockquote {
+  text-wrap: pretty;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+.text-balance {
+  text-wrap: balance;
 }
 
 img {

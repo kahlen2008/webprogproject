@@ -42,7 +42,7 @@
   <link rel="stylesheet" href="css/recipes.css">
 </head>
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
-  <header id="navbar" class="w-full"></header>
+  <header id="navbar" class="w-full sticky top-0 z-40"></header>
 
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-12">
     <!-- Hero Section -->
@@ -147,15 +147,21 @@
     </section>
 
     <!-- Latest Recipes Section -->
-    <section class="space-y-6 pt-4">
-      <div class="flex items-center justify-between">
+    <section id="recipes-section" class="space-y-4 pt-2 scroll-mt-20">
+      <div class="flex flex-wrap items-center justify-between gap-3">
         <h2 id="recipes-section-title" class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">Latest Recipes</h2>
-        <button id="view-more-btn" type="button" class="text-sm font-semibold text-[#ca5c2e] hover:text-[#b34d23] hover:underline flex items-center gap-1">
-          View more <span>&rarr;</span>
-        </button>
+        <div class="flex items-center gap-4">
+          <label id="hide-flagged-wrap" class="hidden items-center gap-2 text-xs sm:text-sm font-medium text-stone-600 cursor-pointer select-none">
+            <input id="hide-flagged-toggle" type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] focus:ring-[#ca5c2e] border-stone-300">
+            <span>Hide allergen recipes</span>
+          </label>
+          <button id="view-more-btn" type="button" class="text-sm font-semibold text-[#ca5c2e] hover:text-[#b34d23] hover:underline flex items-center gap-1">
+            View more <span>&rarr;</span>
+          </button>
+        </div>
       </div>
 
-      <p id="results-message" class="text-sm font-medium text-stone-500 min-h-[1.5rem]" aria-live="polite"></p>
+      <p id="results-message" class="hidden text-sm font-medium text-stone-500" aria-live="polite"></p>
       
       <!-- Recipe Cards Grid (matches 4 columns in mockup) -->
       <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0"></ul>

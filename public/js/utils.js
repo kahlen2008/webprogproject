@@ -17,7 +17,7 @@ export function showToast(message, milliseconds = 3000) {
   }
 
   const toast = document.createElement("div");
-  toast.className = "custom-toast fixed top-6 right-6 bg-stone-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-medium z-50 border border-stone-800/80 pointer-events-auto select-none";
+  toast.className = "custom-toast fixed top-20 right-4 sm:right-6 bg-stone-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-medium z-50 border border-stone-800/80 pointer-events-auto select-none";
   toast.setAttribute("role", "status");
   
   // Initial state for entrance transition
@@ -53,14 +53,46 @@ export function showToast(message, milliseconds = 3000) {
   }, milliseconds);
 }
 
+const MINOR_WORDS = new Set([
+  "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into",
+  "near", "nor", "of", "on", "onto", "or", "per", "the", "to", "with", "via"
+]);
+
+// Converts any text into proper Title Case (capitalizing words except minor words like and, with, of, etc.)
+export function toTitleCase(str) {
+  if (!str) return "";
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .split(/\s+/)
+    .map((word, index, arr) => {
+      if (word.includes("-")) {
+        return word
+          .split("-")
+          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .join("-");
+      }
+      const cleanWord = word.replace(/^[^\w]+|[^\w]+$/g, "");
+      const isFirst = index === 0;
+      const isLast = index === arr.length - 1;
+
+      if (!isFirst && !isLast && MINOR_WORDS.has(cleanWord)) {
+        return word;
+      }
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    })
+    .join(" ");
+}
+
 // The shared recipe card used on the home page and the favourites page.
 // Matches the RecipePlan mockup card layout.
 export function createRecipeCard(recipe, options = {}) {
   const item = document.createElement("li");
-  item.className = "recipe-card bg-white rounded-2xl border border-[#efe6dc] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group flex flex-col justify-between";
+  item.className = "recipe-card bg-white rounded-2xl border border-[#efe6dc] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group flex flex-col";
   
   const recipeId = escapeHtml(recipe.id);
-  const recipeName = escapeHtml(recipe.name);
+  const formattedName = toTitleCase(recipe.name);
+  const recipeName = escapeHtml(formattedName);
   const recipeImage = escapeHtml(recipe.image || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&q=80");
   const recipeCategory = escapeHtml(recipe.category || "Main");
 
@@ -92,13 +124,11 @@ export function createRecipeCard(recipe, options = {}) {
       </a>
       <div class="card-heart-slot absolute top-3 right-3" data-recipe-id="${recipeId}"></div>
     </div>
-    <div class="p-4 flex flex-col justify-between flex-1">
-      <div>
-        <h3 class="font-bold text-stone-900 text-base leading-snug line-clamp-1 hover:text-[#ca5c2e] transition">
-          <a href="recipe.html?id=${encodeURIComponent(recipe.id)}">${recipeName}</a>
-        </h3>
-      </div>
-      <div class="flex items-center justify-between mt-3 pt-2">
+    <div class="p-3.5 sm:p-4 flex flex-col gap-2.5">
+      <h3 class="font-bold text-stone-900 text-base leading-snug line-clamp-1 hover:text-[#ca5c2e] transition">
+        <a href="recipe.html?id=${encodeURIComponent(recipe.id)}">${recipeName}</a>
+      </h3>
+      <div class="flex items-center justify-between">
         <span class="inline-block bg-[#f5ebe4] text-[#a04e28] text-xs font-semibold px-2.5 py-0.5 rounded-full">
           ${recipeCategory}
         </span>

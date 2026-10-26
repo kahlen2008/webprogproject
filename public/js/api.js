@@ -1,4 +1,5 @@
 // Talks to TheMealDB (free recipe API, no key needed). Owner: Person 2.
+import { toTitleCase } from "./utils.js";
 // Everyone else gets recipes from here, so keep the recipe object shape stable:
 //
 // {
@@ -51,7 +52,7 @@ export function normalizeRecipe(meal) {
   }
   return {
     id: String(meal.idMeal),
-    name: meal.strMeal,
+    name: toTitleCase(meal.strMeal),
     image: meal.strMealThumb,
     category: meal.strCategory || "",
     area: meal.strArea || "",
@@ -80,7 +81,7 @@ export async function filterByCategory(category) {
   const data = await fetchJson(`filter.php?c=${encodeURIComponent(category)}`);
   return (data.meals || []).map((meal) => ({
     id: String(meal.idMeal),
-    name: meal.strMeal,
+    name: toTitleCase(meal.strMeal),
     image: meal.strMealThumb,
     category: category,
   }));

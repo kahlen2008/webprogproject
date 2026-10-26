@@ -7,6 +7,7 @@ import { db } from "./firebase-config.js";
 import { doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { updateProfile } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { renderNavbar } from "./navbar.js";
+import { savePreferences } from "./preferences.js";
 
 let currentProfile = {
   displayName: "",
@@ -18,34 +19,67 @@ let currentProfile = {
 
 let activeUser = null;
 
+// Synchronously hydrate from cache immediately so there is zero flash of placeholder content
+function hydrateFromCache() {
+  try {
+    const cachedUser = JSON.parse(localStorage.getItem("recipeplan_user") || "null");
+    const cachedProfile = JSON.parse(localStorage.getItem("recipeplan_profile") || "null");
+
+    if (cachedUser || cachedProfile) {
+      const name = cachedProfile?.displayName || cachedUser?.displayName || cachedUser?.email?.split("@")[0] || "";
+      const email = cachedProfile?.email || cachedUser?.email || "";
+      const avatar = cachedProfile?.photoURL || cachedUser?.photoURL || (name ? `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ca5c2e&color=fff` : "");
+
+      currentProfile = {
+        displayName: name,
+        email: email,
+        photoURL: avatar,
+        diets: cachedProfile?.diets || [],
+        allergies: cachedProfile?.allergies || []
+      };
+      renderProfile();
+    }
+  } catch (e) {}
+}
+
+// Hydrate immediately
+if (document.readyState === "loading") {
+  document.addEventListener("DOMContentLoaded", hydrateFromCache);
+} else {
+  hydrateFromCache();
+}
+
 async function loadProfileForUser(user) {
   if (!user) {
-    // If not logged in, redirect to login
-    window.location.href = "login.html";
+    // If not logged in and no cached user, redirect to login
+    const cached = localStorage.getItem("recipeplan_user");
+    if (!cached) {
+      window.location.href = "login.html";
+    }
     return;
   }
 
   activeUser = user;
-  const name = user.displayName || user.email?.split("@")[0] || "User";
-  const avatar = user.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ca5c2e&color=fff`;
+  const name = user.displayName || user.email?.split("@")[0] || currentProfile.displayName || "User";
+  const avatar = user.photoURL || currentProfile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ca5c2e&color=fff`;
 
-  currentProfile = {
-    displayName: name,
-    email: user.email || "",
-    photoURL: avatar,
-    diets: [],
-    allergies: []
-  };
+  currentProfile.displayName = name;
+  currentProfile.email = user.email || currentProfile.email || "";
+  currentProfile.photoURL = avatar;
 
-  // Try fetching data from Firestore
+  // Render immediately with Auth data without waiting for Firestore network roundtrip
+  renderProfile();
+
+  // Try fetching data from Firestore in the background
   try {
     const userDocRef = doc(db, "users", user.uid);
     const snap = await getDoc(userDocRef);
     if (snap.exists()) {
       const data = snap.data();
-      currentProfile.displayName = data.displayName || name;
-      currentProfile.diets = data.diets || [];
-      currentProfile.allergies = data.allergies || [];
+      if (data.displayName) currentProfile.displayName = data.displayName;
+      if (data.diets) currentProfile.diets = data.diets;
+      if (data.allergies) currentProfile.allergies = data.allergies;
+      renderProfile();
     } else {
       // First time loading, check localStorage
       const cached = localStorage.getItem("recipeplan_profile");
@@ -54,14 +88,13 @@ async function loadProfileForUser(user) {
         if (parsed.email === user.email) {
           currentProfile.diets = parsed.diets || [];
           currentProfile.allergies = parsed.allergies || [];
+          renderProfile();
         }
       }
     }
   } catch (err) {
     console.warn("Could not fetch profile from Firestore:", err);
   }
-
-  renderProfile();
 }
 
 async function saveProfile(updatedFields) {
@@ -94,6 +127,15 @@ async function saveProfile(updatedFields) {
     userCache.displayName = currentProfile.displayName;
     localStorage.setItem("recipeplan_user", JSON.stringify(userCache));
   } catch (e) {}
+
+  if (updatedFields.diets !== undefined || updatedFields.allergies !== undefined) {
+    try {
+      await savePreferences({
+        diets: currentProfile.diets,
+        allergies: currentProfile.allergies,
+      });
+    } catch (e) {}
+  }
 
   renderProfile();
   renderNavbar(activeUser);
