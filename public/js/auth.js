@@ -209,7 +209,7 @@ export function friendlyAuthError(error) {
     case "auth/invalid-email":
       return "Please enter a valid email address.";
     case "auth/weak-password":
-      return "Password must be at least 6 characters.";
+      return "Password must be at least 8 characters, and include at least 1 number and 1 special character.";
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found":
@@ -225,6 +225,20 @@ export function friendlyAuthError(error) {
     default:
       return error.message || "Something went wrong. Please try again.";
   }
+}
+
+// Client-side password validation matching Firebase Authentication policy
+export function validatePasswordRequirements(password) {
+  if (!password || password.length < 8) {
+    return "Password must be at least 8 characters long.";
+  }
+  if (!/\d/.test(password)) {
+    return "Password must include at least one number (0-9).";
+  }
+  if (!/[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(password)) {
+    return "Password must include at least one special character (e.g. !@#$%).";
+  }
+  return null;
 }
 
 // ---------- UI Wiring ----------
@@ -263,8 +277,16 @@ if (signupForm) {
   signupForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     showFormError(signupForm, "");
+
+    const passwordVal = signupForm.password.value;
+    const pwError = validatePasswordRequirements(passwordVal);
+    if (pwError) {
+      showFormError(signupForm, pwError);
+      return;
+    }
+
     try {
-      await signup(signupForm.name.value, signupForm.email.value, signupForm.password.value);
+      await signup(signupForm.name.value, signupForm.email.value, passwordVal);
       window.location.href = "onboarding.html";
     } catch (error) {
       showFormError(signupForm, friendlyAuthError(error));
