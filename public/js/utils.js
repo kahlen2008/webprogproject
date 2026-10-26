@@ -222,3 +222,374 @@ export function cleanInstructionText(text) {
     .replace(/\bpeice\b/gi, "piece");
 }
 
+// Unit definitions for parsing and combining recipe ingredient measurements
+const UNIT_DEFS = [
+  { key: "teaspoon", singular: "teaspoon", plural: "teaspoons", aliases: ["teaspoon", "teaspoons", "tsp", "tsps", "t.", "t"] },
+  { key: "tablespoon", singular: "tablespoon", plural: "tablespoons", aliases: ["tablespoon", "tablespoons", "tbsp", "tbsps", "tbs", "tb", "tbs."] },
+  { key: "cup", singular: "cup", plural: "cups", aliases: ["cup", "cups", "c"] },
+  { key: "fluid_ounce", singular: "fluid ounce", plural: "fluid ounces", aliases: ["fluid ounce", "fluid ounces", "fl oz", "fl. oz.", "fl-oz"] },
+  { key: "ounce", singular: "ounce", plural: "ounces", aliases: ["ounce", "ounces", "oz", "ozs", "oz."] },
+  { key: "pound", singular: "pound", plural: "pounds", aliases: ["pound", "pounds", "lb", "lbs", "lb."] },
+  { key: "gram", singular: "gram", plural: "grams", aliases: ["gram", "grams", "g", "gm", "gms", "g."] },
+  { key: "kilogram", singular: "kilogram", plural: "kilograms", aliases: ["kilogram", "kilograms", "kg", "kgs", "kg."] },
+  { key: "milliliter", singular: "milliliter", plural: "milliliters", aliases: ["milliliter", "milliliters", "ml", "mls", "ml."] },
+  { key: "liter", singular: "liter", plural: "liters", aliases: ["liter", "liters", "l", "ltr", "litres", "litre"] },
+  { key: "pinch", singular: "pinch", plural: "pinches", aliases: ["pinch", "pinches"] },
+  { key: "dash", singular: "dash", plural: "dashes", aliases: ["dash", "dashes"] },
+  { key: "clove", singular: "clove", plural: "cloves", aliases: ["clove", "cloves"] },
+  { key: "slice", singular: "slice", plural: "slices", aliases: ["slice", "slices"] },
+  { key: "stick", singular: "stick", plural: "sticks", aliases: ["stick", "sticks"] },
+  { key: "can", singular: "can", plural: "cans", aliases: ["can", "cans"] },
+  { key: "package", singular: "package", plural: "packages", aliases: ["package", "packages", "packet", "packets", "pkg", "pkgs"] },
+  { key: "stalk", singular: "stalk", plural: "stalks", aliases: ["stalk", "stalks"] },
+  { key: "sprig", singular: "sprig", plural: "sprigs", aliases: ["sprig", "sprigs"] },
+  { key: "leaf", singular: "leaf", plural: "leaves", aliases: ["leaf", "leaves"] },
+  { key: "piece", singular: "piece", plural: "pieces", aliases: ["piece", "pieces"] },
+  { key: "large", singular: "large", plural: "large", aliases: ["large"] },
+  { key: "medium", singular: "medium", plural: "medium", aliases: ["medium"] },
+  { key: "small", singular: "small", plural: "small", aliases: ["small"] },
+];
+
+const UNIT_ALIAS_MAP = new Map();
+for (const def of UNIT_DEFS) {
+  for (const alias of def.aliases) {
+    UNIT_ALIAS_MAP.set(alias.toLowerCase(), def);
+  }
+}
+
+function normalizeUnicodeFractions(str) {
+  return str
+    .replace(/½/g, " 1/2")
+    .replace(/⅓/g, " 1/3")
+    .replace(/⅔/g, " 2/3")
+    .replace(/¼/g, " 1/4")
+    .replace(/¾/g, " 3/4")
+    .replace(/⅛/g, " 1/8")
+    .replace(/⅜/g, " 3/8")
+    .replace(/⅝/g, " 5/8")
+    .replace(/⅞/g, " 7/8");
+}
+
+function parseQuantity(numStr) {
+  const s = numStr.trim();
+  const mixed = s.match(/^(\d+)\s+(\d+)\/(\d+)$/);
+  if (mixed) {
+    return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3]);
+  }
+  const frac = s.match(/^(\d+)\/(\d+)$/);
+  if (frac) {
+    return Number(frac[1]) / Number(frac[2]);
+  }
+  const num = Number(s);
+  return isNaN(num) ? null : num;
+}
+
+function formatQuantity(val) {
+  if (val == null || isNaN(val) || val <= 0) return "";
+  const rounded = Math.round(val * 10000) / 10000;
+  const whole = Math.floor(rounded);
+  const frac = rounded - whole;
+
+  if (frac < 0.015) return String(whole);
+  if (frac > 0.985) return String(whole + 1);
+
+  const fractions = [
+    { value: 1 / 8, str: "1/8" },
+    { value: 1 / 6, str: "1/6" },
+    { value: 1 / 4, str: "1/4" },
+    { value: 1 / 3, str: "1/3" },
+    { value: 3 / 8, str: "3/8" },
+    { value: 1 / 2, str: "1/2" },
+    { value: 5 / 8, str: "5/8" },
+    { value: 2 / 3, str: "2/3" },
+    { value: 3 / 4, str: "3/4" },
+    { value: 5 / 6, str: "5/6" },
+    { value: 7 / 8, str: "7/8" },
+  ];
+
+  for (const f of fractions) {
+    if (Math.abs(frac - f.value) < 0.025) {
+      return whole > 0 ? `${whole} ${f.str}` : f.str;
+    }
+  }
+
+  return (Math.round(val * 100) / 100).toString();
+}
+
+function parseSinglePart(rawText) {
+  if (!rawText) return null;
+  let text = normalizeUnicodeFractions(rawText.trim());
+
+  // Range support: e.g. "1-2"
+  const rangeMatch = text.match(/^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    const rest = (rangeMatch[3] || "").trim();
+    const parsedRest = parseSinglePart(`1 ${rest}`);
+    return {
+      amount: (min + max) / 2,
+      range: [min, max],
+      unitDef: parsedRest.unitDef,
+      unitKey: parsedRest.unitKey,
+      unitRaw: parsedRest.unitRaw,
+      modifier: parsedRest.modifier,
+      isAbbrev: parsedRest.isAbbrev,
+      raw: text,
+    };
+  }
+
+  const qtyMatch = text.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(.*)$/);
+  if (!qtyMatch) {
+    return {
+      amount: null,
+      unitDef: null,
+      unitKey: null,
+      unitRaw: "",
+      modifier: text,
+      isAbbrev: false,
+      raw: text,
+    };
+  }
+
+  const amount = parseQuantity(qtyMatch[1]);
+  const rest = (qtyMatch[2] || "").trim();
+
+  if (!rest) {
+    return {
+      amount,
+      unitDef: null,
+      unitKey: "__count__",
+      unitRaw: "",
+      modifier: "",
+      isAbbrev: false,
+      raw: text,
+    };
+  }
+
+  const parts = rest.split(/\s+/);
+  const firstWord = parts[0];
+  const firstClean = firstWord.replace(/[.,]$/, "").toLowerCase();
+  
+  let unitDef = null;
+  let unitRaw = "";
+  let modifier = "";
+
+  if (parts.length >= 2) {
+    const twoWords = `${parts[0]} ${parts[1]}`.replace(/[.,]$/, "").toLowerCase();
+    if (UNIT_ALIAS_MAP.has(twoWords)) {
+      unitDef = UNIT_ALIAS_MAP.get(twoWords);
+      unitRaw = `${parts[0]} ${parts[1]}`;
+      modifier = parts.slice(2).join(" ");
+    }
+  }
+
+  if (!unitDef && UNIT_ALIAS_MAP.has(firstClean)) {
+    unitDef = UNIT_ALIAS_MAP.get(firstClean);
+    unitRaw = firstWord;
+    modifier = parts.slice(1).join(" ");
+  }
+
+  if (!unitDef) {
+    unitDef = null;
+    unitRaw = firstWord;
+    modifier = parts.slice(1).join(" ");
+  }
+
+  const isAbbrev = unitDef ? (unitRaw.length <= 4 && !unitRaw.toLowerCase().startsWith("cup")) : false;
+  const unitKey = unitDef ? unitDef.key : unitRaw.toLowerCase();
+
+  return {
+    amount,
+    unitDef,
+    unitKey,
+    unitRaw,
+    modifier,
+    isAbbrev,
+    raw: text,
+  };
+}
+
+function parseMeasure(measureStr) {
+  if (!measureStr || typeof measureStr !== "string") return null;
+  const str = measureStr.trim();
+  if (!str) return null;
+
+  const parenMatch = str.match(/^([^(]+)\s*\(([^)]+)\)$/);
+  if (parenMatch) {
+    const primary = parseSinglePart(parenMatch[1]);
+    const secondary = parseSinglePart(parenMatch[2]);
+    return {
+      type: "compound",
+      primary,
+      secondary,
+      raw: str,
+    };
+  }
+
+  const single = parseSinglePart(str);
+  return {
+    type: "single",
+    primary: single,
+    secondary: null,
+    raw: str,
+  };
+}
+
+function formatSinglePart(part) {
+  if (!part) return "";
+  if (part.amount == null) {
+    return part.modifier || part.raw || "";
+  }
+  const qtyStr = part.range ? `${part.range[0]}-${part.range[1]}` : formatQuantity(part.amount);
+  if (!part.unitKey || part.unitKey === "__count__") {
+    return part.modifier ? `${qtyStr} ${part.modifier}` : qtyStr;
+  }
+
+  let unitStr = part.unitRaw;
+  if (part.unitDef) {
+    if (part.isAbbrev) {
+      unitStr = (part.amount > 1 && part.unitDef.key === "pound" && !part.unitRaw.endsWith("s"))
+        ? `${part.unitRaw}s`
+        : part.unitRaw;
+    } else {
+      unitStr = part.amount > 1 ? part.unitDef.plural : part.unitDef.singular;
+    }
+  }
+
+  const noSpace = /^\d+[a-zA-Z]+$/.test(part.raw?.replace(/\s+/g, "") || "");
+  const base = (noSpace && ["g", "kg", "ml", "l"].includes(unitStr.toLowerCase()))
+    ? `${qtyStr}${unitStr}`
+    : `${qtyStr} ${unitStr}`;
+
+  return part.modifier ? `${base} ${part.modifier}` : base;
+}
+
+export function combineMeasures(measureList) {
+  const cleanList = (measureList || [])
+    .map((m) => (typeof m === "string" ? m.trim() : ""))
+    .filter(Boolean);
+
+  if (cleanList.length === 0) return "";
+  if (cleanList.length === 1) return cleanList[0];
+
+  const parsedList = cleanList.map(parseMeasure).filter(Boolean);
+  if (parsedList.length !== cleanList.length) {
+    return cleanList.join(" + ");
+  }
+
+  const allHavePrimary = parsedList.every((v) => v.primary && v.primary.amount != null);
+  if (!allHavePrimary) {
+    return cleanList.join(" + ");
+  }
+
+  const firstP = parsedList[0].primary;
+  const samePrimaryUnit = parsedList.every(
+    (v) => v.primary.unitKey === firstP.unitKey
+  );
+
+  if (!samePrimaryUnit) {
+    return cleanList.join(" + ");
+  }
+
+  const hasRange = parsedList.some((v) => v.primary.range);
+  let combinedPrimary;
+  if (hasRange) {
+    let minSum = 0;
+    let maxSum = 0;
+    for (const v of parsedList) {
+      if (v.primary.range) {
+        minSum += v.primary.range[0];
+        maxSum += v.primary.range[1];
+      } else {
+        minSum += v.primary.amount;
+        maxSum += v.primary.amount;
+      }
+    }
+    combinedPrimary = {
+      ...firstP,
+      amount: (minSum + maxSum) / 2,
+      range: [minSum, maxSum],
+    };
+  } else {
+    const totalPrimaryAmount = parsedList.reduce((sum, v) => sum + v.primary.amount, 0);
+    combinedPrimary = {
+      ...firstP,
+      amount: totalPrimaryAmount,
+    };
+  }
+
+  const primaryFormatted = formatSinglePart(combinedPrimary);
+
+  // Check secondary
+  const allHaveSecondary = parsedList.every(
+    (v) => v.secondary && v.secondary.amount != null
+  );
+
+  if (allHaveSecondary) {
+    const firstS = parsedList[0].secondary;
+    const sameSecondaryUnit = parsedList.every(
+      (v) => v.secondary.unitKey === firstS.unitKey
+    );
+    if (sameSecondaryUnit) {
+      const totalSecondaryAmount = parsedList.reduce((sum, v) => sum + v.secondary.amount, 0);
+      const combinedSecondary = {
+        ...firstS,
+        amount: totalSecondaryAmount,
+      };
+      const secondaryFormatted = formatSinglePart(combinedSecondary);
+      return `${primaryFormatted} (${secondaryFormatted})`;
+    }
+  }
+
+  return primaryFormatted;
+}
+
+// Ensures every word of an ingredient starts with a capital letter (e.g. "Garlic Powder", "Stir-Fry Vegetables", "Prawns (Shrimp)")
+export function capitalizeIngredient(str) {
+  if (!str) return "";
+  return String(str)
+    .trim()
+    .toLowerCase()
+    .replace(/(?:^|[\s\-(/])[a-z]/g, (match) => match.toUpperCase());
+}
+
+// Combines repeated ingredients in a recipe, adding up their measurements
+export function combineIngredients(ingredients) {
+  if (!Array.isArray(ingredients)) return [];
+  const map = new Map();
+
+  for (const item of ingredients) {
+    const name = typeof item === "string" ? item : item.name;
+    const measure = typeof item === "string" ? "" : (item.measure || "");
+    if (!name || !name.trim()) continue;
+
+    const cleanName = name.trim();
+    const key = cleanName.toLowerCase();
+
+    if (!map.has(key)) {
+      map.set(key, {
+        name: cleanName,
+        measures: measure ? [measure.trim()] : [],
+      });
+    } else {
+      const existing = map.get(key);
+      if (measure && measure.trim()) {
+        existing.measures.push(measure.trim());
+      }
+    }
+  }
+
+  const result = [];
+  for (const [, entry] of map) {
+    const combinedMeasure = combineMeasures(entry.measures);
+    result.push({
+      name: capitalizeIngredient(entry.name),
+      measure: combinedMeasure,
+    });
+  }
+  return result;
+}
+
+
+

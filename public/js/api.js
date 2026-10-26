@@ -1,5 +1,5 @@
 // Talks to TheMealDB (free recipe API, no key needed). Owner: Person 2.
-import { toTitleCase, cleanInstructionText } from "./utils.js";
+import { toTitleCase, cleanInstructionText, combineIngredients } from "./utils.js";
 // Everyone else gets recipes from here, so keep the recipe object shape stable:
 //
 // {
@@ -44,11 +44,11 @@ async function fetchJson(path) {
 
 // Turns TheMealDB's raw meal (strIngredient1 ... strIngredient20) into our recipe object.
 export function normalizeRecipe(meal) {
-  const ingredients = [];
+  const rawIngredients = [];
   for (let i = 1; i <= 20; i++) {
     const name = (meal[`strIngredient${i}`] || "").trim();
     const measure = (meal[`strMeasure${i}`] || "").trim();
-    if (name) ingredients.push({ name, measure });
+    if (name) rawIngredients.push({ name, measure });
   }
   return {
     id: String(meal.idMeal),
@@ -58,7 +58,7 @@ export function normalizeRecipe(meal) {
     area: meal.strArea || "",
     instructions: cleanInstructionText(meal.strInstructions || ""),
     youtube: meal.strYoutube || "",
-    ingredients,
+    ingredients: combineIngredients(rawIngredients),
   };
 }
 

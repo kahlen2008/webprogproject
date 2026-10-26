@@ -2,7 +2,7 @@
 // Matches the design and interactions shown in RecipePlan mockup.
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient } from "./utils.js";
 import {
   getPreferences,
   savePreferences,
@@ -337,27 +337,46 @@ if (searchForm) {
   });
   syncHideToggle();
 
-  // Initial load: inspect preferences and pre-select matching diet category chip if present
-  const initialPrefs = getPreferences();
-  let defaultCategory = null;
-  if (initialPrefs.diets.includes("Vegetarian") || initialPrefs.diets.includes("Vegan")) {
-    defaultCategory = "Vegetarian";
-  } else if (initialPrefs.diets.includes("Pescatarian")) {
-    defaultCategory = "Seafood";
-  }
+  // Handle URL query parameters (e.g. from index.html search bar)
+  const urlParams = new URLSearchParams(window.location.search);
+  const searchParam = urlParams.get("search") || urlParams.get("query") || urlParams.get("q");
+  const categoryParam = urlParams.get("category");
 
-  if (defaultCategory) {
-    const matchingChip = document.querySelector(`.category-chip[data-category="${defaultCategory}"]`);
+  if (searchParam) {
+    const queryInput = searchForm?.querySelector('input[name="query"]');
+    if (queryInput) queryInput.value = searchParam;
+    runSearch(searchParam, `Search Results for "${searchParam}"`);
+  } else if (categoryParam) {
+    const matchingChip = document.querySelector(`.category-chip[data-category="${categoryParam}"]`);
     if (matchingChip) {
-      activeCategory = defaultCategory;
+      activeCategory = categoryParam;
       categoryChips.forEach((c) => c.classList.remove("active"));
       matchingChip.classList.add("active");
-      runCategoryFilter(defaultCategory);
+    }
+    runCategoryFilter(categoryParam);
+  } else {
+    // Initial load: inspect preferences and pre-select matching diet category chip if present
+    const initialPrefs = getPreferences();
+    let defaultCategory = null;
+    if (initialPrefs.diets.includes("Vegetarian") || initialPrefs.diets.includes("Vegan")) {
+      defaultCategory = "Vegetarian";
+    } else if (initialPrefs.diets.includes("Pescatarian")) {
+      defaultCategory = "Seafood";
+    }
+
+    if (defaultCategory) {
+      const matchingChip = document.querySelector(`.category-chip[data-category="${defaultCategory}"]`);
+      if (matchingChip) {
+        activeCategory = defaultCategory;
+        categoryChips.forEach((c) => c.classList.remove("active"));
+        matchingChip.classList.add("active");
+        runCategoryFilter(defaultCategory);
+      } else {
+        runSearch("", "Latest Recipes");
+      }
     } else {
       runSearch("", "Latest Recipes");
     }
-  } else {
-    runSearch("", "Latest Recipes");
   }
 }
 
@@ -393,6 +412,10 @@ async function showRecipe(id) {
     // Fallback if API lookup fails or offline
     if (!recipe) {
       recipe = FALLBACK_RECIPES_BY_ID[String(id)] || FALLBACK_RECIPES_BY_ID["52772"];
+    }
+
+    if (recipe && recipe.ingredients) {
+      recipe.ingredients = combineIngredients(recipe.ingredients);
     }
 
     const prefs = getPreferences();
@@ -495,6 +518,41 @@ async function showRecipe(id) {
           return;
         }
 
+        // Helper to detect recipe component subheaders like "Make the mac and cheese", "Make the grilled cheese", "For the sauce:"
+        function isComponentHeader(str) {
+          const trimmed = str.trim();
+          if (/^(?:assembly|preparation|method|directions)[:.-]?$/i.test(trimmed)) return true;
+          if (/^([A-Za-z0-9\s,&'-]{3,40}):$/.test(trimmed)) return true;
+          
+          const pattern = /^(?:(?:make|prepare|cook)\s+(?:the\s+)?|to\s+(?:make|prepare|assemble|cook|bake)\s+(?:the\s+)?|for\s+(?:the\s+)?)([a-z0-9\s,&'-]+)[.:]?$/i;
+          const match = trimmed.match(pattern);
+          if (!match) return false;
+          
+          if (trimmed.length > 45) return false;
+          if (/\b(?:\d+\s*(?:minutes?|mins?|hours?|cups?|tbsp|tsp|g|oz|degrees?|°)|until|whisk|boil|stir|fry|bake|heat)\b/i.test(match[1])) return false;
+          
+          return true;
+        }
+
+        if (isComponentHeader(line)) {
+          currentSection = null; // Reset bullet section so subsequent items are numbered cooking steps
+          const cleanHeader = line.replace(/[:.-]+$/, "").trim();
+          items.push({
+            type: "header",
+            header: {
+              label: toTitleCase(cleanHeader),
+              icon: "🍳",
+              badgeClass: "bg-stone-100 text-stone-800 border-stone-200 font-semibold",
+            },
+          });
+          return;
+        }
+
+        // Filter out conversational fluff / blog preamble lines
+        if (/^(?:this recipe is|here is how to|learn how to|an easy recipe for|in this recipe|a classic recipe for|today we are making|enjoy!*|bon app[eé]tit!*|serve and enjoy!*)$/i.test(line.trim())) {
+          return;
+        }
+
         // Filter out generic step numbers/titles
         if (standaloneHeaderRegex.test(line)) return;
 
@@ -532,13 +590,15 @@ async function showRecipe(id) {
 
     const parsedItems = parseRecipeInstructions(recipe.instructions);
     let stepNumber = 0;
-
     const stepsHtml = parsedItems
-      .map((item) => {
+      .map((item, index) => {
         if (item.type === "header") {
+          // First header matches an ingredient row box (py-2.5 + 1px borders + 24px line = 46px)
+          // and is vertically centred, so it sits level with the first ingredient.
+          const topPadding = index === 0 ? "h-[46px] flex items-center" : "pt-6 pb-1";
           return `
-            <li class="pt-5 pb-1 list-none -ml-1">
-              <div class="flex items-center gap-3">
+            <li class="${topPadding} list-none -ml-1">
+              <div class="flex items-center gap-3 w-full">
                 <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider border ${item.header.badgeClass} shadow-2xs">
                   <span>${item.header.icon}</span> ${escapeHtml(item.header.label)}
                 </span>
@@ -568,28 +628,60 @@ async function showRecipe(id) {
       })
       .join("");
 
+    // Factual fallback when TheMealDB gives no description (it never does).
+    // Category is treated as a label, not a noun, so "Vegetarian" doesn't read as a person.
+    function buildFallbackDescription(r) {
+      const area = r.area && r.area !== "Unknown" ? r.area : "";
+      const cat = (r.category || "").trim();
+      const catPhrase = {
+        vegetarian: "vegetarian dish",
+        vegan: "vegan dish",
+        dessert: "dessert",
+        side: "side dish",
+        starter: "starter",
+        breakfast: "breakfast dish",
+        miscellaneous: "dish",
+      }[cat.toLowerCase()] || (cat ? `${cat.toLowerCase()} dish` : "dish");
+      const article = /^[aeiou]/i.test(area || catPhrase) ? "An" : "A";
+      const lead = `${article} ${area ? area + " " : ""}${catPhrase}`;
+
+      // Name the first few distinctive ingredients, skipping pantry staples.
+      const staples = /^(salt|pepper|black pepper|water|oil|olive oil|vegetable oil|sugar|butter|flour|plain flour)$/i;
+      const names = (r.ingredients || [])
+        .map((i) => (i.name || "").trim().toLowerCase())
+        .filter((n) => n && !staples.test(n));
+      const join = (arr) => (arr.length > 1 ? `${arr.slice(0, -1).join(", ")} and ${arr[arr.length - 1]}` : arr[0]);
+      const keys = names.slice(0, 3);
+      const extras = names.slice(3, 5);
+      if (!keys.length) return `${lead}, made from simple pantry staples.`;
+      const first = `${lead} with ${join(keys)}.`;
+      return extras.length
+        ? `${first} Finished with ${join(extras)} for extra depth of flavour.`
+        : `${first} A short ingredient list that keeps things simple.`;
+    }
+
     const ingredientsHtml = (recipe.ingredients || [])
       .map((ing) => {
         const flaggedLabels = result.byIngredient?.[ing.name.toLowerCase()] || [];
-        if (flaggedLabels.length > 0) {
-          return `
-            <li class="flex items-center justify-between gap-3 bg-red-50/80 border border-red-200/90 rounded-xl px-3 py-2 text-sm sm:text-base">
-              <div class="flex items-center gap-2.5">
-                <span class="text-red-500 font-bold text-base select-none leading-none">!</span>
-                <span class="font-semibold text-stone-900">${escapeHtml(ing.measure)}</span>
-                <span class="text-stone-800 font-medium">${escapeHtml(ing.name)}</span>
-              </div>
-              <span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-600 text-white flex-shrink-0">
-                ${escapeHtml(flaggedLabels.join(", "))}
-              </span>
-            </li>
-          `;
-        }
+        const isFlagged = flaggedLabels.length > 0;
+        const chipsHtml = isFlagged
+          ? `<div class="mt-1.5 flex flex-wrap gap-1.5">
+              ${flaggedLabels
+                .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
+                .join("")}
+            </div>`
+          : "";
+
         return `
-          <li class="flex items-center gap-3 text-stone-700 text-sm sm:text-base py-1">
-            <span class="text-[#ca5c2e] font-bold text-lg select-none leading-none">+</span>
-            <span class="font-medium text-stone-900">${escapeHtml(ing.measure)}</span>
-            <span class="text-stone-700">${escapeHtml(ing.name)}</span>
+          <li class="flex items-start gap-3 rounded-xl px-3.5 py-2.5 ${isFlagged ? "bg-red-50/70 border border-red-200/80" : "border border-transparent hover:bg-white/70 transition"}">
+            <span class="mt-[6px] sm:mt-[8px] w-2 h-2 rounded-full flex-shrink-0 ${isFlagged ? "bg-red-500" : "bg-[#ca5c2e]/50"}" aria-hidden="true"></span>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
+                <span class="text-sm text-stone-500">${escapeHtml(ing.measure)}</span>
+              </div>
+              ${chipsHtml}
+            </div>
           </li>
         `;
       })
@@ -685,8 +777,8 @@ async function showRecipe(id) {
             <!-- Description -->
             <div class="pt-2">
               <h3 class="text-base font-bold text-stone-900 mb-2">Description</h3>
-              <p class="text-stone-600 text-sm sm:text-base leading-relaxed">
-                ${escapeHtml(recipe.description || `A delicious ${recipe.area ? recipe.area + ' ' : ''}${recipe.category ? recipe.category.toLowerCase() : 'dish'} prepared with fresh, wholesome ingredients and authentic seasoning. Simple to make and full of vibrant flavours.`)}
+              <p class="text-stone-600 text-sm sm:text-base leading-relaxed line-clamp-2 min-h-[3.25em]">
+                ${escapeHtml(recipe.description || buildFallbackDescription(recipe))}
               </p>
             </div>
           </div>

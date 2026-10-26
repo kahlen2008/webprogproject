@@ -48,7 +48,7 @@
     <!-- Back Button -->
     <div>
       <a 
-        href="index.html" 
+        href="recipes.html" 
         id="back-to-recipes-btn" 
         class="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-[#ca5c2e] transition group focus:outline-none"
         onclick="if (window.history.length > 1) { window.history.back(); return false; }"
@@ -64,6 +64,9 @@
 
     <article id="recipe-detail" aria-live="polite" class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 md:p-10"></article>
   </main>
+
+  <!-- Global Footer (rendered by js/navbar.js) -->
+  <footer id="site-footer"></footer>
 
   <script type="module" src="js/navbar.js"></script>
   <script type="module" src="js/recipes.js"></script>
