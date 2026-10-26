@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service | RecipePlan</title>
+  <meta name="description" content="RecipePlan Terms of Service. Understand our culinary platform guidelines, dietary disclaimers, and user terms.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
+  <header id="navbar" class="w-full sticky top-0 z-40"></header>
+
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-12 space-y-8">
+    
+    <!-- Top Navigation / Breadcrumb -->
+    <div class="flex items-center justify-between">
+      <a 
+        href="index.html" 
+        id="back-to-home-btn" 
+        class="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-[#ca5c2e] transition group focus:outline-none"
+      >
+        <span class="w-8 h-8 rounded-full bg-white border border-[#efe6dc] flex items-center justify-center group-hover:border-[#ca5c2e] group-hover:bg-[#fbf2ec] transition shadow-xs">
+          <svg class="w-4 h-4 text-stone-600 group-hover:text-[#ca5c2e] transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <polyline points="15 18 9 12 15 6"></polyline>
+          </svg>
+        </span>
+        <span>Back to Home</span>
+      </a>
+
+      <!-- Tab Switcher between Terms and Privacy -->
+      <nav class="inline-flex p-1 bg-white border border-[#ede4da] rounded-xl shadow-xs text-xs font-semibold" aria-label="Legal document switcher">
+        <a href="terms.html" class="px-3.5 py-1.5 rounded-lg bg-[#ca5c2e] text-white shadow-2xs transition" aria-current="page">Terms of Service</a>
+        <a href="privacy.html" class="px-3.5 py-1.5 rounded-lg text-stone-600 hover:text-[#ca5c2e] transition">Privacy Policy</a>
+      </nav>
+    </div>
+
+    <!-- Main Content Card -->
+    <article class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-10 md:p-12 space-y-8 text-stone-700 leading-relaxed">
+      
+      <!-- Document Header -->
+      <div class="border-b border-[#ede4da] pb-6 space-y-2">
+        <h1 class="text-3xl sm:text-4xl font-extrabold text-stone-900 tracking-tight font-heading">Terms of Service</h1>
+        <p class="text-xs sm:text-sm text-stone-500">Effective Date: October 26, 2026 · Last Updated: October 2026</p>
+      </div>
+
+      <!-- Section 1 -->
+      <section class="space-y-3">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">1. Acceptance of Terms</h2>
+        <p class="text-sm sm:text-base">
+          Welcome to RecipePlan. By accessing or using our website, services, meal planning applications, and tools (collectively, the "Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, please do not use the Service.
+        </p>
+      </section>
+
+      <!-- Section 2 -->
+      <section class="space-y-3">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">2. User Accounts & Security</h2>
+        <p class="text-sm sm:text-base">
+          To access personalised meal planning, dietary filtering, and favourite saving features, you may register an account. You agree to provide accurate, current, and complete information during registration.
+        </p>
+        <ul class="list-disc pl-5 text-sm sm:text-base space-y-1.5 text-stone-600">
+          <li><strong>Password Requirements:</strong> For your security, account passwords must be at least 8 characters long and include at least one numerical digit and one special character.</li>
+          <li><strong>Account Responsibility:</strong> You are responsible for safeguarding your login credentials and for all activities that occur under your account.</li>
+        </ul>
+      </section>
+
+      <!-- Section 3: Critical Culinary & Health Disclaimer -->
+      <section class="space-y-3 bg-[#fdf8f4] border border-[#ede4da] rounded-2xl p-5 sm:p-6">
+        <div class="flex items-start gap-3">
+          <div class="w-8 h-8 rounded-xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center flex-shrink-0 mt-0.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+          </div>
+          <div class="space-y-2">
+            <h2 class="text-base sm:text-lg font-bold text-stone-900 font-heading">3. Dietary, Allergen & Nutritional Disclaimer</h2>
+            <p class="text-xs sm:text-sm text-stone-600">
+              RecipePlan provides recipe suggestions, category tags (such as Vegan, Vegetarian, Halal, Keto), and ingredient lists for informational and culinary planning purposes only.
+            </p>
+            <p class="text-xs sm:text-sm text-stone-600">
+              <strong>Allergy Warning:</strong> Automated ingredient filters and dietary tags are generated algorithmically and do not substitute for professional medical or dietary advice. Manufacturing processes, product reformulations, and regional differences can alter allergen content. Always read food packaging labels before preparing or consuming any recipe.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Section 4 -->
+      <section class="space-y-3">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">4. Meal Planning & User Content</h2>
+        <p class="text-sm sm:text-base">
+          RecipePlan enables you to schedule recipes into weekly meal calendars, generate automated grocery lists, and save preferred dishes. We grant you a personal, non-exclusive, non-transferable licence to utilise these features for personal, non-commercial culinary planning.
+        </p>
+      </section>
+
+      <!-- Section 5 -->
+      <section class="space-y-3">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">5. Prohibited Conduct</h2>
+        <p class="text-sm sm:text-base">
+          When using RecipePlan, you agree not to:
+        </p>
+        <ul class="list-disc pl-5 text-sm sm:text-base space-y-1.5 text-stone-600">
+          <li>Attempt to reverse-engineer, exploit, or bypass authentication and authorization systems.</li>
+          <li>Scrape or mass-extract recipe content or database records for commercial redistribution without prior written consent.</li>
+          <li>Impersonate another user or access another user's private meal plans or saved items.</li>
+        </ul>
+      </section>
+
+      <!-- Section 6 -->
+      <section class="space-y-3">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">6. Termination & Deletion</h2>
+        <p class="text-sm sm:text-base">
+          You may stop using RecipePlan at any time. You can also delete your account and associated dietary profile data directly from your Profile settings. We reserve the right to suspend or terminate accounts that breach these Terms.
+        </p>
+      </section>
+
+      <!-- Section 7 -->
+      <section class="space-y-3">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">7. Changes to Terms</h2>
+        <p class="text-sm sm:text-base">
+          We may update these Terms periodically. We will reflect updates by changing the "Last Updated" date at the top of this page. Your continued use of RecipePlan following any revisions constitutes your acceptance of the new Terms.
+        </p>
+      </section>
+
+      <!-- Section 8 -->
+      <section class="space-y-3 border-t border-[#ede4da] pt-6">
+        <h2 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">8. Contact Us</h2>
+        <p class="text-sm sm:text-base">
+          If you have questions about these Terms of Service or RecipePlan policies, please contact us at <a href="mailto:support@recipeplan.example" class="font-semibold text-[#ca5c2e] hover:underline">support@recipeplan.example</a>.
+        </p>
+      </section>
+
+    </article>
+  </main>
+
+  <!-- Global Footer -->
+  <footer class="mt-auto border-t border-[#ede4da] bg-white py-6 text-center text-xs text-stone-500">
+    <div class="max-w-4xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between gap-3">
+      <p>© 2026 RecipePlan. All rights reserved.</p>
+      <div class="flex items-center gap-4 font-medium">
+        <a href="terms.html" class="text-[#ca5c2e] hover:underline">Terms of Service</a>
+        <span class="text-stone-300">·</span>
+        <a href="privacy.html" class="text-stone-600 hover:text-[#ca5c2e] transition">Privacy Policy</a>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module" src="js/navbar.js"></script>
+</body>
+</html>

@@ -45,89 +45,83 @@
 
   <div class="min-h-screen flex flex-col lg:flex-row">
     
-    <!-- LEFT HALF: Brand Showcase Hero Panel -->
-    <div class="relative lg:w-1/2 bg-gradient-to-br from-[#231510] via-[#2a1711] to-[#140c09] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between overflow-hidden">
+    <!-- LEFT HALF: Brand Showcase Hero Panel (RecipePlan Color Scheme, No Gradients) -->
+    <div class="lg:w-1/2 bg-[#faf7f2] border-b lg:border-b-0 lg:border-r border-[#ede4da] text-stone-800 p-8 sm:p-12 lg:p-16 flex flex-col justify-between">
       
-      <!-- Background Ambient Glow & Visual Elements -->
-      <div class="absolute -top-32 -left-32 w-96 h-96 bg-[#ca5c2e]/25 rounded-full blur-3xl pointer-events-none"></div>
-      <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-amber-600/20 rounded-full blur-3xl pointer-events-none"></div>
-      
-      <!-- Subtle Culinary Grid Motif -->
-      <div class="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
-
-      <!-- Top Header / Back Link -->
-      <div class="relative z-10 flex items-center justify-between">
-        <a href="index.html" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/90 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 transition shadow-2xs group">
-          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
-          </svg>
+      <!-- Top Header: Back to Home + Logo -->
+      <div class="flex items-center justify-between">
+        <!-- Back to Home Button (Matches 'Back to recipes' styling) -->
+        <a 
+          href="index.html" 
+          id="back-to-home-btn" 
+          class="inline-flex items-center gap-2 text-sm font-semibold text-stone-600 hover:text-[#ca5c2e] transition group focus:outline-none"
+        >
+          <span class="w-8 h-8 rounded-full bg-white border border-[#efe6dc] flex items-center justify-center group-hover:border-[#ca5c2e] group-hover:bg-[#fbf2ec] transition shadow-xs">
+            <svg class="w-4 h-4 text-stone-600 group-hover:text-[#ca5c2e] transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+          </span>
           <span>Back to Home</span>
         </a>
 
-        <!-- Brand Logo Badge -->
-        <a href="index.html" class="inline-flex items-center gap-2 group">
-          <div class="w-8 h-8 rounded-xl bg-[#ca5c2e] flex items-center justify-center text-white shadow-md shadow-[#ca5c2e]/30 group-hover:scale-105 transition">
-            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2"></path>
-              <path d="M15 2v18"></path>
-              <path d="M6 2v7a3 3 0 0 0 6 0V2"></path>
-              <path d="M9 2v18"></path>
-            </svg>
-          </div>
-          <span class="text-base font-extrabold tracking-tight font-heading text-white">Recipe<span class="text-[#f5a278]">Plan</span></span>
+        <!-- RecipePlan Logo -->
+        <a href="index.html" class="inline-flex items-center gap-2 select-none group">
+          <svg class="w-6 h-6 text-[#ca5c2e] transition group-hover:scale-105" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2"></path>
+            <path d="M15 2v18"></path>
+            <path d="M6 2v7a3 3 0 0 0 6 0V2"></path>
+            <path d="M9 2v18"></path>
+          </svg>
+          <span class="text-xl font-normal text-stone-800 font-heading">Recipe<span class="font-extrabold text-stone-900 -ml-0.5">Plan</span></span>
         </a>
       </div>
 
       <!-- Middle Main Hero Message -->
-      <div class="relative z-10 my-10 lg:my-auto max-w-lg space-y-6">
-        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase text-amber-200 bg-white/10 backdrop-blur-md border border-white/15 shadow-2xs">
-          <span class="w-2 h-2 rounded-full bg-[#f5a278] animate-pulse"></span>
-          <span>RecipePlan · Smart Kitchen</span>
-        </div>
+      <div class="my-10 lg:my-auto max-w-lg space-y-6">
 
-        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading tracking-tight leading-[1.15] text-white">
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading tracking-tight leading-[1.15] text-stone-900">
           Cook smarter.<br>
           Plan faster.<br>
-          <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#f5a278] to-amber-200">Eat wonderfully.</span>
+          <span class="text-[#ca5c2e]">Eat wonderfully.</span>
         </h1>
 
-        <p class="text-sm sm:text-base text-stone-300 font-normal leading-relaxed">
-          Log in to your personalized meal hub. Access saved favourites, weekly schedules, and tailored recipe recommendations aligned with your diet.
+        <p class="text-sm sm:text-base text-stone-600 font-normal leading-relaxed">
+          Log in to your personalised meal hub. Access saved favourites, weekly schedules, and tailored recipe recommendations aligned with your diet.
         </p>
 
-        <!-- Feature Highlights -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-          <div class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
-            <div class="w-8 h-8 rounded-xl bg-[#ca5c2e]/30 flex items-center justify-center text-amber-200 flex-shrink-0">
+        <!-- Feature Highlights in Brand Theme Cards -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5 pt-2">
+          <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white border border-[#ede4da] shadow-xs">
+            <div class="w-9 h-9 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] flex-shrink-0">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
             </div>
             <div class="text-xs">
-              <p class="font-semibold text-white">700+ Recipes</p>
-              <p class="text-stone-400 text-[11px]">Global culinary catalog</p>
+              <p class="font-bold text-stone-900">700+ Recipes</p>
+              <p class="text-stone-500 text-[11px]">Global culinary catalogue</p>
             </div>
           </div>
 
-          <div class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
-            <div class="w-8 h-8 rounded-xl bg-[#ca5c2e]/30 flex items-center justify-center text-amber-200 flex-shrink-0">
+          <div class="flex items-center gap-3.5 p-3.5 rounded-2xl bg-white border border-[#ede4da] shadow-xs">
+            <div class="w-9 h-9 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] flex-shrink-0">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
               </svg>
             </div>
             <div class="text-xs">
-              <p class="font-semibold text-white">Allergy Shield</p>
-              <p class="text-stone-400 text-[11px]">Automatic safety alerts</p>
+              <p class="font-bold text-stone-900">Allergy Shield</p>
+              <p class="text-stone-500 text-[11px]">Automatic safety alerts</p>
             </div>
           </div>
         </div>
       </div>
 
       <!-- Bottom Trust Testimonial / Footnote -->
-      <div class="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-stone-400">
+      <div class="pt-4 border-t border-[#ede4da] flex items-center justify-between text-xs text-stone-500">
         <span>Trusted by home cooks everywhere</span>
-        <span class="flex items-center gap-1 text-amber-300">
-          ★★★★★ <span class="text-stone-300 ml-1 font-semibold">4.9/5</span>
+        <span class="flex items-center gap-1 text-amber-500 font-semibold">
+          ★★★★★ <span class="text-stone-700 ml-1">4.9/5</span>
         </span>
       </div>
     </div>
@@ -139,7 +133,7 @@
       <div class="flex items-center justify-between lg:justify-end text-xs text-stone-500">
         <a href="index.html" class="lg:hidden inline-flex items-center gap-1.5 font-semibold text-stone-700 hover:text-[#ca5c2e]">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+            <polyline points="15 18 9 12 15 6"></polyline>
           </svg>
           Home
         </a>
@@ -164,7 +158,7 @@
             <div class="relative">
               <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                 </svg>
               </span>
               <input 
@@ -173,7 +167,7 @@
                 type="email" 
                 autocomplete="email" 
                 placeholder="you@example.com"
-                class="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition font-medium"
+                class="w-full pl-10 pr-4 py-3 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition font-medium"
                 required
               >
             </div>
@@ -189,7 +183,7 @@
               <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
                 <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
-                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M7 11V7a5 5 0 0 1 10 0v4"></path>
                 </svg>
               </span>
               <input 
@@ -198,7 +192,7 @@
                 type="password" 
                 autocomplete="current-password" 
                 placeholder="Enter your password"
-                class="w-full pl-10 pr-11 py-3 rounded-xl border border-stone-200 focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition font-medium"
+                class="w-full pl-10 pr-11 py-3 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition font-medium"
                 required
               >
               <button 
@@ -208,7 +202,7 @@
                 aria-label="Toggle password visibility"
               >
                 <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
                   <circle cx="12" cy="12" r="3"></circle>
                 </svg>
               </button>
@@ -216,28 +210,28 @@
           </div>
 
           <!-- Error Alert Container -->
-          <p class="form-error text-xs text-red-600 font-semibold min-h-[1rem]" role="alert"></p>
+          <p class="form-error text-xs text-red-600 font-semibold empty:hidden !mt-2" role="alert"></p>
 
           <!-- Submit Button -->
           <button 
             type="submit" 
-            class="w-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-semibold py-3.5 rounded-xl transition shadow-sm hover:shadow text-sm focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 active:scale-[0.99] cursor-pointer"
+            class="w-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-semibold py-3.5 rounded-xl transition shadow-xs hover:shadow text-sm focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 active:scale-[0.99] cursor-pointer !mt-5"
           >
             Log In
           </button>
 
           <!-- OR Divider -->
           <div class="relative flex items-center justify-center my-5">
-            <div class="flex-grow border-t border-stone-200"></div>
+            <div class="flex-grow border-t border-[#ede4da]"></div>
             <span class="px-3 text-xs text-stone-400 font-semibold uppercase tracking-wider whitespace-nowrap select-none">or continue with</span>
-            <div class="flex-grow border-t border-stone-200"></div>
+            <div class="flex-grow border-t border-[#ede4da]"></div>
           </div>
 
           <!-- Google Button -->
           <button 
             type="button" 
             id="google-login-btn" 
-            class="w-full bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 font-semibold py-3 px-4 rounded-xl transition shadow-2xs hover:shadow-xs text-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-stone-300 active:scale-[0.99] cursor-pointer"
+            class="w-full bg-white hover:bg-stone-50 border border-[#ede4da] text-stone-700 font-semibold py-3 px-4 rounded-xl transition shadow-2xs hover:shadow-xs text-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-stone-300 active:scale-[0.99] cursor-pointer"
           >
             <svg class="w-4 h-4" viewBox="0 0 24 24">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
@@ -252,7 +246,7 @@
 
       <!-- Bottom Terms / Privacy Note -->
       <div class="text-center text-[11px] text-stone-400">
-        By continuing, you agree to RecipePlan's Terms of Service and Privacy Policy.
+        By continuing, you agree to RecipePlan's <a href="terms.html" class="underline hover:text-stone-600">Terms of Service</a> and <a href="privacy.html" class="underline hover:text-stone-600">Privacy Policy</a>.
       </div>
     </div>
 
