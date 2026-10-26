@@ -29,6 +29,35 @@ People who cook at home, such as students, busy workers and households with diet
 
 The project covers the skills the course asks for: a responsive HTML and Tailwind CSS interface, JavaScript interactivity, a public API (TheMealDB), user accounts and a database (Firebase Auth and Firestore), and a live deployment (Firebase Hosting).
 
+## Scope
+
+This is what four people can finish in five weeks (Oct 26 to Nov 29, 2026). Items under Out of scope are only built if every Must item is already done, so confirm this list as a team.
+
+**In scope**
+
+- **Accounts:** sign up, log in and log out with email and password or Google, password reset, and pages that need a login are protected.
+- **Onboarding and profile:** a two-step diet and allergy setup after sign-up, editable later on the profile page.
+- **Recipe discovery:** search by name, filter by category and cuisine, and a recipe page with ingredients, instructions and a serving size scaler, using TheMealDB data.
+- **Diet and allergy warnings:** badges and banners based on ingredient names, on recipe cards, the recipe page, favourites and the planner.
+- **Favourites:** saved per user in Firestore and synced across devices.
+- **Meal planner and shopping list:** a weekly plan (seven days, breakfast, lunch and dinner) saved per user, plus one combined shopping list with checkboxes and a print view.
+- **Interface:** responsive Tailwind design for phone, tablet and desktop, with loading, empty and error states and basic accessibility.
+- **Deployment:** live on Firebase Hosting, with security rules that keep each user's data private.
+
+**Out of scope (proposed)**
+
+- Adding or uploading our own recipes. All recipes come from TheMealDB.
+- Nutrition, calorie or cost calculations.
+- Ordering groceries or connecting to shops.
+- Sharing plans or following other users. Star ratings are optional.
+- Guaranteed allergen safety or medical advice. Warnings are keyword matches on ingredient names.
+- A native mobile app, offline mode, other languages or an admin dashboard.
+- Photo uploads, so Firebase Storage is not used.
+
+**Constraints**
+
+Four people, five weeks, plain JavaScript with Tailwind from the CDN (no frameworks or build step), the free Firebase plan, and TheMealDB's free API.
+
 ## Folder structure
 
 Every page gets its own HTML and JS file, with styling done by Tailwind classes in the HTML, so each person mostly works in their own files and rarely touches anyone else's. Everything the browser needs lives in `public/`, which is also the folder Firebase Hosting deploys.
@@ -208,7 +237,7 @@ Person 1 owns everything about who the user is, from the login screens to the Fi
 **Happy path**
 
 1. A new visitor clicks Sign up in the navbar.
-2. They enter name, email and password; each field validates as they type.
+2. They enter name, email and password; each field validates as they type, and the password rules (at least 8 characters, a number and a special character) show as a checklist that ticks off.
 3. They submit. Firebase Auth creates the account and a `users/{uid}` document is saved.
 4. They are taken to the onboarding page, which asks for diet preferences (step 1) and then allergies (step 2) (see Sign-up flow), then land on the home page, and the navbar now shows their name and a Log out button.
 5. On a later visit they log in with email/password or Google and return to the page they came from.
@@ -216,14 +245,14 @@ Person 1 owns everything about who the user is, from the login screens to the Fi
 
 **Requirements**
 
-- **Must:** Email/password signup, login and logout. Inline validation (valid email, password of at least 6 characters, which is Firebase's minimum). Friendly error messages for wrong password and email already in use. Logged-out users are redirected away from Favourites, Planner and Profile. Export `getCurrentUser()` and `onAuthChange(callback)` for the rest of the team.
+- **Must:** Email/password signup, login and logout. Inline validation (valid email, password of at least 8 characters that includes a number and a special character, enforced in our own JavaScript because Firebase's default minimum is only 6). Friendly error messages for wrong password and email already in use. Logged-out users are redirected away from Favourites, Planner and Profile. Export `getCurrentUser()` and `onAuthChange(callback)` for the rest of the team.
 - **Should:** Google sign-in, password reset by email, and a loading state on the submit buttons.
 - **Nice to have:** Write the shared js/preferences.js checker (see How preferences affect the website) so other pages can warn about allergens.
 
 **UI/UX**
 
 - Login and signup are a centred card (about 400px wide) with labels above fields and errors in text beneath them.
-- A show/hide password toggle, a full-width primary button, a "Continue with Google" button under an "or" divider, and a link to switch between login and signup.
+- A show/hide password toggle, a checklist under the password field for the rules (8 or more characters, a number, a special character), a full-width primary button, a "Continue with Google" button under an "or" divider, and a link to switch between login and signup.
 - The navbar shows Login / Sign up when logged out, and the user's initial and name with a small menu (Profile, Log out) when logged in.
 - Onboarding shows a progress bar (Step 1 of 2, Step 2 of 2) and one question per screen, using selectable chips. Profile reuses the same chips for dietary preferences and allergies, with a Save button that stays disabled until something changes.
 
@@ -333,12 +362,18 @@ Three decisions in the first few days keep the four slices from colliding.
 
 - **Shared contracts:** Person 1 exposes something like `getCurrentUser()` and `onAuthChange(callback)`. Persons 3 and 4 depend on it, so they can stub it until it is ready.
 - **Recipe data shape:** Person 2 defines what a recipe object looks like (id, name, image, ingredients, etc.) in the first day or two, since Persons 3 and 4 store and display it.
-- **Naming and folder structure:** Agree on conventions up front (including the Tailwind colours and sizes listed above), and use one shared Git repo with feature branches.
+- **Naming and folder structure:** Agree on conventions up front (including the Tailwind colours and sizes listed above), and use one shared Git repo with two branches: main always holds the working, deployed version, and dev is where everyone commits. Pull from dev before you start and before you push, commit small and often, and merge dev into main only when it has been tested (Person 4 does the merge and deploys from main).
 
 ## Timeline
 
-Features freeze on Nov 15, the end of week 3, so the last two weeks go to integration and deployment.
+The plan runs from Monday Oct 26 to Sunday Nov 29, 2026. Each row lists what every person should have finished by the end of that week, and the last column says what must be true before the team moves on. Features freeze on Nov 15, so weeks 4 and 5 are only for fixing, testing and deploying.
 
-&#91;embedded content: 5-week plan · 4 feature tracks, 1 freeze\]
+| Week | Person 1: Accounts | Person 2: Recipes and design | Person 3: Favourites and QA | Person 4: Planner and deployment | Team checkpoint (end of week) |
+| --- | --- | --- | --- | --- | --- |
+| **Week 1**, Oct 26 to Nov 1: set up and foundations | Create the Firebase project, enable Email/Password and Google sign-in, create Firestore, and add teammates as editors. Fill in firebase-config.js. Build signup and login with email and password, and a navbar that shows logged-in or logged-out state. Write the first firestore.rules. | Add the Tailwind script to every page. Build js/ui.js (button, recipe card, form field, toast, loading skeleton). Write api.js with search, recipe lookup and categories, and agree the recipe object. The home page shows search results with loading, empty and error states. | Study Firestore reads and writes. Create favourites.js with the five agreed function names, stubbed. Add the heart button to the recipe card using a fake user until login works. Draft the manual test checklist. | Create the GitHub repo with main and dev branches, and the README. Run firebase init and the first deploy of a hello page, and check the web.app domain is authorised in Firebase Auth. Define the meal plan data shape. Build the empty planner.html layout. | Everyone can run the site locally and has pushed to the dev branch. The first deploy is live. The recipe object and function names are agreed. |
+| **Week 2**, Nov 2 to Nov 8: core happy paths | Google sign-in, creating the users/{uid} document for first-time users. Onboarding page with step 1 diet and step 2 allergies saved to Firestore, with the onboardingDone redirect rules. First version of js/preferences.js (getPreferences and checkRecipe), handed over by Nov 8. Logged-out users are redirected away from protected pages. | Category chips and cuisine filter with a Clear filters button. recipe.html shows photo, ingredients, numbered instructions and video link. Responsive card grid (one, two and three columns). sessionStorage caching of API results. | addFavourite, removeFavourite and isFavourite working against Firestore. Heart button on recipe cards and the recipe page, showing the correct state on page load. favourites.html lists saved recipes. Logged-out users get a login prompt. | addToPlan, removeFromPlan and getPlan working against Firestore. An Add to meal plan dialog (day and meal). The desktop planner grid shows recipe thumbnails in the right slots, and a recipe can be removed from a slot. | A new user can sign up, set preferences, search, save a favourite and add a recipe to the plan, end to end. Every page is merged into dev, and a tested version of dev is merged into main. |
+| **Week 3**, Nov 9 to Nov 15: finish features, then freeze | Profile page to edit diets and allergies. Password reset and live form validation with friendly error messages. Loading states on buttons. Tune the allergen keyword lists in preferences.js. | Serving size scaler. Allergen badge on cards and warning banner on the recipe page using preferences.js. Hide-allergens toggle. Diet chips pre-selected from the profile. | Real-time favourites with onSnapshot. Sorting and filtering. Empty state and an Undo toast. Save ingredientNames with each favourite and show allergen badges on the favourites page. | Shopping list that merges duplicate ingredients, with checkboxes saved in Firestore. Move recipes between slots (drag and drop if time allows). Confirm message when adding a recipe that contains an allergen. Phone layout with day tabs. | **Feature freeze on Nov 15.** Every Must item is on main. After this date only fixes are allowed, no new features. |
+| **Week 4**, Nov 16 to Nov 22: integration and bug fixes | Review firestore.rules and test that one user cannot read another user's data. Fix redirect and onboarding bugs. Check the forms with keyboard only and make sure every input has a label. | Make styles consistent across all pages. Check loading, empty and error states on every screen, including when TheMealDB is unreachable. Fix responsive layout problems found in testing. | Run the full manual test checklist with two accounts and log every bug. Test on a phone and in Chrome, Firefox and Safari. Retest fixes. | Print styles for the shopping list (print:hidden on the navbar and buttons). Redeploy at least twice this week to catch problems that only appear in production. Update the README. | The full flow works on the live site. Every bug from testing is fixed or written down as a known issue. |
+| **Week 5**, Nov 23 to Nov 29: polish, deploy and present | Final pass on login and sign-up. Create demo accounts (one with allergies set, one empty). Write up accounts and security for your report or presentation. | Visual polish. Final accessibility check: alt text, colour contrast and visible focus. Write up recipes and design. | Final run of the test checklist and sign-off. Write up favourites and testing. Prepare the favourites part of the demo. | Final deployment by Nov 25, then no more code changes. Finish the README and the demo script. Record a backup screen recording of the demo in case the network fails. | The final site is live, the demo has been rehearsed at least once, and everything is submitted before the module deadline (add the date here). |
 
 Persons 1 and 2 start first because Persons 3 and 4 depend on auth and the recipe data shape. Deploy to Firebase Hosting early in the final week so there is time to fix anything that only breaks in production.
