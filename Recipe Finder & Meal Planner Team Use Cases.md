@@ -1,17 +1,40 @@
-# Recipe Finder & Meal Planner: Team Use Cases
+# RecipePlan: Team Use Cases
 
 Oct 26, 2026 · @k
 
 ## Overview
 
-Each of the four team members owns one feature end to end, covering the HTML and Tailwind CSS interface, the JavaScript logic, and the Firebase or API side. The site is a recipe finder and meal planner built with HTML, Tailwind CSS and plain JavaScript, using Firebase Auth and Firestore, TheMealDB for recipe data, and Firebase Hosting for deployment.
+Each of the four team members owns one feature end to end, covering the HTML and Tailwind CSS interface, the JavaScript logic, and the Firebase or API side. RecipePlan is a recipe finder and meal planner built with HTML, Tailwind CSS and plain JavaScript, using Firebase Auth and Firestore, TheMealDB for recipe data, and Firebase Hosting for deployment.
+
+## Purpose and the problem it solves
+
+RecipePlan helps people decide what to cook, in a way that fits how they eat, and turns that decision into a plan and a shopping list. Users search recipes, set their diet and allergies once, save favourites, build a weekly meal plan, and get one combined list of what to buy.
+
+**The problems it addresses**
+
+- **Deciding what to eat takes effort.** Recipes are spread across many sites and apps, so people search, compare and forget what they found. One place to search, save and revisit recipes removes that repeated work.
+- **Diets and allergies make browsing slower and riskier.** Someone who avoids peanuts, dairy or meat has to read every ingredient list by hand. The site stores those preferences once and flags or hides recipes that conflict with them.
+- **Planning and shopping are usually separate chores.** People plan meals in one place and write a shopping list in another, and often miss items or buy duplicates. Planning the week and generating a merged list in the same app joins the two steps.
+- **Notes and bookmarks stay on one device.** Accounts mean favourites and meal plans follow the user across their phone and laptop.
+
+**Why it matters**
+
+Eating is a daily decision, so a small saving of time and effort repeats every day. Allergy and diet support matters most, because a clear warning at the moment of choosing a recipe is more useful than finding out while cooking. The warnings are a helper based on ingredient names, not a safety guarantee, and the site says so.
+
+**Who it is for**
+
+People who cook at home, such as students, busy workers and households with dietary needs or allergies.
+
+**What it demonstrates for the module**
+
+The project covers the skills the course asks for: a responsive HTML and Tailwind CSS interface, JavaScript interactivity, a public API (TheMealDB), user accounts and a database (Firebase Auth and Firestore), and a live deployment (Firebase Hosting).
 
 ## Folder structure
 
 Every page gets its own HTML and JS file, with styling done by Tailwind classes in the HTML, so each person mostly works in their own files and rarely touches anyone else's. Everything the browser needs lives in `public/`, which is also the folder Firebase Hosting deploys.
 
 ```
-recipe-planner/
+recipeplan/
 ├── README.md               how to run and deploy (Person 4)
 ├── firebase.json           hosting settings (Person 4)
 ├── firestore.rules         security rules (Person 1)
@@ -20,6 +43,7 @@ recipe-planner/
     ├── recipe.html         recipe detail (Person 2)
     ├── login.html          log in (Person 1)
     ├── signup.html         sign up (Person 1)
+    ├── onboarding.html     diet then allergies, 2 steps (Person 1)
     ├── profile.html        profile and diet preferences (Person 1)
     ├── favourites.html     saved recipes (Person 3)
     ├── planner.html        weekly plan and shopping list (Person 4)
@@ -27,6 +51,8 @@ recipe-planner/
     │   ├── firebase-config.js  Firebase setup, imported by all (Person 1)
     │   ├── auth.js             login, signup, logout (Person 1)
     │   ├── navbar.js           navbar that reacts to login state (Person 1)
+    │   ├── onboarding.js       two-step preferences flow (Person 1)
+    │   ├── preferences.js      allergen and diet checker used by every page (Person 1)
     │   ├── api.js              TheMealDB requests (Person 2)
     │   ├── recipes.js          search, filters, detail page (Person 2)
     │   ├── ui.js               shared Tailwind class sets and components (Person 2)
@@ -80,6 +106,7 @@ All personal data lives in subcollections under `users/{uid}`, so each user's da
 users/{uid}                          (Person 1)
   displayName   string               "Sam Lee"
   email         string               "sam@example.com"
+  onboardingDone boolean              false until the preferences step is saved or skipped
   diets         array of string      ["vegetarian"]
   allergies     array of string      ["peanuts"]
   createdAt     timestamp
@@ -89,6 +116,7 @@ users/{uid}/favourites/{recipeId}    (Person 3)
   name          string               "Teriyaki Chicken Casserole"
   image         string               image URL
   category      string               "Chicken"
+  ingredientNames array of string    ["chicken", "soy sauce"]  used for allergen checks
   addedAt       timestamp
 
 users/{uid}/mealPlan/{day}           (Person 4)   day = monday ... sunday
@@ -128,6 +156,47 @@ match /recipes/{recipeId}/ratings/{uid} {
 
 Person 1 keeps `firestore.rules`, so the others should send any schema change to Person 1 before changing a field name, because renamed fields break the other pages.
 
+## Sign-up flow and dietary preferences
+
+Sign-up is three screens: create the account, choose diets, then choose allergies. One question per screen keeps each form short and easy to use on a phone. Person 1 builds a dedicated `onboarding.html` page for the last two screens, and the Profile page reuses the same chips so users can edit their choices later.
+
+1. **Create the account.** The user enters name, email and password on `signup.html` (or continues with Google). Firebase Auth creates the account and a `users/{uid}` document is saved with `onboardingDone: false`.
+2. **Step 1 of 2: diet.** They are sent to `onboarding.html`. A progress bar shows "Step 1 of 2" above the heading "How do you eat?". Selectable chips: Vegetarian, Vegan, Pescatarian, Gluten-free, Dairy-free, Halal, and "No preference". More than one can be chosen. Buttons: Next and Skip.
+3. **Step 2 of 2: allergies.** The same page swaps to the heading "Any food allergies?". Chips: Peanuts, Tree nuts, Milk, Eggs, Gluten/wheat, Soy, Fish, Shellfish, Sesame, and "None", plus an "Other" text box. One line under the heading explains that this is used to warn them about recipes. Buttons: Back, Skip and Finish.
+4. **Saving.** Next saves `diets` straight away, so progress survives a page refresh. Finish saves `allergies` and sets `onboardingDone: true`. Skip moves on without saving that screen. Back keeps what was already selected.
+5. **Land on the home page** with a toast ("Preferences saved"). Their diets are already applied to the recipe filters, and they can change both lists later on `profile.html`.
+
+Two cases to handle:
+
+- **Google sign-in:** a first-time Google user has no `users/{uid}` document yet. Create it with `onboardingDone: false` and send them to `onboarding.html` like everyone else.
+- **Returning user who never finished:** after login, if `onboardingDone` is false, redirect to `onboarding.html` instead of the home page. If `onboardingDone` is already true and someone opens `onboarding.html` directly, redirect them to the home page.
+
+The schema needs one new field on `users/{uid}`: `onboardingDone` (boolean). `diets` and `allergies` are already in it. The new files are `onboarding.html` and `js/onboarding.js`, both owned by Person 1.
+
+## How preferences affect the website
+
+Preferences should warn and filter, never block: the user always stays in control, and every page that shows recipes reads the same saved preferences.
+
+| Page | Owner | What changes for a logged-in user with preferences |
+| --- | --- | --- |
+| Profile | Person 1 | Edit diets and allergies at any time; changes apply on the next page load. |
+| Home and search | Person 2 | Diet chips are pre-selected. A "Hide recipes with my allergens" toggle is on by default. Cards that contain an allergen get a small warning badge. |
+| Recipe page | Person 2 | A warning banner above the ingredients names the matching allergens and highlights those ingredients. |
+| Favourites | Person 3 | Saved recipes show the same warning badge, so a recipe saved before the user added an allergy is still flagged. |
+| Meal planner | Person 4 | Adding a flagged recipe shows a confirm message ("This contains peanuts. Add anyway?"). Flagged slots keep the warning badge, and the shopping list marks flagged ingredients. |
+| Logged out | Everyone | No filtering. Show a small note, "Log in to personalise recipes". |
+
+**One shared checker.** Person 1 writes `js/preferences.js` with `getPreferences()` and `checkRecipe(recipe, prefs)`. The checker returns the allergens and diet conflicts it found, for example `{ allergens: ["peanuts"], dietConflicts: [] }`, and every page calls it, so the rules live in one place. It works by matching keywords against a recipe's ingredient names (peanuts: "peanut"; shellfish: "prawn", "shrimp", "crab"; milk: "milk", "cheese", "butter", "cream"; and so on). Vegetarian and vegan use TheMealDB's own Vegetarian and Vegan categories plus a meat keyword list. Person 1 hands this over by end of week 2 so the others can build against it, and until then they can stub it to return no warnings.
+
+**Limits to plan for:**
+
+- **TheMealDB has no allergen or diet data.** Everything above is keyword matching on ingredient names, so it will miss some cases (a "curry paste" may contain shrimp) and flag some wrongly. Say so in the UI with a short line such as "Based on ingredient names. Always check labels." The site is a helper, not medical advice, and the team should say that in the demo.
+- **Category lists have no ingredients.** TheMealDB's category filter only returns name and image, while name search and the recipe page return full ingredients. For category results, fetch each recipe's details in the background (the cached `getRecipeById` from `api.js`) and add the badge when it arrives, or check only on the recipe page.
+- **Favourites need ingredients too.** Add an `ingredientNames` array (strings) to each favourite document when it is saved, so the favourites page can check allergens without extra API calls. Tell Person 3 to include it, and list it in the schema.
+- **Allergy data is health information.** It lives under `users/{uid}`, which only that user can read, so keep it there and never copy it into shared collections such as ratings.
+
+**Requirement split.** Must: collect and save diets and allergies, pre-select diet chips, warning badge and banner on recipe pages. Should: hide-allergens toggle, planner confirm message, background checks on category results. Nice to have: "Other" allergy matching, diet-based suggestions on the home page.
+
 ## Person 1: Accounts and profile
 
 Person 1 owns everything about who the user is, from the login screens to the Firebase Auth setup behind them.
@@ -141,7 +210,7 @@ Person 1 owns everything about who the user is, from the login screens to the Fi
 1. A new visitor clicks Sign up in the navbar.
 2. They enter name, email and password; each field validates as they type.
 3. They submit. Firebase Auth creates the account and a `users/{uid}` document is saved.
-4. They land on the home page, and the navbar now shows their name and a Log out button.
+4. They are taken to the onboarding page, which asks for diet preferences (step 1) and then allergies (step 2) (see Sign-up flow), then land on the home page, and the navbar now shows their name and a Log out button.
 5. On a later visit they log in with email/password or Google and return to the page they came from.
 6. On the Profile page they tick dietary preferences and save, and a confirmation toast appears.
 
@@ -149,14 +218,14 @@ Person 1 owns everything about who the user is, from the login screens to the Fi
 
 - **Must:** Email/password signup, login and logout. Inline validation (valid email, password of at least 6 characters, which is Firebase's minimum). Friendly error messages for wrong password and email already in use. Logged-out users are redirected away from Favourites, Planner and Profile. Export `getCurrentUser()` and `onAuthChange(callback)` for the rest of the team.
 - **Should:** Google sign-in, password reset by email, and a loading state on the submit buttons.
-- **Nice to have:** Saved dietary preferences pre-select the diet filter on the recipes page.
+- **Nice to have:** Write the shared js/preferences.js checker (see How preferences affect the website) so other pages can warn about allergens.
 
 **UI/UX**
 
 - Login and signup are a centred card (about 400px wide) with labels above fields and errors in text beneath them.
 - A show/hide password toggle, a full-width primary button, a "Continue with Google" button under an "or" divider, and a link to switch between login and signup.
 - The navbar shows Login / Sign up when logged out, and the user's initial and name with a small menu (Profile, Log out) when logged in.
-- Profile shows dietary preferences as selectable chips, with a Save button that stays disabled until something changes.
+- Onboarding shows a progress bar (Step 1 of 2, Step 2 of 2) and one question per screen, using selectable chips. Profile reuses the same chips for dietary preferences and allergies, with a Save button that stays disabled until something changes.
 
 ## Person 2: Recipe discovery
 
@@ -238,7 +307,7 @@ Person 4 owns turning saved recipes into a weekly plan and a combined shopping l
 
 **Requirements**
 
-- **Must:** Add and remove recipes by day and meal. Persist the plan in Firestore. Build the shopping list from planned recipes and merge duplicates (match ingredient names ignoring case; add amounts when the unit is the same and list them separately when it is not). Deploy to Firebase Hosting.
+- **Must:** Add and remove recipes by day and meal. Persist the plan in Firestore. Warn before adding a recipe that contains one of the user's allergens. Build the shopping list from planned recipes and merge duplicates (match ingredient names ignoring case; add amounts when the unit is the same and list them separately when it is not). Deploy to Firebase Hosting.
 - **Should:** Drag and drop between slots, checkbox state saved in Firestore, and print styles (Tailwind's print: prefix, for example print:hidden) that hide the navbar and buttons.
 - **Nice to have:** A "Clear week" button with confirmation, and a "Copy list" button that copies the shopping list to the clipboard.
 - **Project duty:** README with run and deploy steps, the first deploy in week 1, and the final demo script.
