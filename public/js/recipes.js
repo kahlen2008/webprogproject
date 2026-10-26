@@ -2,7 +2,7 @@
 // Matches the design and interactions shown in RecipePlan mockup.
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText } from "./utils.js";
 import {
   getPreferences,
   savePreferences,
@@ -451,8 +451,10 @@ async function showRecipe(id) {
     function parseRecipeInstructions(text) {
       if (!text) return [{ type: "step", text: "Follow cooking guidelines for standard preparation." }];
 
+      const cleaned = cleanInstructionText(text);
+
       // Insert newlines before inline step markers like "...STEP 2..." if on the same line
-      const normalized = text
+      const normalized = cleaned
         .replace(/([^\r\n])\s*(STEP\s*\d+[:.-]?)/gi, "$1\n$2")
         .replace(/\r\n/g, "\n");
 
@@ -499,6 +501,16 @@ async function showRecipe(id) {
         let cleanText = line.replace(prefixRegex, "").trim();
         if (cleanText.length <= 3) return;
 
+        // Apply drop-cap typo fixes at step start if needed (e.g. "emove" -> "Remove", "oak the" -> "Soak the")
+        cleanText = cleanText
+          .replace(/^emove\b/i, "Remove")
+          .replace(/^oak the\b/i, "Soak the")
+          .replace(/^dd the\b/i, "Add the")
+          .replace(/^reheat\b/i, "Preheat");
+
+        // Ensure sentence capitalization
+        cleanText = cleanText.charAt(0).toUpperCase() + cleanText.slice(1);
+
         cleanText = ensureFullStop(cleanText);
 
         if (currentSection) {
@@ -538,8 +550,8 @@ async function showRecipe(id) {
         if (item.type === "bullet") {
           return `
             <li class="flex items-start gap-3.5 pl-1">
-              <span class="flex-shrink-0 w-2 h-2 rounded-full ${item.header.dotClass} mt-2.5 ml-3"></span>
-              <p class="text-stone-700 text-base leading-relaxed flex-1 text-pretty">${escapeHtml(item.text)}</p>
+              <span class="flex-shrink-0 w-2 h-2 rounded-full ${item.header.dotClass} mt-[10px] ml-2.5"></span>
+              <p class="text-stone-700 text-base leading-7 flex-1 text-pretty">${escapeHtml(item.text)}</p>
             </li>
           `;
         }
@@ -547,10 +559,10 @@ async function showRecipe(id) {
         stepNumber++;
         return `
           <li class="flex items-start gap-4">
-            <span class="flex-shrink-0 w-8 h-8 rounded-full bg-[#fbece4] text-[#ca5c2e] font-bold text-sm flex items-center justify-center mt-0.5">
+            <span class="flex-shrink-0 w-7 h-7 rounded-full bg-[#fbece4] text-[#ca5c2e] font-bold text-xs sm:text-sm flex items-center justify-center">
               ${stepNumber}
             </span>
-            <p class="text-stone-700 text-base leading-relaxed flex-1 text-pretty">${escapeHtml(item.text)}</p>
+            <p class="text-stone-700 text-base leading-7 flex-1 text-pretty">${escapeHtml(item.text)}</p>
           </li>
         `;
       })

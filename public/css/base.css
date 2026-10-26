@@ -107,13 +107,16 @@ main {
 
 /* Silky smooth tab panel transitions */
 .tab-panel {
-  display: none;
+  display: none !important;
   opacity: 0;
   transform: translateY(6px);
 }
 
 .tab-panel.active {
-  display: block;
+  display: flex !important;
+  flex-direction: column;
+  flex: 1 1 auto;
+  height: 100%;
   animation: tabSlideFadeIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 

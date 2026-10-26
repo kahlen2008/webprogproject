@@ -64,7 +64,7 @@
     <section id="onboarding-card" class="hidden w-full max-w-2xl bg-white/95 backdrop-blur rounded-3xl border border-[#ede3d8] shadow-sm p-6 sm:p-10">
       <!-- Progress -->
       <div class="flex items-center justify-between gap-4">
-        <p id="step-label" class="text-xs font-bold uppercase tracking-wider text-[#ca5c2e]">Step 1 of 2</p>
+        <p id="step-label" class="text-xs font-bold uppercase tracking-wider text-[#ca5c2e] flex items-center gap-1.5">Step 1 of 2 <span class="text-[10px] font-bold text-[#ca5c2e] bg-[#ca5c2e]/10 px-2 py-0.5 rounded-full tracking-wider uppercase">Compulsory</span></p>
         <div class="flex-1 max-w-[10rem] h-1.5 rounded-full bg-stone-100 overflow-hidden" role="progressbar" aria-valuemin="1" aria-valuemax="2" aria-valuenow="1" id="step-progress">
           <div id="step-progress-bar" class="h-full w-1/2 rounded-full bg-[#ca5c2e] transition-all duration-500 ease-out"></div>
         </div>
@@ -106,12 +106,12 @@
 
       <!-- Footer actions -->
       <div class="mt-4 pt-6 border-t border-stone-100 flex items-center justify-between gap-3">
-        <button id="back-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition">
+        <button id="back-btn" type="button" class="invisible inline-flex items-center gap-1.5 px-3 py-2.5 rounded-xl text-sm font-semibold text-stone-600 hover:text-stone-900 hover:bg-stone-100 transition">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
           Back
         </button>
         <div class="flex items-center gap-2">
-          <button id="skip-btn" type="button" class="px-4 py-2.5 rounded-xl text-sm font-semibold text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition">Skip</button>
+          <button id="skip-btn" type="button" class="hidden px-4 py-2.5 rounded-xl text-sm font-semibold text-stone-500 hover:text-stone-800 hover:bg-stone-100 transition">Skip</button>
           <button id="next-btn" type="button" class="inline-flex items-center gap-2 bg-[#ca5c2e] hover:bg-[#b34d23] disabled:opacity-60 disabled:cursor-wait text-white text-sm font-semibold px-6 py-2.5 rounded-xl transition shadow-sm">
             <span id="next-btn-label">Next</span>
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>

@@ -155,6 +155,11 @@ function renderProfile() {
     displayNameInput.value = currentProfile.displayName;
   }
 
+  const profileEmailInput = document.getElementById("profile-email-input");
+  if (profileEmailInput) {
+    profileEmailInput.value = currentProfile.email || activeUser?.email || "";
+  }
+
   // Update Diet checkboxes
   const dietCheckboxes = document.querySelectorAll("input[name='diet-pref']");
   dietCheckboxes.forEach((cb) => {
@@ -324,11 +329,108 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+function showDeleteAccountModal() {
+  return new Promise((resolve) => {
+    const existing = document.getElementById("delete-account-modal-backdrop");
+    if (existing) existing.remove();
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "delete-account-modal-backdrop";
+    backdrop.className = "fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-200 opacity-0";
+    backdrop.setAttribute("role", "dialog");
+    backdrop.setAttribute("aria-modal", "true");
+
+    backdrop.innerHTML = `
+      <div class="relative w-full max-w-md bg-white rounded-3xl shadow-2xl border border-stone-100 p-6 sm:p-7 text-center transition-all duration-200 transform scale-95 opacity-0">
+        <!-- Close 'X' Button -->
+        <button type="button" id="delete-modal-close" class="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition focus:outline-none" aria-label="Close dialog">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+
+        <!-- Danger Trash Icon -->
+        <div class="w-14 h-14 rounded-2xl bg-red-100/80 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-200/60 shadow-xs">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+        </div>
+
+        <h3 class="text-xl font-bold text-stone-900 tracking-tight">Delete Account?</h3>
+        <p class="text-sm text-stone-500 mt-2 leading-relaxed">
+          Are you sure you want to permanently delete your account? This will erase your personal profile, saved favourites, and weekly meal plans.
+        </p>
+
+        <!-- Warning Callout -->
+        <div class="mt-4 p-3.5 rounded-xl bg-red-50/80 border border-red-100/80 text-xs text-red-700 font-medium text-left flex items-start gap-2.5">
+          <svg class="w-4 h-4 text-red-500 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span class="leading-relaxed">This action is irreversible and your account data cannot be recovered.</span>
+        </div>
+
+        <!-- Action Buttons -->
+        <div class="mt-6 flex items-center gap-3">
+          <button type="button" id="delete-modal-cancel" class="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-semibold text-sm transition focus:outline-none shadow-xs">
+            Cancel
+          </button>
+          <button type="button" id="delete-modal-confirm" class="flex-1 px-4 py-2.5 rounded-xl bg-red-600 hover:bg-red-700 text-white font-semibold text-sm transition shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-red-500/40 inline-flex items-center justify-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"></path></svg>
+            <span>Delete Account</span>
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    const dialog = backdrop.querySelector(".relative");
+
+    requestAnimationFrame(() => {
+      backdrop.classList.remove("opacity-0");
+      backdrop.classList.add("opacity-100");
+      dialog.classList.remove("scale-95", "opacity-0");
+      dialog.classList.add("scale-100", "opacity-100");
+    });
+
+    let closed = false;
+    function cleanup(confirmed) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKeyDown);
+
+      backdrop.classList.remove("opacity-100");
+      backdrop.classList.add("opacity-0");
+      dialog.classList.remove("scale-100", "opacity-100");
+      dialog.classList.add("scale-95", "opacity-0");
+
+      setTimeout(() => {
+        backdrop.remove();
+        resolve(confirmed);
+      }, 200);
+    }
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup(false);
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) cleanup(false);
+    });
+
+    backdrop.querySelector("#delete-modal-close")?.addEventListener("click", () => cleanup(false));
+    backdrop.querySelector("#delete-modal-cancel")?.addEventListener("click", () => cleanup(false));
+    backdrop.querySelector("#delete-modal-confirm")?.addEventListener("click", () => cleanup(true));
+  });
+}
+
   // Delete Account handlers
   async function handleDeleteAccount() {
-    const confirmed = window.confirm(
-      "Are you sure you want to permanently delete your account?\n\nThis will remove your profile, saved favourites, and weekly meal plans. This action cannot be undone."
-    );
+    const confirmed = await showDeleteAccountModal();
     if (!confirmed) return;
 
     try {
@@ -339,10 +441,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }, 500);
     } catch (err) {
       if (err.code === "auth/requires-recent-login") {
-        alert("For security reasons, please log in again before deleting your account.");
-        window.location.href = "login.html";
+        showToast("For security reasons, please log in again before deleting your account.", 4000);
+        setTimeout(() => {
+          window.location.href = "login.html";
+        }, 1200);
       } else {
-        alert("Could not delete account. " + (err.message || "Please try again."));
+        showToast("Could not delete account. " + (err.message || "Please try again."), 4000);
       }
     }
   }
@@ -357,3 +461,4 @@ document.addEventListener("DOMContentLoaded", () => {
     mainDeleteBtn.addEventListener("click", handleDeleteAccount);
   }
 });
+

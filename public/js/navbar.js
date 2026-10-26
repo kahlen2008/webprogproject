@@ -52,12 +52,6 @@ export function renderNavbar(user) {
       <path d="M9 2v18"></path>
     </svg>`;
 
-  const searchSvg = `
-    <svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="11" cy="11" r="8"></circle>
-      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-    </svg>`;
-
   const chevronDownSvg = `
     <svg class="w-4 h-4 text-stone-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <polyline points="6 9 12 15 18 9"></polyline>
@@ -127,12 +121,8 @@ export function renderNavbar(user) {
           ${linksHtml}
         </nav>
 
-        <!-- Right Side: Search & Account -->
-        <div class="flex items-center gap-4">
-          <a href="index.html" class="text-stone-500 hover:text-[#ca5c2e] p-1.5 rounded-full hover:bg-stone-100 transition" title="Search Recipes" aria-label="Search">
-            ${searchSvg}
-          </a>
-
+        <!-- Right Side: Account & Mobile Toggle -->
+        <div class="flex items-center gap-3">
           ${userDisplayHtml}
 
           <!-- Mobile Hamburger Toggle -->

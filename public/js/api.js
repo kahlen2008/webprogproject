@@ -1,5 +1,5 @@
 // Talks to TheMealDB (free recipe API, no key needed). Owner: Person 2.
-import { toTitleCase } from "./utils.js";
+import { toTitleCase, cleanInstructionText } from "./utils.js";
 // Everyone else gets recipes from here, so keep the recipe object shape stable:
 //
 // {
@@ -56,7 +56,7 @@ export function normalizeRecipe(meal) {
     image: meal.strMealThumb,
     category: meal.strCategory || "",
     area: meal.strArea || "",
-    instructions: meal.strInstructions || "",
+    instructions: cleanInstructionText(meal.strInstructions || ""),
     youtube: meal.strYoutube || "",
     ingredients,
   };

@@ -45,28 +45,46 @@ const state = {
   saving: false,
 };
 
-const CHECK_SVG = `<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+const CHECK_SVG = `<svg class="chip-check-icon w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+function hasStep1Selection() {
+  return state.diets.size > 0 || state.noDietPreference;
+}
+
+function updateNextBtnState() {
+  if (state.step === 1) {
+    const valid = hasStep1Selection();
+    els.next.classList.toggle("opacity-60", !valid);
+  } else {
+    els.next.classList.remove("opacity-60");
+  }
+}
 
 // ---------- Rendering ----------
 function renderDietChips() {
   const chips = DIET_OPTIONS.map((opt) => {
-    const pressed = !state.noDietPreference && state.diets.has(opt.value);
+    const checked = !state.noDietPreference && state.diets.has(opt.value);
     return `
-      <button type="button" class="choice-chip diet-chip flex items-center gap-3 p-4 rounded-2xl border border-stone-200 bg-white text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40"
-        data-value="${escapeHtml(opt.value)}" aria-pressed="${pressed}">
-        <span class="chip-check flex-shrink-0 w-5 h-5 rounded-full bg-[#ca5c2e] text-white flex items-center justify-center">${CHECK_SVG}</span>
-        <span>
+      <button type="button" role="checkbox" class="choice-chip diet-chip flex items-center gap-3.5 p-4 rounded-2xl border ${checked ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-200 bg-white'} text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
+        data-value="${escapeHtml(opt.value)}" aria-checked="${checked}" aria-pressed="${checked}">
+        <span class="chip-checkbox flex-shrink-0 w-5 h-5 rounded-md border-2 ${checked ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
+          ${CHECK_SVG}
+        </span>
+        <span class="flex-1 min-w-0">
           <span class="block text-sm font-semibold text-stone-900">${escapeHtml(opt.label)}</span>
           <span class="block text-xs text-stone-500 mt-0.5">${escapeHtml(opt.description)}</span>
         </span>
       </button>`;
   }).join("");
 
+  const checkedNone = state.noDietPreference;
   const none = `
-    <button type="button" class="choice-chip diet-chip sm:col-span-2 flex items-center justify-center gap-2 p-3.5 rounded-2xl border border-dashed border-stone-300 bg-white text-sm font-semibold text-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40"
-      data-value="${NO_PREFERENCE}" aria-pressed="${state.noDietPreference}">
-      <span class="chip-check w-5 h-5 rounded-full bg-[#ca5c2e] text-white flex items-center justify-center">${CHECK_SVG}</span>
-      No preference, I eat everything
+    <button type="button" role="checkbox" class="choice-chip diet-chip sm:col-span-2 flex items-center justify-center gap-3 p-3.5 rounded-2xl border border-dashed ${checkedNone ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-300 bg-white'} text-sm font-semibold text-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
+      data-value="${NO_PREFERENCE}" aria-checked="${checkedNone}" aria-pressed="${checkedNone}">
+      <span class="chip-checkbox flex-shrink-0 w-5 h-5 rounded-md border-2 ${checkedNone ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
+        ${CHECK_SVG}
+      </span>
+      <span>No preference, I eat everything</span>
     </button>`;
 
   els.dietChips.innerHTML = chips + none;
@@ -74,20 +92,25 @@ function renderDietChips() {
 
 function renderAllergyChips() {
   const chips = ALLERGEN_OPTIONS.map((opt) => {
-    const pressed = !state.noAllergies && state.allergies.has(opt.value);
+    const checked = !state.noAllergies && state.allergies.has(opt.value);
     return `
-      <button type="button" class="choice-chip allergy-chip inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-stone-200 bg-white text-sm font-semibold text-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40"
-        data-value="${escapeHtml(opt.value)}" aria-pressed="${pressed}">
-        <span class="chip-check w-4 h-4 rounded-full bg-[#ca5c2e] text-white flex items-center justify-center">${CHECK_SVG}</span>
-        ${escapeHtml(opt.label)}
+      <button type="button" role="checkbox" class="choice-chip allergy-chip inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full border ${checked ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-200 bg-white'} text-sm font-semibold text-stone-800 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
+        data-value="${escapeHtml(opt.value)}" aria-checked="${checked}" aria-pressed="${checked}">
+        <span class="chip-checkbox flex-shrink-0 w-4 h-4 rounded border-2 ${checked ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
+          ${CHECK_SVG}
+        </span>
+        <span>${escapeHtml(opt.label)}</span>
       </button>`;
   }).join("");
 
+  const checkedNone = state.noAllergies;
   const none = `
-    <button type="button" class="choice-chip allergy-chip inline-flex items-center gap-2 px-4 py-2.5 rounded-full border border-dashed border-stone-300 bg-white text-sm font-semibold text-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40"
-      data-value="${NO_PREFERENCE}" aria-pressed="${state.noAllergies}">
-      <span class="chip-check w-4 h-4 rounded-full bg-[#ca5c2e] text-white flex items-center justify-center">${CHECK_SVG}</span>
-      None
+    <button type="button" role="checkbox" class="choice-chip allergy-chip inline-flex items-center gap-2.5 px-4 py-2.5 rounded-full border border-dashed ${checkedNone ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-300 bg-white'} text-sm font-semibold text-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
+      data-value="${NO_PREFERENCE}" aria-checked="${checkedNone}" aria-pressed="${checkedNone}">
+      <span class="chip-checkbox flex-shrink-0 w-4 h-4 rounded border-2 ${checkedNone ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
+        ${CHECK_SVG}
+      </span>
+      <span>None</span>
     </button>`;
 
   els.allergyChips.innerHTML = chips + none;
@@ -117,12 +140,23 @@ function showStep(step, direction = "forward") {
   void active.offsetWidth; // restart animation
   active.classList.add(direction === "back" ? "step-enter-back" : "step-enter");
 
-  els.stepLabel.textContent = `Step ${step} of 2`;
+  if (isDiet) {
+    els.stepLabel.innerHTML = `Step 1 of 2 <span class="ml-1.5 inline-flex items-center text-[10px] font-bold text-[#ca5c2e] bg-[#ca5c2e]/10 px-2 py-0.5 rounded-full tracking-wider uppercase">Compulsory</span>`;
+    els.skip.classList.add("hidden");
+    els.back.classList.add("invisible");
+  } else {
+    els.stepLabel.innerHTML = `Step 2 of 2 <span class="ml-1.5 inline-flex items-center text-[10px] font-medium text-stone-500 bg-stone-100 px-2 py-0.5 rounded-full tracking-normal normal-case">Optional</span>`;
+    els.skip.classList.remove("hidden");
+    els.back.classList.remove("invisible");
+  }
+
   els.progress.setAttribute("aria-valuenow", String(step));
   els.progressBar.style.width = isDiet ? "50%" : "100%";
   els.nextLabel.textContent = isDiet ? "Next" : "Finish";
   els.error.textContent = "";
-  document.title = `${isDiet ? "Your diet" : "Your allergies"} | RecipePlan`;
+  document.title = `${isDiet ? "Your diet (Required)" : "Your allergies"} | RecipePlan`;
+
+  updateNextBtnState();
 }
 
 function setSaving(saving) {
@@ -143,6 +177,10 @@ els.dietChips.addEventListener("click", (e) => {
     state.diets.has(value) ? state.diets.delete(value) : state.diets.add(value);
   }
   renderDietChips();
+  updateNextBtnState();
+  if (hasStep1Selection()) {
+    els.error.textContent = "";
+  }
 });
 
 els.allergyChips.addEventListener("click", (e) => {
@@ -206,6 +244,16 @@ function goHome() {
 
 els.next.addEventListener("click", async () => {
   if (state.saving) return;
+
+  // Step 1 is compulsory validation
+  if (state.step === 1 && !hasStep1Selection()) {
+    els.error.textContent = "Step 1 is compulsory. Please select at least one diet option or choose 'No preference'.";
+    els.stepDiet.classList.remove("shake");
+    void els.stepDiet.offsetWidth;
+    els.stepDiet.classList.add("shake");
+    return;
+  }
+
   setSaving(true);
   try {
     if (state.step === 1) {
@@ -229,16 +277,15 @@ els.next.addEventListener("click", async () => {
 
 els.skip.addEventListener("click", async () => {
   if (state.saving) return;
+  // Step 1 is compulsory, cannot skip
+  if (state.step === 1) {
+    return;
+  }
   setSaving(true);
   try {
-    if (state.step === 1) {
-      await savePreferences({ onboardingStep: 2 });
-      showStep(2);
-    } else {
-      await savePreferences({ onboardingComplete: true, onboardingStep: 2 });
-      goHome();
-      return;
-    }
+    await savePreferences({ onboardingComplete: true, onboardingStep: 2 });
+    goHome();
+    return;
   } catch (err) {
     els.error.textContent = "Couldn't save just now. Please try again.";
   }
@@ -252,24 +299,20 @@ els.back.addEventListener("click", async () => {
     savePreferences({ onboardingStep: 1 });
     return;
   }
-  // Step 1: return to the previous page, but never back into signup/login.
-  const ref = document.referrer;
-  const sameOrigin = ref && new URL(ref).origin === window.location.origin;
-  if (sameOrigin && !/(signup|login|onboarding)\.html/.test(ref)) {
-    window.history.back();
-  } else {
-    goHome();
-  }
 });
 
 // ---------- Init ----------
 function hydrateFromSaved(prefs) {
   state.diets = new Set(prefs.diets);
+  if (prefs.onboardingStep === 2 && state.diets.size === 0) {
+    state.noDietPreference = true;
+  }
   const knownAllergens = new Set(ALLERGEN_OPTIONS.map((o) => o.value));
   state.allergies = new Set(prefs.allergies.filter((a) => knownAllergens.has(a)));
   state.customAllergies = prefs.allergies.filter((a) => !knownAllergens.has(a));
   renderDietChips();
   renderAllergyChips();
+  updateNextBtnState();
 }
 
 let initialised = false;

@@ -192,3 +192,33 @@ export function createRecipeCard(recipe, options = {}) {
 
   return item;
 }
+
+// Cleans common typos and missing drop-cap letters found in TheMealDB instructions
+export function cleanInstructionText(text) {
+  if (!text) return "";
+
+  return text
+    // Fix missing initial letter caused by drop-cap stripping during scraping in TheMealDB
+    // (e.g. "emove and discard the bay leaf" -> "Remove and discard the bay leaf", "oak the beans" -> "Soak the beans")
+    .replace(/(^|[.!?\n]\s*)emove\b/gi, "$1Remove")
+    .replace(/(^|[.!?\n]\s*)oak the\b/gi, "$1Soak the")
+    .replace(/(^|[.!?\n]\s*)dd the\b/gi, "$1Add the")
+    .replace(/(^|[.!?\n]\s*)reheat\b/gi, "$1Preheat")
+    .replace(/(^|[.!?\n]\s*)eat the (oven|oil|pan|skillet|pot)\b/gi, "$1Heat the $2")
+    .replace(/(^|[.!?\n]\s*)ook for\b/gi, "$1Cook for")
+    .replace(/(^|[.!?\n]\s*)ake for\b/gi, "$1Bake for")
+    .replace(/(^|[.!?\n]\s*)our into\b/gi, "$1Pour into")
+    .replace(/(^|[.!?\n]\s*)tir in\b/gi, "$1Stir in")
+    .replace(/(^|[.!?\n]\s*)erve with\b/gi, "$1Serve with")
+    .replace(/(^|[.!?\n]\s*)hisk together\b/gi, "$1Whisk together")
+    // Fix common word-level typos found in community-submitted recipes
+    .replace(/\buntill\b/gi, "until")
+    .replace(/\bteaspon\b/gi, "teaspoon")
+    .replace(/\btablespon\b/gi, "tablespoon")
+    .replace(/\bseperate\b/gi, "separate")
+    .replace(/\bseperated\b/gi, "separated")
+    .replace(/\bminuts\b/gi, "minutes")
+    .replace(/\bpeices\b/gi, "pieces")
+    .replace(/\bpeice\b/gi, "piece");
+}
+
