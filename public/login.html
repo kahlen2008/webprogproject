@@ -41,121 +41,223 @@
   <link rel="stylesheet" href="css/components.css">
   <link rel="stylesheet" href="css/auth.css">
 </head>
-<body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased relative overflow-x-hidden">
-  
-  <!-- Subtle decorative background botanical elements matching mockup -->
-  <div class="absolute inset-0 pointer-events-none opacity-40 select-none overflow-hidden">
-    <svg class="absolute -left-12 top-20 w-64 h-64 text-[#ca5c2e]/10" viewBox="0 0 100 100" fill="currentColor">
-      <path d="M50 0 C60 30 90 40 100 50 C70 60 60 90 50 100 C40 70 10 60 0 50 C30 40 40 10 50 0 Z"></path>
-    </svg>
-    <svg class="absolute -right-16 top-1/3 w-80 h-80 text-[#ca5c2e]/10" viewBox="0 0 100 100" fill="currentColor">
-      <circle cx="50" cy="50" r="40" stroke="currentColor" stroke-width="4" fill="none"></circle>
-      <path d="M50 10 Q70 50 50 90 Q30 50 50 10 Z"></path>
-    </svg>
-    <svg class="absolute left-10 bottom-10 w-48 h-48 text-[#ca5c2e]/10" viewBox="0 0 100 100" fill="currentColor">
-      <path d="M10 50 Q50 10 90 50 Q50 90 10 50 Z"></path>
-    </svg>
-  </div>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen font-sans antialiased">
 
-  <header id="navbar" class="w-full relative z-10"></header>
-
-  <main class="flex-1 flex items-center justify-center px-4 py-12 relative z-10">
-    <div class="max-w-md w-full bg-white rounded-3xl border border-[#ede3d8] p-8 sm:p-10 shadow-sm space-y-6">
+  <div class="min-h-screen flex flex-col lg:flex-row">
+    
+    <!-- LEFT HALF: Brand Showcase Hero Panel -->
+    <div class="relative lg:w-1/2 bg-gradient-to-br from-[#231510] via-[#2a1711] to-[#140c09] text-white p-8 sm:p-12 lg:p-16 flex flex-col justify-between overflow-hidden">
       
-      <!-- Card Header -->
-      <div class="text-center space-y-1.5">
-        <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">Welcome back</h1>
-        <p class="text-sm text-stone-500 font-normal">Log in to continue to RecipePlan</p>
+      <!-- Background Ambient Glow & Visual Elements -->
+      <div class="absolute -top-32 -left-32 w-96 h-96 bg-[#ca5c2e]/25 rounded-full blur-3xl pointer-events-none"></div>
+      <div class="absolute -bottom-32 -right-32 w-96 h-96 bg-amber-600/20 rounded-full blur-3xl pointer-events-none"></div>
+      
+      <!-- Subtle Culinary Grid Motif -->
+      <div class="absolute inset-0 bg-[radial-gradient(#ffffff0a_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none"></div>
+
+      <!-- Top Header / Back Link -->
+      <div class="relative z-10 flex items-center justify-between">
+        <a href="index.html" class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold text-white/90 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/15 transition shadow-2xs group">
+          <svg class="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+          </svg>
+          <span>Back to Home</span>
+        </a>
+
+        <!-- Brand Logo Badge -->
+        <a href="index.html" class="inline-flex items-center gap-2 group">
+          <div class="w-8 h-8 rounded-xl bg-[#ca5c2e] flex items-center justify-center text-white shadow-md shadow-[#ca5c2e]/30 group-hover:scale-105 transition">
+            <svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 2v6a3 3 0 0 1-3 3 3 3 0 0 1-3-3V2"></path>
+              <path d="M15 2v18"></path>
+              <path d="M6 2v7a3 3 0 0 0 6 0V2"></path>
+              <path d="M9 2v18"></path>
+            </svg>
+          </div>
+          <span class="text-base font-extrabold tracking-tight font-heading text-white">Recipe<span class="text-[#f5a278]">Plan</span></span>
+        </a>
       </div>
 
-      <!-- Login Form -->
-      <form id="login-form" class="space-y-4" novalidate>
-        <div class="space-y-1.5">
-          <label for="email" class="block text-xs font-semibold text-stone-700">Email</label>
-          <input 
-            id="email" 
-            name="email" 
-            type="email" 
-            autocomplete="email" 
-            placeholder="you@example.com"
-            class="w-full px-4 py-2.5 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition"
-            required
-          >
+      <!-- Middle Main Hero Message -->
+      <div class="relative z-10 my-10 lg:my-auto max-w-lg space-y-6">
+        <div class="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full text-xs font-semibold tracking-wide uppercase text-amber-200 bg-white/10 backdrop-blur-md border border-white/15 shadow-2xs">
+          <span class="w-2 h-2 rounded-full bg-[#f5a278] animate-pulse"></span>
+          <span>RecipePlan · Smart Kitchen</span>
         </div>
 
-        <div class="space-y-1.5">
-          <label for="password" class="block text-xs font-semibold text-stone-700">Password</label>
-          <div class="relative">
-            <input 
-              id="password" 
-              name="password" 
-              type="password" 
-              autocomplete="current-password" 
-              placeholder="Enter your password"
-              class="w-full px-4 py-2.5 pr-11 rounded-xl border border-[#ede4da] focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition"
-              required
-            >
-            <button 
-              type="button" 
-              id="toggle-password-btn" 
-              class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 focus:outline-none"
-              aria-label="Toggle password visibility"
-            >
-              <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
-                <circle cx="12" cy="12" r="3"></circle>
+        <h1 class="text-3xl sm:text-4xl lg:text-5xl font-extrabold font-heading tracking-tight leading-[1.15] text-white">
+          Cook smarter.<br>
+          Plan faster.<br>
+          <span class="text-transparent bg-clip-text bg-gradient-to-r from-[#f5a278] to-amber-200">Eat wonderfully.</span>
+        </h1>
+
+        <p class="text-sm sm:text-base text-stone-300 font-normal leading-relaxed">
+          Log in to your personalized meal hub. Access saved favourites, weekly schedules, and tailored recipe recommendations aligned with your diet.
+        </p>
+
+        <!-- Feature Highlights -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+          <div class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+            <div class="w-8 h-8 rounded-xl bg-[#ca5c2e]/30 flex items-center justify-center text-amber-200 flex-shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
               </svg>
-            </button>
+            </div>
+            <div class="text-xs">
+              <p class="font-semibold text-white">700+ Recipes</p>
+              <p class="text-stone-400 text-[11px]">Global culinary catalog</p>
+            </div>
           </div>
-          <div class="flex justify-end pt-1">
-            <button type="button" id="forgot-password-link" class="text-xs font-medium text-stone-500 hover:text-[#ca5c2e] transition focus:outline-none">Forgot password?</button>
+
+          <div class="flex items-center gap-3 p-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xs">
+            <div class="w-8 h-8 rounded-xl bg-[#ca5c2e]/30 flex items-center justify-center text-amber-200 flex-shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+              </svg>
+            </div>
+            <div class="text-xs">
+              <p class="font-semibold text-white">Allergy Shield</p>
+              <p class="text-stone-400 text-[11px]">Automatic safety alerts</p>
+            </div>
           </div>
         </div>
+      </div>
 
-        <p class="form-error text-xs text-red-600 font-medium" role="alert"></p>
+      <!-- Bottom Trust Testimonial / Footnote -->
+      <div class="relative z-10 pt-4 border-t border-white/10 flex items-center justify-between text-xs text-stone-400">
+        <span>Trusted by home cooks everywhere</span>
+        <span class="flex items-center gap-1 text-amber-300">
+          ★★★★★ <span class="text-stone-300 ml-1 font-semibold">4.9/5</span>
+        </span>
+      </div>
+    </div>
 
-        <button 
-          type="submit" 
-          class="w-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-semibold py-3 rounded-xl transition shadow-sm text-sm focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40"
-        >
-          Log In
-        </button>
-
-        <!-- OR Divider -->
-        <div class="relative flex items-center justify-center my-4">
-          <div class="border-t border-stone-200 w-full"></div>
-          <span class="bg-white px-3 text-xs text-stone-400 font-medium select-none">or</span>
-          <div class="border-t border-stone-200 w-full"></div>
-        </div>
-
-        <!-- Continue with Google Button -->
-        <button 
-          type="button" 
-          id="google-login-btn" 
-          class="w-full bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 font-semibold py-2.5 px-4 rounded-xl transition shadow-xs text-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-stone-300"
-        >
-          <svg class="w-4 h-4" viewBox="0 0 24 24">
-            <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-            <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-            <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-            <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+    <!-- RIGHT HALF: Clean Form Container -->
+    <div class="lg:w-1/2 bg-white flex flex-col justify-between p-8 sm:p-12 lg:p-16">
+      
+      <!-- Top Bar: Switch to Signup Link -->
+      <div class="flex items-center justify-between lg:justify-end text-xs text-stone-500">
+        <a href="index.html" class="lg:hidden inline-flex items-center gap-1.5 font-semibold text-stone-700 hover:text-[#ca5c2e]">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
           </svg>
-          Continue with Google
-        </button>
-      </form>
-
-      <!-- Footer Switch -->
-      <div class="text-center pt-2">
-        <p class="text-xs text-stone-600">
+          Home
+        </a>
+        <p>
           Don't have an account? 
-          <a href="signup.html" class="font-semibold text-[#ca5c2e] hover:underline">Sign up</a>
+          <a href="signup.html" class="font-bold text-[#ca5c2e] hover:text-[#b34d23] hover:underline transition ml-1">Sign up</a>
         </p>
       </div>
 
-    </div>
-  </main>
+      <!-- Centered Form -->
+      <div class="max-w-md w-full mx-auto my-auto py-8">
+        <div class="space-y-2 mb-8">
+          <h2 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-heading">Welcome back</h2>
+          <p class="text-sm text-stone-500">Enter your credentials to access your RecipePlan account.</p>
+        </div>
 
-  <script type="module" src="js/navbar.js"></script>
+        <form id="login-form" class="space-y-5" novalidate>
+          
+          <!-- Email Input -->
+          <div class="space-y-1.5">
+            <label for="email" class="block text-xs font-bold text-stone-700 uppercase tracking-wider">Email Address</label>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                </svg>
+              </span>
+              <input 
+                id="email" 
+                name="email" 
+                type="email" 
+                autocomplete="email" 
+                placeholder="you@example.com"
+                class="w-full pl-10 pr-4 py-3 rounded-xl border border-stone-200 focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition font-medium"
+                required
+              >
+            </div>
+          </div>
+
+          <!-- Password Input -->
+          <div class="space-y-1.5">
+            <div class="flex items-center justify-between">
+              <label for="password" class="block text-xs font-bold text-stone-700 uppercase tracking-wider">Password</label>
+              <button type="button" id="forgot-password-link" class="text-xs font-semibold text-[#ca5c2e] hover:text-[#b34d23] hover:underline transition focus:outline-none">Forgot password?</button>
+            </div>
+            <div class="relative">
+              <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                  <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                </svg>
+              </span>
+              <input 
+                id="password" 
+                name="password" 
+                type="password" 
+                autocomplete="current-password" 
+                placeholder="Enter your password"
+                class="w-full pl-10 pr-11 py-3 rounded-xl border border-stone-200 focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 text-stone-800 placeholder-stone-400 text-sm focus:outline-none transition font-medium"
+                required
+              >
+              <button 
+                type="button" 
+                id="toggle-password-btn" 
+                class="absolute right-3 top-1/2 -translate-y-1/2 text-stone-400 hover:text-stone-600 focus:outline-none p-1"
+                aria-label="Toggle password visibility"
+              >
+                <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                  <circle cx="12" cy="12" r="3"></circle>
+                </svg>
+              </button>
+            </div>
+          </div>
+
+          <!-- Error Alert Container -->
+          <p class="form-error text-xs text-red-600 font-semibold min-h-[1rem]" role="alert"></p>
+
+          <!-- Submit Button -->
+          <button 
+            type="submit" 
+            class="w-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-semibold py-3.5 rounded-xl transition shadow-sm hover:shadow text-sm focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 active:scale-[0.99] cursor-pointer"
+          >
+            Log In
+          </button>
+
+          <!-- OR Divider -->
+          <div class="relative flex items-center justify-center my-5">
+            <div class="flex-grow border-t border-stone-200"></div>
+            <span class="px-3 text-xs text-stone-400 font-semibold uppercase tracking-wider whitespace-nowrap select-none">or continue with</span>
+            <div class="flex-grow border-t border-stone-200"></div>
+          </div>
+
+          <!-- Google Button -->
+          <button 
+            type="button" 
+            id="google-login-btn" 
+            class="w-full bg-white hover:bg-stone-50 border border-stone-200 text-stone-700 font-semibold py-3 px-4 rounded-xl transition shadow-2xs hover:shadow-xs text-sm flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-stone-300 active:scale-[0.99] cursor-pointer"
+          >
+            <svg class="w-4 h-4" viewBox="0 0 24 24">
+              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
+              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
+            </svg>
+            <span>Google</span>
+          </button>
+        </form>
+      </div>
+
+      <!-- Bottom Terms / Privacy Note -->
+      <div class="text-center text-[11px] text-stone-400">
+        By continuing, you agree to RecipePlan's Terms of Service and Privacy Policy.
+      </div>
+    </div>
+
+  </div>
+
   <script type="module" src="js/auth.js"></script>
 </body>
 </html>
