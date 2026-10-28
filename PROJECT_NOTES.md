@@ -1,113 +1,159 @@
-# Project notes (read before every task)
+# RecipePlan: Project Notes
 
-This file is the team's shared reference. If you use an AI coding assistant, tell it to read this file first.
+Shared rules for the whole team. Read this before you edit anything. Full use cases, flows and the timeline are in `Recipe Finder & Meal Planner Team Use Cases.md`.
 
 ## What we are building
 
-A recipe finder and meal planner. Users search recipes (TheMealDB API), log in (Firebase Auth), save favourites and a weekly meal plan (Firestore), and get a combined shopping list. Deployed on Firebase Hosting.
+**RecipePlan** is a recipe finder and weekly meal planner for home cooks, especially people with a diet or allergy. Users:
+
+- create an account and pick their diet and allergies in a 2-step onboarding page
+- search recipes (TheMealDB API) and see a warning on recipes that clash with their preferences
+- save favourites, rate and comment on recipes
+- plan a week of meals (Mon to Sun, Breakfast / Lunch / Dinner)
+- get one merged shopping list for the week
+
+TheMealDB has no allergen data, so warnings are keyword matching on ingredient names. It is a helper, not a guarantee. Keep that wording in the UI.
+
+Course: K0126002 Web Programming, Gachon University, Fall 2026.
+
+## Stack
+
+- Plain HTML, CSS and JavaScript. No frameworks, no build step.
+- Tailwind CSS v3 via CDN (`https://cdn.tailwindcss.com`). Every page has the same `tailwind.config` block with the `brand` colours (`#ca5c2e` main). Copy it from an existing page.
+- Shared CSS files still exist: `css/base.css`, `css/components.css`, plus one CSS file per page where needed.
+- JavaScript uses ES modules (`<script type="module">`), so use a local server (`npx serve public`), not `file://`.
+- Firebase Authentication (email/password and Google) and Cloud Firestore.
+- TheMealDB: `https://www.themealdb.com/api/json/v1/1`
+- Fonts: Inter (body), Outfit (headings).
+
+## Git workflow
+
+- `main` = stable and deployed. Do not work on it directly.
+- `dev` = daily work. Pull before you start and before you push: `git pull origin dev`.
+- Person 4 merges tested `dev` into `main` (pull request).
+- Commit small and often. Message says what changed.
+
+## Deployment
+
+All site files live in `public/`. The repo currently has:
+
+- GitHub Pages: `.github/workflows/deploy.yml` uploads `./public`
+- Firebase Hosting: `firebase.json`, `.firebaserc` (project `recipe-plan-app`) and the two `firebase-hosting-*.yml` workflows
+
+See "Open decisions" for which one is the official submission link.
 
 ## Rules
 
-- Plain HTML, CSS and JavaScript only. No frameworks and no build step.
-- All site files live in `public/`. Pages sit next to each other, so links are `css/base.css` and `js/auth.js`.
-- JavaScript uses ES modules: `<script type="module" src="js/xyz.js"></script>` and `import { ... } from './auth.js'`.
-- Edit only your own files. To change a shared file (`base.css`, `components.css`, `firebase-config.js`, `auth.js`, `api.js`), ask its owner.
-- One page = one HTML file + one CSS file + one JS file.
-- Do not weaken `firestore.rules` to make an error go away. Ask Person 1.
-- Check every screen in four states: loading, empty, error, success.
+1. Plain HTML, CSS and JS only. No React, Vue or build tools.
+2. One page = one HTML file + one JS file (+ one CSS file if it needs one).
+3. Edit only your own files (table below). Need a change in someone else's file? Ask them.
+4. Do not weaken `firestore.rules`. Ask Person 1.
+5. Every page that loads data has four states: loading, empty, error, content.
+6. Escape any user or API text before putting it in `innerHTML` (`escapeHtml` in `utils.js`).
+7. Passwords: at least 8 characters, one number, one special character. Enforced by the Firebase password policy and by `validatePasswordRequirements` in `auth.js`.
 
-## Ownership
+## Who owns what
 
-| Person | Owns |
-| --- | --- |
-| 1 | Accounts and profile: `login.html`, `signup.html`, `profile.html`, `css/auth.css`, `js/auth.js`, `js/navbar.js`, `js/firebase-config.js`, `firestore.rules` |
-| 2 | Recipe discovery and design system: `index.html`, `recipe.html`, `css/base.css`, `css/components.css`, `css/recipes.css`, `js/api.js`, `js/recipes.js` |
-| 3 | Favourites and QA: `favourites.html`, `css/favourites.css`, `js/favourites.js` |
-| 4 | Meal planner and deployment: `planner.html`, `css/planner.css`, `js/planner.js`, `firebase.json`, `README.md` |
-| anyone | `js/utils.js` (small shared helpers, tell the team when you change it) |
+| Person | Area | Files |
+| --- | --- | --- |
+| 1 (Lead) | Accounts, onboarding, profile, diet and allergy checker, security rules | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/firebase-config.js`, `css/auth.css`, `css/onboarding.css`, `firestore.rules` |
+| 2 | Recipe discovery, API, shared look | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css` |
+| 3 | Favourites, ratings and comments, QA | `favourites.html`, `js/favourites.js`, `css/favourites.css`, ratings code (planned `js/ratings.js`) |
+| 4 | Meal planner, shopping list, deployment, README | `planner.html`, `js/planner.js`, `css/planner.css`, `firebase.json`, `.github/workflows/`, `README.md` |
+| Anyone | Small shared helpers | `js/utils.js` (add, do not change existing functions) |
+
+`privacy.html` and `terms.html` are Person 1's.
 
 ## Contracts between people
 
-Person 1 exports from `js/auth.js`:
+Use these functions instead of rewriting them. If you change a signature, tell the team first.
 
-- `getCurrentUser()` returns the logged-in user or `null`.
-- `onAuthChange(callback)` calls `callback(user)` now and whenever login state changes.
-- `signup(name, email, password)`, `login(email, password)`, `loginWithGoogle()`, `logout()`.
+**`js/auth.js` (Person 1)**
+`getCurrentUser()`, `onAuthChange(cb)`, `signup(name, email, password)`, `login(email, password)`, `loginWithGoogle()`, `logout()`, `deleteAccount()`, `resetPassword(email)`, `validatePasswordRequirements(password)` (returns an error string or `null`), `friendlyAuthError(error)`.
 
-Person 2 exports from `js/api.js` and defines the **recipe object**:
+**`js/preferences.js` (Person 1)**
+`getPreferences()` returns `{ diets, allergies, hideFlagged, onboardingComplete, onboardingStep }`.
+`savePreferences(partial)`, `syncPreferencesFromCloud()`, `needsOnboarding()`, `hasPreferences()`.
+Checking: `checkRecipe(recipe, prefs)`, `checkRecipes(recipes)`, `checkIngredients(...)`, `getIngredientNames(recipe)`, `decorateCard(...)`, `describeResult(...)`, `openFlaggedRecipeModal(...)`, `confirmIfFlagged(recipe)` (asks the user before adding a flagged recipe, resolves `true` to continue).
+Options: `DIET_OPTIONS`, `ALLERGEN_OPTIONS`, `dietLabel(value)`.
+
+**`js/api.js` (Person 2)**
+`searchRecipes(query)`, `getRecipeById(id)`, `listCategories()`, `filterByCategory(category)`, `normalizeRecipe(meal)`.
+
+Recipe object used everywhere:
 
 ```js
-{
-  id: "52772",            // string, TheMealDB idMeal
-  name: "Teriyaki Chicken Casserole",
-  image: "https://...",
-  category: "Chicken",
-  area: "Japanese",
-  instructions: "...",
-  youtube: "https://...",
-  ingredients: [{ name: "soy sauce", measure: "3/4 cup" }]
-}
+{ id, name, image, category, area, instructions, ingredients: [{ name, measure }], youtube }
 ```
 
-Person 3 exports from `js/favourites.js`: `addFavourite(recipe)`, `removeFavourite(recipeId)`, `getFavourites()`, `isFavourite(recipeId)`, `watchFavourites(callback)`.
+**`js/favourites.js` (Person 3)**
+`getFavourites()`, `addFavourite(recipe)`, `removeFavourite(recipeId)`, `isFavourite(recipeId)`, `watchFavourites(cb)`.
 
-Person 4 exports from `js/planner.js`: `addToPlan(day, meal, recipe)`, `removeFromPlan(day, meal)`, `getPlan()`, `buildShoppingList(plan)`.
+**`js/planner.js` (Person 4)**
+`DAYS`, `MEALS`, `getPlan()`, `savePlan(plan)`, `addToPlan(day, meal, recipe, skipConfirm)`, `removeFromPlan(day, meal)`, `generateFromFavourites()`, `renderPlannerTable()`.
 
-Until a teammate's function is ready, write a temporary fake version in your own file and replace it later.
+**`js/utils.js` (shared)**
+`escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText`, `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items).
+
+**`js/firebase-config.js`** exports `app`, `auth`, `db`. Import these, never call `initializeApp` again.
 
 ## Database schema (Firestore)
 
-All personal data lives under `users/{uid}`. Recipes are not stored, only what belongs to the user. Use `serverTimestamp()` for every timestamp.
-
 ```
-users/{uid}                          (Person 1)
-  displayName   string
-  email         string
-  diets         array of string      e.g. ["vegetarian"]
-  allergies     array of string
-  createdAt     timestamp
+users/{uid}
+  displayName, email, createdAt
+  diets: []                 e.g. ["Vegetarian", "Halal"]
+  allergies: []             e.g. ["Peanuts", "Shellfish"]
+  hideFlagged: boolean
+  onboardingComplete: boolean
+  onboardingStep: 1 | 2
+  favourites/{recipeId}     the recipe object + ingredientNames [] + savedAt
+  mealPlan/{weekId}         { Mon: { Breakfast, Lunch, Dinner }, ... }
+  shoppingList/{weekId}     { items: [{ name, measure, checked }] }
 
-users/{uid}/favourites/{recipeId}    (Person 3)   doc id = TheMealDB idMeal as a string
-  recipeId      string
-  name          string
-  image         string
-  category      string
-  addedAt       timestamp
-
-users/{uid}/mealPlan/{day}           (Person 4)   day = monday ... sunday
-  breakfast     map or null          { recipeId, name, image, ingredients }
-  lunch         map or null
-  dinner        map or null
-  updatedAt     timestamp
-    ingredients = array of { name, measure }
-
-users/{uid}/shoppingList/current     (Person 4)
-  checked       array of string      ingredient names ticked off
-  updatedAt     timestamp
-
-recipes/{recipeId}/ratings/{uid}     (Person 2, optional)
-  stars         number               1 to 5
-  comment       string
-  displayName   string
-  createdAt     timestamp
+recipes/{recipeId}/ratings/{uid}   (Person 3)
+  stars (1 to 5), comment, displayName, createdAt
 ```
 
-Tell Person 1 before renaming any field, because other pages depend on the names.
+Rules (`firestore.rules`): everything under `users/{uid}` is readable and writable only by that user. Ratings are readable by anyone and writable only by their author.
+
+Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to `login.html`. `onboardingComplete` true goes to `index.html`. Step 1 is diet, step 2 is allergies. Next on step 1 saves diets straight away. Skip and Finish both set `onboardingComplete`.
+
+## Current status vs plan (check before you build)
+
+- Favourites and the weekly plan are stored in `localStorage` only for now. Firestore sync (`users/{uid}/favourites`, `mealPlan`) is still to do (Persons 3 and 4). Preferences already sync to Firestore.
+- The shopping list on `planner.html` is still sample markup. It needs to be built from the plan using `combineIngredients` (Person 4).
+- Ratings and comments are not built yet (no `ratings.js`; the rule is in place).
+- `planner.js` still seeds a demo plan on first load. Remove before final.
+- "Generate from Favourites" in the planner is an extra we added.
 
 ## Shared UI/UX rules
 
-- Mobile first. One column on phones, two from about 600px, three or four from about 900px.
-- Use the colours, spacing and components defined in `css/base.css` and `css/components.css`. Do not invent new ones for a single page.
-- Navbar on every page: logo, Recipes, Favourites, Planner, and Login / Sign up (or the user's name and Log out).
-- Every screen handles loading, empty, error and success states.
-- Accessibility: alt text on images, a label on every input, visible keyboard focus, and never show an error with colour alone.
+- Use the `brand` Tailwind colours and the Inter / Outfit fonts. Cream page background, white rounded cards, orange main button.
+- Mobile first. Check every page at phone width.
+- Buttons and inputs must have labels and visible focus. Images need `alt` text.
+- Show toasts (`showToast`) for success and errors, not `alert()`.
+- Allergen and diet warnings use the same badge and modal from `preferences.js` on every page.
 
-## Timeline (5 weeks)
+## Out of scope (only if everything else is done)
 
-| Weeks | Goal |
-| --- | --- |
-| Week 1 | Setup, Firebase project, first deploy, recipe object agreed, design system started |
-| Weeks 1-2 | Each person builds their happy path with stubs for the others |
-| Week 3 | Finish features, then feature freeze at the end of the week |
-| Week 4 | Integration and bug fixes |
-| Week 5 | QA, responsive and accessibility polish, final deploy, demo preparation |
+"Fill my week" smart auto-planner, substitution suggestions, search by ingredients on hand, cooking mode, dark mode.
+
+## Timeline
+
+Team dates (Oct 26 to Nov 29, feature freeze Nov 15):
+
+| Week | Dates | Goal |
+| --- | --- | --- |
+| 1 | Oct 26 to Nov 1 | Repo, Firebase, auth and onboarding, recipe search, page shells |
+| 2 | Nov 2 to Nov 8 | Recipe detail, preferences checker on cards, favourites on Firestore, planner table |
+| 3 | Nov 9 to Nov 15 | Ratings and comments, planner on Firestore, shopping list. **Feature freeze Nov 15** |
+| 4 | Nov 16 to Nov 22 | Testing, bug fixes, responsive and accessibility pass, README |
+| 5 | Nov 23 to Nov 29 | Deploy, final check, slides and demo |
+
+## Open decisions
+
+1. **Firebase allowed?** Confirm with the professor that Firebase Auth and Firestore are acceptable.
+2. **GitHub Pages vs Firebase Hosting.** The course asks for GitHub Pages. Decide which URL we submit and make sure that deployment works.
+3. **Deadline and course weeks.** The course page shows Oct 25 midnight in one place and Nov 3 in another, and lists Weeks 10 to 14. Email muhiddin@gachon.ac.kr to confirm, then realign the timeline above.
+4. **Use cases file.** Keep `Recipe Finder & Meal Planner Team Use Cases.md` in sync with this file (folder tree there still lists `ui.js` and `ratings.js`).
