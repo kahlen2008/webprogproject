@@ -1,4 +1,12 @@
 // Shared helpers for RecipePlan with modern Tailwind aesthetics.
+import { getCurrentUser } from "./auth.js";
+import { db } from "./firebase-config.js";
+import {
+  doc,
+  setDoc,
+  deleteDoc,
+  serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
 // Makes text safe to put inside HTML (stops a recipe name from breaking the page).
 export function escapeHtml(text) {
@@ -155,26 +163,43 @@ export function createRecipeCard(recipe, options = {}) {
         const exists = storedFavs.some((f) => String(f.id) === String(recipe.id));
         const icon = favBtn.querySelector(".heart-icon");
 
+        const user = getCurrentUser();
         if (exists) {
           storedFavs = storedFavs.filter((f) => String(f.id) !== String(recipe.id));
           icon.setAttribute("fill", "none");
-          icon.classList.remove("text-red-500");
-          favBtn.classList.remove("text-red-500");
+          icon.classList.remove("text-[#ca5c2e]", "text-red-500");
+          favBtn.classList.remove("text-[#ca5c2e]", "text-red-500");
           showToast(`Removed "${recipe.name}" from favourites`);
+          if (user && user.uid) {
+            deleteDoc(doc(db, "users", user.uid, "favourites", String(recipe.id))).catch(console.warn);
+          }
         } else {
-          storedFavs.push({
-            id: recipe.id,
-            name: recipe.name,
-            image: recipe.image,
-            category: recipe.category,
-            addedAt: new Date().toISOString()
-          });
+          const favItem = {
+            id: String(recipe.id),
+            name: recipe.name || "",
+            image: recipe.image || "",
+            category: recipe.category || "Main",
+            area: recipe.area || "",
+            savedAt: new Date().toISOString(),
+          };
+          storedFavs.unshift(favItem);
           icon.setAttribute("fill", "#ca5c2e");
           icon.classList.add("text-[#ca5c2e]");
           favBtn.classList.add("text-[#ca5c2e]");
           showToast(`Saved "${recipe.name}" to favourites!`);
+          if (user && user.uid) {
+            setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
+              id: String(recipe.id),
+              name: recipe.name || "",
+              image: recipe.image || "",
+              category: recipe.category || "Main",
+              area: recipe.area || "",
+              savedAt: serverTimestamp(),
+            }).catch(console.warn);
+          }
         }
         localStorage.setItem("recipeplan_favourites", JSON.stringify(storedFavs));
+        window.dispatchEvent(new CustomEvent("favourites-changed"));
       });
 
       // Check initial favourite state
@@ -191,6 +216,42 @@ export function createRecipeCard(recipe, options = {}) {
   }
 
   return item;
+}
+
+/**
+ * Synchronizes heart icons across all rendered cards on the page.
+ * Keeps them up-to-date even when navigating back via browser history / bfcache.
+ */
+export function syncAllCardHearts() {
+  let storedFavs = [];
+  try {
+    storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+  } catch (err) {}
+  const favIdSet = new Set(storedFavs.map((f) => String(f.id)));
+
+  document.querySelectorAll(".favourite-btn[data-id]").forEach((btn) => {
+    const id = btn.getAttribute("data-id");
+    const icon = btn.querySelector(".heart-icon");
+    const isSaved = favIdSet.has(String(id));
+    if (icon) {
+      if (isSaved) {
+        icon.setAttribute("fill", "#ca5c2e");
+        icon.classList.add("text-[#ca5c2e]");
+        btn.classList.add("text-[#ca5c2e]");
+      } else {
+        icon.setAttribute("fill", "none");
+        icon.classList.remove("text-[#ca5c2e]");
+        btn.classList.remove("text-[#ca5c2e]");
+      }
+    }
+  });
+}
+
+// Automatically sync all heart buttons when page is shown (handles bfcache / back navigation) or favourites change
+if (typeof window !== "undefined") {
+  window.addEventListener("pageshow", syncAllCardHearts);
+  window.addEventListener("favourites-changed", syncAllCardHearts);
+  window.addEventListener("storage", syncAllCardHearts);
 }
 
 // Cleans common typos and missing drop-cap letters found in TheMealDB instructions

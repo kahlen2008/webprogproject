@@ -3,6 +3,7 @@
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient } from "./utils.js";
+import { addFavourite, removeFavourite, isFavourite } from "./favourites.js";
 import {
   getPreferences,
   savePreferences,
@@ -408,7 +409,7 @@ async function showRecipe(id) {
     } else {
       recipe = await getRecipeById(id);
     }
-    
+
     // Fallback if API lookup fails or offline
     if (!recipe) {
       recipe = FALLBACK_RECIPES_BY_ID[String(id)] || FALLBACK_RECIPES_BY_ID["52772"];
@@ -523,14 +524,14 @@ async function showRecipe(id) {
           const trimmed = str.trim();
           if (/^(?:assembly|preparation|method|directions)[:.-]?$/i.test(trimmed)) return true;
           if (/^([A-Za-z0-9\s,&'-]{3,40}):$/.test(trimmed)) return true;
-          
+
           const pattern = /^(?:(?:make|prepare|cook)\s+(?:the\s+)?|to\s+(?:make|prepare|assemble|cook|bake)\s+(?:the\s+)?|for\s+(?:the\s+)?)([a-z0-9\s,&'-]+)[.:]?$/i;
           const match = trimmed.match(pattern);
           if (!match) return false;
-          
+
           if (trimmed.length > 45) return false;
           if (/\b(?:\d+\s*(?:minutes?|mins?|hours?|cups?|tbsp|tsp|g|oz|degrees?|°)|until|whisk|boil|stir|fry|bake|heat)\b/i.test(match[1])) return false;
-          
+
           return true;
         }
 
@@ -667,8 +668,8 @@ async function showRecipe(id) {
         const chipsHtml = isFlagged
           ? `<div class="mt-1.5 flex flex-wrap gap-1.5">
               ${flaggedLabels
-                .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
-                .join("")}
+            .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
+            .join("")}
             </div>`
           : "";
 
@@ -814,41 +815,42 @@ async function showRecipe(id) {
     const favIcon = document.getElementById("fav-icon");
     const favLabel = document.getElementById("fav-btn-label");
 
-    let storedFavs = [];
+    // Initialize favourite state (optimistic instant load from cache)
+    let isFaved = false;
     try {
-      storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+      const stored = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+      isFaved = stored.some((f) => String(f.id) === String(recipe.id));
     } catch (e) {}
 
-    const isFav = storedFavs.some((f) => String(f.id) === String(recipe.id));
-    if (isFav) {
-      favIcon.setAttribute("fill", "#ca5c2e");
-      favLabel.textContent = "Saved to Favourites";
-    }
-
-    favBtn.addEventListener("click", () => {
-      let currentFavs = [];
-      try {
-        currentFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-      } catch (e) {}
-
-      const exists = currentFavs.some((f) => String(f.id) === String(recipe.id));
-      if (exists) {
-        currentFavs = currentFavs.filter((f) => String(f.id) !== String(recipe.id));
-        favIcon.setAttribute("fill", "none");
-        favLabel.textContent = "Save to Favourites";
-        showToast(`Removed "${recipe.name}" from favourites`);
-      } else {
-        currentFavs.push({
-          id: recipe.id,
-          name: recipe.name,
-          image: recipe.image,
-          category: recipe.category
-        });
+    const updateFavDisplay = (faved) => {
+      isFaved = Boolean(faved);
+      if (isFaved) {
         favIcon.setAttribute("fill", "#ca5c2e");
         favLabel.textContent = "Saved to Favourites";
-        showToast(`Saved "${recipe.name}" to favourites!`);
+      } else {
+        favIcon.setAttribute("fill", "none");
+        favLabel.textContent = "Save to Favourites";
       }
-      localStorage.setItem("recipeplan_favourites", JSON.stringify(currentFavs));
+    };
+    updateFavDisplay(isFaved);
+
+    // Verify against isFavourite in background if needed
+    isFavourite(recipe.id).then((serverFaved) => {
+      if (serverFaved !== isFaved) updateFavDisplay(serverFaved);
+    }).catch(() => {});
+
+    // Instant optimistic toggle on click (0ms delay)
+    favBtn.addEventListener("click", () => {
+      const nextState = !isFaved;
+      updateFavDisplay(nextState);
+
+      if (nextState) {
+        showToast(`Saved "${recipe.name}" to favourites!`);
+        addFavourite(recipe).catch(console.warn);
+      } else {
+        showToast(`Removed "${recipe.name}" from favourites`);
+        removeFavourite(recipe.id).catch(console.warn);
+      }
     });
 
     // Add to meal plan quick action

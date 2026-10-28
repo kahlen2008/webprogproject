@@ -2,19 +2,32 @@
 // Connected to Firebase Auth and Firestore.
 
 import { getCurrentUser, onAuthChange, logout, deleteAccount, resetPassword } from "./auth.js";
-import { showToast } from "./utils.js";
+import { showToast, escapeHtml } from "./utils.js";
 import { db } from "./firebase-config.js";
 import { doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { updateProfile } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { renderNavbar } from "./navbar.js";
 import { savePreferences } from "./preferences.js";
 
+const COMMON_ALLERGENS = [
+  { value: "Peanuts", label: "Peanuts", icon: "🥜" },
+  { value: "Tree Nuts", label: "Tree Nuts", icon: "🌰" },
+  { value: "Dairy", label: "Dairy", icon: "🥛" },
+  { value: "Eggs", label: "Eggs", icon: "🥚" },
+  { value: "Gluten", label: "Gluten / Wheat", icon: "🌾" },
+  { value: "Soy", label: "Soy", icon: "🫘" },
+  { value: "Fish", label: "Fish", icon: "🐟" },
+  { value: "Shellfish", label: "Shellfish", icon: "🦐" },
+  { value: "Sesame", label: "Sesame", icon: "🌿" },
+];
+
 let currentProfile = {
   displayName: "",
   email: "",
   photoURL: "",
   diets: [],
-  allergies: []
+  allergies: [],
+  hideFlagged: false,
 };
 
 let activeUser = null;
@@ -35,7 +48,8 @@ function hydrateFromCache() {
         email: email,
         photoURL: avatar,
         diets: cachedProfile?.diets || [],
-        allergies: cachedProfile?.allergies || []
+        allergies: cachedProfile?.allergies || [],
+        hideFlagged: cachedProfile?.hideFlagged || false,
       };
       renderProfile();
     }
@@ -79,6 +93,7 @@ async function loadProfileForUser(user) {
       if (data.displayName) currentProfile.displayName = data.displayName;
       if (data.diets) currentProfile.diets = data.diets;
       if (data.allergies) currentProfile.allergies = data.allergies;
+      if (data.hideFlagged !== undefined) currentProfile.hideFlagged = data.hideFlagged;
       renderProfile();
     } else {
       // First time loading, check localStorage
@@ -88,6 +103,7 @@ async function loadProfileForUser(user) {
         if (parsed.email === user.email) {
           currentProfile.diets = parsed.diets || [];
           currentProfile.allergies = parsed.allergies || [];
+          if (parsed.hideFlagged !== undefined) currentProfile.hideFlagged = parsed.hideFlagged;
           renderProfile();
         }
       }
@@ -108,7 +124,8 @@ async function saveProfile(updatedFields) {
         displayName: currentProfile.displayName,
         email: currentProfile.email,
         diets: currentProfile.diets,
-        allergies: currentProfile.allergies
+        allergies: currentProfile.allergies,
+        hideFlagged: currentProfile.hideFlagged,
       }, { merge: true });
 
       // Update Firebase Auth profile displayName if changed
@@ -128,11 +145,12 @@ async function saveProfile(updatedFields) {
     localStorage.setItem("recipeplan_user", JSON.stringify(userCache));
   } catch (e) {}
 
-  if (updatedFields.diets !== undefined || updatedFields.allergies !== undefined) {
+  if (updatedFields.diets !== undefined || updatedFields.allergies !== undefined || updatedFields.hideFlagged !== undefined) {
     try {
       await savePreferences({
         diets: currentProfile.diets,
         allergies: currentProfile.allergies,
+        hideFlagged: currentProfile.hideFlagged,
       });
     } catch (e) {}
   }
@@ -160,35 +178,112 @@ function renderProfile() {
     profileEmailInput.value = currentProfile.email || activeUser?.email || "";
   }
 
-  // Update Diet checkboxes
+  // Update Diet checkboxes and live counter
   const dietCheckboxes = document.querySelectorAll("input[name='diet-pref']");
+  let activeDietCount = 0;
   dietCheckboxes.forEach((cb) => {
-    cb.checked = (currentProfile.diets || []).includes(cb.value);
+    const isChecked = (currentProfile.diets || []).includes(cb.value);
+    cb.checked = isChecked;
+    if (isChecked) activeDietCount++;
   });
+  const dietCountText = document.getElementById("diet-count-text");
+  if (dietCountText) {
+    dietCountText.textContent = `${activeDietCount} active`;
+  }
 
-  // Update Allergies tags
-  const allergiesList = document.getElementById("allergies-tags");
-  if (allergiesList) {
-    allergiesList.innerHTML = (currentProfile.allergies || [])
-      .map(
-        (allergy) => `
-        <span class="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-[#fbf2ec] text-[#ca5c2e] border border-[#f3ddd0]">
-          ${allergy}
-          <button type="button" class="remove-allergy-btn hover:text-[#b34d23] focus:outline-none ml-0.5" data-allergy="${allergy}" aria-label="Remove ${allergy}">
-            &times;
-          </button>
-        </span>
-      `
-      )
-      .join("");
+  // Update Hide Flagged toggle
+  const hideFlaggedToggle = document.getElementById("profile-hide-flagged");
+  if (hideFlaggedToggle) {
+    hideFlaggedToggle.checked = currentProfile.hideFlagged === true;
+  }
 
-    allergiesList.querySelectorAll(".remove-allergy-btn").forEach((btn) => {
+  // Render Common Allergens Grid
+  const commonGrid = document.getElementById("common-allergens-grid");
+  if (commonGrid) {
+    commonGrid.innerHTML = COMMON_ALLERGENS.map((allergen) => {
+      const isSelected = (currentProfile.allergies || []).includes(allergen.value);
+      return `
+        <button 
+          type="button" 
+          class="common-allergen-btn flex items-center justify-between p-2.5 sm:p-3 rounded-xl border text-xs transition select-none ${
+            isSelected
+              ? "border-[#ca5c2e] bg-[#fbf2ec] text-[#ca5c2e] font-semibold shadow-2xs hover:bg-[#f8ede6]"
+              : "border-stone-200 bg-white hover:border-[#ca5c2e]/40 hover:bg-[#fdfaf7] text-stone-700 font-medium shadow-2xs"
+          }"
+          data-allergy="${escapeHtml(allergen.value)}"
+        >
+          <span class="flex items-center gap-1.5 truncate">
+            <span class="text-sm">${allergen.icon}</span>
+            <span class="truncate">${escapeHtml(allergen.label)}</span>
+          </span>
+          <span class="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+            isSelected ? "bg-[#ca5c2e] text-white" : "bg-stone-100 text-stone-400"
+          }">
+            ${
+              isSelected
+                ? `<svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>`
+                : `<span class="text-xs font-bold leading-none">+</span>`
+            }
+          </span>
+        </button>
+      `;
+    }).join("");
+
+    commonGrid.querySelectorAll(".common-allergen-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const item = btn.dataset.allergy;
-        const newAllergies = (currentProfile.allergies || []).filter((a) => a !== item);
-        saveProfile({ allergies: newAllergies });
+        if (!item) return;
+        const current = currentProfile.allergies || [];
+        const updated = current.includes(item)
+          ? current.filter((a) => a !== item)
+          : [...current, item];
+        saveProfile({ allergies: updated });
       });
     });
+  }
+
+  // Update Allergies tags, clear button and counter
+  const allergiesList = document.getElementById("allergies-tags");
+  const allergyCountText = document.getElementById("allergy-count-text");
+  const clearAllBtn = document.getElementById("clear-all-allergies-btn");
+  const registeredCount = (currentProfile.allergies || []).length;
+
+  if (allergyCountText) {
+    allergyCountText.textContent = `${registeredCount} registered`;
+  }
+  if (clearAllBtn) {
+    if (registeredCount > 0) {
+      clearAllBtn.classList.remove("hidden");
+    } else {
+      clearAllBtn.classList.add("hidden");
+    }
+  }
+
+  if (allergiesList) {
+    if (registeredCount === 0) {
+      allergiesList.innerHTML = `<p class="text-xs text-stone-400 italic py-1">No allergies registered yet. Tap any common allergen above or type your own.</p>`;
+    } else {
+      allergiesList.innerHTML = (currentProfile.allergies || [])
+        .map(
+          (allergy) => `
+          <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold bg-[#fbf2ec] text-[#ca5c2e] border border-[#f3ddd0] shadow-2xs">
+            <span>${escapeHtml(allergy)}</span>
+            <button type="button" class="remove-allergy-btn hover:text-[#b34d23] focus:outline-none ml-0.5 p-0.5 hover:bg-[#ca5c2e]/10 rounded-full transition" data-allergy="${escapeHtml(allergy)}" aria-label="Remove ${escapeHtml(allergy)}">
+              <svg class="w-3 h-3" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+          </span>
+        `
+        )
+        .join("");
+
+      allergiesList.querySelectorAll(".remove-allergy-btn").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const item = btn.dataset.allergy;
+          const newAllergies = (currentProfile.allergies || []).filter((a) => a !== item);
+          saveProfile({ allergies: newAllergies });
+        });
+      });
+    }
   }
 }
 
@@ -297,6 +392,31 @@ document.addEventListener("DOMContentLoaded", () => {
         selected.push(cb.value);
       });
       saveProfile({ diets: selected });
+    });
+  }
+
+  // Live diet checkbox count update
+  document.querySelectorAll("input[name='diet-pref']").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const checkedCount = document.querySelectorAll("input[name='diet-pref']:checked").length;
+      const countEl = document.getElementById("diet-count-text");
+      if (countEl) countEl.textContent = `${checkedCount} active`;
+    });
+  });
+
+  // Hide Flagged filter toggle
+  const hideFlaggedToggle = document.getElementById("profile-hide-flagged");
+  if (hideFlaggedToggle) {
+    hideFlaggedToggle.addEventListener("change", (e) => {
+      saveProfile({ hideFlagged: e.target.checked });
+    });
+  }
+
+  // Clear All Allergies button
+  const clearAllAllergiesBtn = document.getElementById("clear-all-allergies-btn");
+  if (clearAllAllergiesBtn) {
+    clearAllAllergiesBtn.addEventListener("click", () => {
+      saveProfile({ allergies: [] });
     });
   }
 

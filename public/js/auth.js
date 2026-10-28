@@ -60,6 +60,7 @@ export async function signup(name, email, password) {
       email: email,
       diets: [],
       allergies: [],
+      hideFlagged: false,
       onboardingComplete: false,
       onboardingStep: 1,
       createdAt: serverTimestamp(),
@@ -77,6 +78,7 @@ export async function signup(name, email, password) {
       photoURL: userObj.photoURL,
       diets: [],
       allergies: [],
+      hideFlagged: false,
       onboardingComplete: false,
       onboardingStep: 1
     }));
@@ -147,6 +149,7 @@ export async function loginWithGoogle() {
           email: credential.user.email,
           diets: [],
           allergies: [],
+          hideFlagged: false,
           onboardingComplete: false,
           onboardingStep: 1,
           createdAt: serverTimestamp(),
@@ -157,6 +160,7 @@ export async function loginWithGoogle() {
           photoURL: userObj.photoURL,
           diets: [],
           allergies: [],
+          hideFlagged: false,
           onboardingComplete: false,
           onboardingStep: 1
         }));
@@ -256,6 +260,51 @@ if (togglePwBtn && pwInput) {
     pwInput.type = isPw ? "text" : "password";
     togglePwBtn.classList.toggle("text-[#ca5c2e]", isPw);
   });
+}
+
+// Live password requirements ticks & crosses updater
+const pwRequirementsList = document.getElementById("password-requirements");
+if (pwInput && pwRequirementsList) {
+  const reqLength = document.getElementById("req-length");
+  const reqNumber = document.getElementById("req-number");
+  const reqSpecial = document.getElementById("req-special");
+
+  const tickSvg = `<svg class="w-3.5 h-3.5 text-emerald-600 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>`;
+  const crossSvg = `<svg class="w-3.5 h-3.5 text-red-500 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>`;
+
+  const setRuleStatus = (itemEl, isValid) => {
+    if (!itemEl) return;
+    const iconContainer = itemEl.querySelector(".rule-icon");
+    if (iconContainer) {
+      iconContainer.innerHTML = isValid ? tickSvg : crossSvg;
+    }
+    if (isValid) {
+      itemEl.classList.remove("text-stone-500");
+      itemEl.classList.add("text-emerald-700", "font-medium");
+    } else {
+      itemEl.classList.remove("text-emerald-700", "font-medium");
+      itemEl.classList.add("text-stone-500");
+    }
+  };
+
+  const evaluatePasswordRequirements = () => {
+    const val = pwInput.value || "";
+    setRuleStatus(reqLength, val.length >= 8);
+    setRuleStatus(reqNumber, /\d/.test(val));
+    setRuleStatus(reqSpecial, /[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]/.test(val));
+
+    // Clear password error alert if requirements are newly met
+    const signupEl = document.getElementById("signup-form");
+    if (signupEl) {
+      const errBox = signupEl.querySelector(".form-error");
+      if (errBox && errBox.textContent.includes("Password must") && !validatePasswordRequirements(val)) {
+        errBox.textContent = "";
+      }
+    }
+  };
+
+  pwInput.addEventListener("input", evaluatePasswordRequirements);
+  evaluatePasswordRequirements();
 }
 
 const loginForm = document.getElementById("login-form");

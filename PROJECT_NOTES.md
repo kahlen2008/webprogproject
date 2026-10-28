@@ -54,13 +54,13 @@ See "Open decisions" for which one is the official submission link.
 
 ## Who owns what
 
-| Person | Area | Files |
-| --- | --- | --- |
+| Person   | Area                                                                    | Files                                                                                                                                                                                                                                                              |
+| -------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1 (Lead) | Accounts, onboarding, profile, diet and allergy checker, security rules | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/firebase-config.js`, `css/auth.css`, `css/onboarding.css`, `firestore.rules` |
-| 2 | Recipe discovery, API, shared look | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css` |
-| 3 | Favourites, ratings and comments, QA | `favourites.html`, `js/favourites.js`, `css/favourites.css`, ratings code (planned `js/ratings.js`) |
-| 4 | Meal planner, shopping list, deployment, README | `planner.html`, `js/planner.js`, `css/planner.css`, `firebase.json`, `.github/workflows/`, `README.md` |
-| Anyone | Small shared helpers | `js/utils.js` (add, do not change existing functions) |
+| 2        | Recipe discovery, API, shared look                                      | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css`                                                                                           |
+| 3        | Favourites, ratings and comments, QA                                    | `favourites.html`, `js/favourites.js`, `css/favourites.css`, ratings code (planned `js/ratings.js`)                                                                                                                                                        |
+| 4        | Meal planner, shopping list, deployment, README                         | `planner.html`, `js/planner.js`, `css/planner.css`, `firebase.json`, `.github/workflows/`, `README.md`                                                                                                                                                 |
+| Anyone   | Small shared helpers                                                    | `js/utils.js` (add, do not change existing functions)                                                                                                                                                                                                            |
 
 `privacy.html` and `terms.html` are Person 1's.
 
@@ -107,7 +107,7 @@ users/{uid}
   hideFlagged: boolean
   onboardingComplete: boolean
   onboardingStep: 1 | 2
-  favourites/{recipeId}     the recipe object + ingredientNames [] + savedAt
+  favourites/{recipeId}     { id, name, image, category, area, savedAt }
   mealPlan/{weekId}         { Mon: { Breakfast, Lunch, Dinner }, ... }
   shoppingList/{weekId}     { items: [{ name, measure, checked }] }
 
@@ -143,17 +143,10 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 Team dates (Oct 26 to Nov 29, feature freeze Nov 15):
 
-| Week | Dates | Goal |
-| --- | --- | --- |
-| 1 | Oct 26 to Nov 1 | Repo, Firebase, auth and onboarding, recipe search, page shells |
-| 2 | Nov 2 to Nov 8 | Recipe detail, preferences checker on cards, favourites on Firestore, planner table |
-| 3 | Nov 9 to Nov 15 | Ratings and comments, planner on Firestore, shopping list. **Feature freeze Nov 15** |
-| 4 | Nov 16 to Nov 22 | Testing, bug fixes, responsive and accessibility pass, README |
-| 5 | Nov 23 to Nov 29 | Deploy, final check, slides and demo |
-
-## Open decisions
-
-1. **Firebase allowed?** Confirm with the professor that Firebase Auth and Firestore are acceptable.
-2. **GitHub Pages vs Firebase Hosting.** The course asks for GitHub Pages. Decide which URL we submit and make sure that deployment works.
-3. **Deadline and course weeks.** The course page shows Oct 25 midnight in one place and Nov 3 in another, and lists Weeks 10 to 14. Email muhiddin@gachon.ac.kr to confirm, then realign the timeline above.
-4. **Use cases file.** Keep `Recipe Finder & Meal Planner Team Use Cases.md` in sync with this file (folder tree there still lists `ui.js` and `ratings.js`).
+| Week | Dates            | Goal                                                                                       |
+| ---- | ---------------- | ------------------------------------------------------------------------------------------ |
+| 1    | Oct 26 to Nov 1  | Repo, Firebase, auth and onboarding, recipe search, page shells                            |
+| 2    | Nov 2 to Nov 8   | Recipe detail, preferences checker on cards, favourites on Firestore, planner table        |
+| 3    | Nov 9 to Nov 15  | Ratings and comments, planner on Firestore, shopping list. **Feature freeze Nov 15** |
+| 4    | Nov 16 to Nov 22 | Testing, bug fixes, responsive and accessibility pass, README                              |
+| 5    | Nov 23 to Nov 29 | Deploy, final check, slides and demo                                                       |

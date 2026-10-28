@@ -11,10 +11,12 @@ function initRotatingSearchPlaceholder() {
   const suggestions = [
     'Search "Pasta"...',
     'Search "Chicken Curry"...',
-    'Search "Vegetarian Salad"...',
-    'Search "Quick Breakfast"...',
-    'Search "Creamy Salmon"...',
+    'Search "Stuffed Cabbage"...',
+    'Search "English Breakfast"...',
+    'Search "Teriyaki Salmon"...',
     'Search "Chocolate Soufflé"...',
+    'Search "Fettucine Alfredo"...',
+    'Search "Steak"...',
   ];
 
   // Respect user's motion preferences

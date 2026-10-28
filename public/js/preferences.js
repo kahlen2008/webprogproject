@@ -16,12 +16,15 @@ const INGREDIENT_CACHE_LIMIT = 400;
 
 // ---------- Options shown in onboarding and profile ----------
 export const DIET_OPTIONS = [
-  { value: "Vegetarian", label: "Vegetarian", description: "No meat or seafood" },
-  { value: "Vegan", label: "Vegan", description: "No animal products" },
-  { value: "Pescatarian", label: "Pescatarian", description: "Seafood, but no meat" },
-  { value: "Gluten Free", label: "Gluten-free", description: "No wheat, barley or rye" },
-  { value: "Dairy Free", label: "Dairy-free", description: "No milk, butter or cheese" },
-  { value: "Halal", label: "Halal", description: "Flags pork and alcohol" },
+  { value: "Vegetarian", label: "Vegetarian", description: "No meat or seafood", icon: "🥦" },
+  { value: "Vegan", label: "Vegan", description: "No animal products", icon: "🌱" },
+  { value: "Pescatarian", label: "Pescatarian", description: "Seafood, but no meat", icon: "🐟" },
+  { value: "Gluten Free", label: "Gluten-free", description: "No wheat, barley or rye", icon: "🌾" },
+  { value: "Dairy Free", label: "Dairy-free", description: "No milk, butter or cheese", icon: "🥛" },
+  { value: "Halal", label: "Halal", description: "Flags pork and alcohol", icon: "🌙" },
+  { value: "Kosher", label: "Kosher", description: "Flags pork and shellfish", icon: "✡️" },
+  { value: "Low Carb", label: "Low-carb", description: "Reduced sugars & carbs", icon: "🥑" },
+  { value: "Keto", label: "Keto", description: "High healthy fat, minimal carbs", icon: "🥩" },
 ];
 
 export const ALLERGEN_OPTIONS = [
@@ -132,6 +135,9 @@ const DIET_RULES = {
   "Gluten Free": ["gluten"],
   "Dairy Free": ["dairy"],
   Halal: ["porkProducts", "alcohol"],
+  Kosher: ["porkProducts", "shellfish"],
+  "Low Carb": ["gluten"],
+  Keto: ["gluten"],
 };
 
 const ALLERGEN_RULES = {
@@ -151,6 +157,9 @@ const ALIASES = {
   "gluten-free": "Gluten Free", "gluten free": "Gluten Free",
   "dairy-free": "Dairy Free", "dairy free": "Dairy Free",
   vegetarian: "Vegetarian", vegan: "Vegan", pescatarian: "Pescatarian", halal: "Halal",
+  kosher: "Kosher",
+  "low carb": "Low Carb", "low-carb": "Low Carb", lowcarb: "Low Carb",
+  keto: "Keto", "keto-friendly": "Keto",
   peanut: "Peanuts", peanuts: "Peanuts",
   nuts: "Tree Nuts", "tree nut": "Tree Nuts", "tree nuts": "Tree Nuts",
   dairy: "Dairy", milk: "Dairy", lactose: "Dairy",
@@ -159,6 +168,11 @@ const ALIASES = {
   soy: "Soy", soya: "Soy",
   fish: "Fish", shellfish: "Shellfish", sesame: "Sesame",
 };
+
+export function dietLabel(value) {
+  const match = DIET_OPTIONS.find((opt) => opt.value === value);
+  return match ? match.label : value;
+}
 
 function canonical(value) {
   const key = String(value || "").trim().toLowerCase();
@@ -309,10 +323,6 @@ export function checkIngredients(ingredientNames, prefs = getPreferences()) {
     hasAllergen: allergens.length > 0,
     hasDietConflict: dietConflicts.length > 0,
   };
-}
-
-export function dietLabel(value) {
-  return DIET_OPTIONS.find((d) => d.value === value)?.label || value;
 }
 
 export function checkRecipe(recipe, prefs = getPreferences()) {
