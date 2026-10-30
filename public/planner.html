@@ -61,9 +61,14 @@
         </button>
       </div>
 
-      <!-- Action Button -->
-      <div>
-        <button id="generate-plan-btn" type="button" class="inline-flex items-center gap-2 border border-[#ca5c2e] text-[#ca5c2e] hover:bg-[#ca5c2e]/10 px-4 py-2 rounded-xl text-xs sm:text-sm font-semibold transition focus:outline-none shadow-xs">
+      <!-- Action Buttons -->
+      <div class="flex flex-wrap items-center gap-2">
+
+        <button id="open-add-drawer-btn" type="button" class="inline-flex items-center gap-1.5 bg-[#ca5c2e] hover:bg-[#b34d23] text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition focus:outline-none shadow-xs">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Add to Calendar
+        </button>
+        <button id="generate-plan-btn" type="button" class="inline-flex items-center gap-2 border border-[#ca5c2e] text-[#ca5c2e] hover:bg-[#ca5c2e]/10 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition focus:outline-none shadow-xs">
           Generate from Favourites
         </button>
       </div>
@@ -91,6 +96,7 @@
     <!-- Integrated Shopping List Section -->
     <section class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 space-y-4">
       <div class="flex items-center justify-between">
+  
         <div>
           <h2 class="text-lg font-bold text-stone-900 tracking-tight">Shopping List</h2>
           <p class="text-xs text-stone-500">Auto-generated ingredients for this week's meals</p>
@@ -129,6 +135,86 @@
     </section>
 
   </main>
+
+  <!-- Meal Picker Slide-over Drawer / Side Panel -->
+  <div id="meal-picker-drawer" class="fixed inset-0 z-50 invisible transition-[visibility] duration-300" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+    <!-- Backdrop overlay -->
+    <div id="drawer-backdrop" class="fixed inset-0 bg-stone-900/50 backdrop-blur-xs opacity-0 transition-opacity duration-300"></div>
+
+    <div class="fixed inset-y-0 right-0 max-w-full flex pl-6 sm:pl-10">
+      <div id="drawer-panel" class="w-screen max-w-md bg-white shadow-2xl flex flex-col transform translate-x-full transition-transform duration-300 ease-in-out border-l border-[#efe6dc]">
+        
+        <!-- Drawer Header -->
+        <div class="p-5 sm:p-6 border-b border-[#efe6dc] bg-[#faf7f2]/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <h2 id="drawer-title" class="text-lg font-bold text-stone-900 tracking-tight">Add to Meal Plan</h2>
+              <p class="text-xs text-stone-500">Pick a recipe for your weekly calendar</p>
+            </div>
+            <button id="close-drawer-btn" type="button" class="p-2 rounded-xl text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition focus:outline-none" aria-label="Close panel">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+
+          <!-- Target Slot Selector -->
+          <div class="bg-white p-3 rounded-2xl border border-[#efe6dc] flex items-center gap-3 shadow-2xs">
+            <div class="flex-1">
+              <label for="drawer-day-select" class="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Target Day</label>
+              <select id="drawer-day-select" class="w-full text-xs font-semibold text-stone-800 bg-stone-50 border border-stone-200 rounded-lg px-2 py-1.5 focus:border-[#ca5c2e] focus:ring-1 focus:ring-[#ca5c2e] outline-none transition">
+                <option value="Mon">Monday</option>
+                <option value="Tue">Tuesday</option>
+                <option value="Wed">Wednesday</option>
+                <option value="Thu">Thursday</option>
+                <option value="Fri">Friday</option>
+                <option value="Sat">Saturday</option>
+                <option value="Sun">Sunday</option>
+              </select>
+            </div>
+            <div class="flex-1">
+              <label for="drawer-meal-select" class="block text-[10px] font-bold uppercase tracking-wider text-stone-400 mb-1">Target Meal</label>
+              <select id="drawer-meal-select" class="w-full text-xs font-semibold text-stone-800 bg-stone-50 border border-stone-200 rounded-lg px-2 py-1.5 focus:border-[#ca5c2e] focus:ring-1 focus:ring-[#ca5c2e] outline-none transition">
+                <option value="Breakfast">Breakfast</option>
+                <option value="Lunch">Lunch</option>
+                <option value="Dinner">Dinner</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Search & Tab Bar -->
+        <div class="p-4 border-b border-[#efe6dc] bg-white space-y-3">
+          <div class="relative">
+            <span class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-stone-400">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
+            <input id="drawer-search-input" type="search" placeholder="Search recipes (e.g. Pasta, Curry, Salad)..." class="w-full pl-9 pr-9 py-2 rounded-xl border border-stone-200 text-xs sm:text-sm text-stone-800 focus:outline-none focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 transition">
+            <button id="drawer-search-clear" type="button" class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-stone-400 hover:text-stone-700">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+          </div>
+
+          <!-- Tab buttons -->
+          <div class="flex items-center gap-2">
+            <button id="drawer-tab-favs" type="button" class="flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold bg-[#ca5c2e] text-white transition flex items-center justify-center gap-1.5 shadow-xs">
+              <svg class="w-3.5 h-3.5 fill-current" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+              <span>Saved Favourites</span>
+              <span id="drawer-favs-count" class="bg-white/25 text-white text-[10px] px-1.5 py-0.5 rounded-full font-bold">0</span>
+            </button>
+            <button id="drawer-tab-search" type="button" class="flex-1 py-1.5 px-3 rounded-xl text-xs font-semibold bg-stone-100 text-stone-600 hover:bg-stone-200 transition flex items-center justify-center gap-1.5">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span>Explore / Search</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Recipe Cards List -->
+        <div id="drawer-recipe-list" class="flex-1 overflow-y-auto p-4 space-y-2">
+          <!-- Populated dynamically via planner.js -->
+        </div>
+
+      </div>
+    </div>
+  </div>
 
   <!-- Global Footer (rendered by js/navbar.js) -->
   <footer id="site-footer"></footer>
