@@ -41,7 +41,7 @@ This is what four people can finish in five weeks (Oct 26 to Nov 29, 2026). Item
 - **Diet and allergy warnings:** badges and banners based on ingredient names, on recipe cards, the recipe page, favourites and the planner.
 - **Favourites:** saved per user in Firestore and synced across devices, plus star ratings and comments on each recipe that every logged-in user can read.
 - **Meal planner and shopping list:** a weekly plan (seven days, breakfast, lunch and dinner) saved per user, plus one combined shopping list with checkboxes and a print view.
-- **Interface:** responsive Tailwind design for phone, tablet and desktop, with loading, empty and error states and basic accessibility.
+- **Interface:** responsive Tailwind design for phone, tablet and desktop, with loading, empty and error states and basic accessibility. A language switcher (130+ languages, powered by Google Translate) is in the navbar, and non-English recipe searches are translated to English before they query TheMealDB.
 - **Deployment:** live on Firebase Hosting, with security rules that keep each user's data private.
 
 **Out of scope (proposed)**
@@ -51,7 +51,7 @@ This is what four people can finish in five weeks (Oct 26 to Nov 29, 2026). Item
 - Ordering groceries or connecting to shops.
 - Sharing plans or following other users, and moderation tools for comments.
 - Guaranteed allergen safety or medical advice. Warnings are keyword matches on ingredient names.
-- A native mobile app, offline mode, other languages or an admin dashboard.
+- A native mobile app, offline mode or an admin dashboard.
 - Photo uploads, so Firebase Storage is not used.
 
 * **Extra features for later:** a "Fill my week" button that auto-plans meals that are safe for the user, substitution suggestions for flagged ingredients, searching by the ingredients you already have, a step-by-step cooking mode, and dark mode.
@@ -233,9 +233,9 @@ Preferences should warn and filter, never block: the user always stays in contro
 
 Person 1 owns everything about who the user is, from the login screens to the Firebase Auth setup behind them.
 
-- **Frontend:** Signup and login pages, form validation, a navbar that changes when the user is logged in, and a profile page.
+- **Frontend:** Signup and login pages, form validation, a navbar that changes when the user is logged in, a profile page, and a language switcher in the navbar and on the login and signup pages.
 - **Backend:** Firebase Auth with email/password and Google sign-in, password reset, route protection, and a `users/{uid}` Firestore document for display name and dietary preferences (vegetarian, allergies, etc.).
-- **Extra:** Owns `firebase-config.js` and the Firestore security rules for the whole project.
+- **Extra:** Owns `firebase-config.js`, the Firestore security rules for the whole project, and `i18n.js` (the language switcher and translation of non-English search terms).
 
 **Happy path**
 

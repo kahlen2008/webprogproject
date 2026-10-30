@@ -25,6 +25,7 @@ Course: K0126002 Web Programming, Gachon University, Fall 2026.
 - Firebase Authentication (email/password and Google) and Cloud Firestore.
 - TheMealDB: `https://www.themealdb.com/api/json/v1/1`
 - Fonts: Inter (body), Outfit (headings).
+- Languages: a headless Google Translate engine (`js/i18n.js`) gives a language switcher with 130+ languages.
 
 ## Git workflow
 
@@ -56,7 +57,7 @@ See "Open decisions" for which one is the official submission link.
 
 | Person   | Area                                                                    | Files                                                                                                                                                                                                                                                              |
 | -------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 1 (Lead) | Accounts, onboarding, profile, diet and allergy checker, security rules | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/firebase-config.js`, `css/auth.css`, `css/onboarding.css`, `firestore.rules` |
+| 1 (Lead) | Accounts, onboarding, profile, diet and allergy checker, languages (i18n), Firestore schema helpers, security rules | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/i18n.js`, `js/schema.js`, `js/firebase-config.js`, `css/auth.css`, `css/onboarding.css`, `firestore.rules` |
 | 2        | Recipe discovery, API, shared look                                      | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css`                                                                                           |
 | 3        | Favourites, ratings and comments, QA                                    | `favourites.html`, `js/favourites.js`, `css/favourites.css`, ratings code (planned `js/ratings.js`)                                                                                                                                                        |
 | 4        | Meal planner, shopping list, deployment, README                         | `planner.html`, `js/planner.js`, `css/planner.css`, `firebase.json`, `.github/workflows/`, `README.md`                                                                                                                                                 |
@@ -76,6 +77,12 @@ Use these functions instead of rewriting them. If you change a signature, tell t
 `savePreferences(partial)`, `syncPreferencesFromCloud()`, `needsOnboarding()`, `hasPreferences()`.
 Checking: `checkRecipe(recipe, prefs)`, `checkRecipes(recipes)`, `checkIngredients(...)`, `getIngredientNames(recipe)`, `decorateCard(...)`, `describeResult(...)`, `openFlaggedRecipeModal(...)`, `confirmIfFlagged(recipe)` (asks the user before adding a flagged recipe, resolves `true` to continue).
 Options: `DIET_OPTIONS`, `ALLERGEN_OPTIONS`, `dietLabel(value)`.
+
+**`js/i18n.js` (Person 1)**
+`LANGUAGES`, `getCurrentLanguage()`, `setLanguage(code)`, `translateQueryToEnglish(query)` (used by `searchRecipes`), `translatePlaceholders()`, `createLanguageSwitcherHtml()`, `bindLanguageSwitcher()`, `ensureStandaloneLanguageSwitcher()`. Wrap text that must not be translated (recipe search terms, the brand name) in `translate="no" class="notranslate"`.
+
+**`js/schema.js` (Person 1)**
+Firestore path helpers (`SchemaPaths`), document builders (`createUserDoc`, `createFavouriteDoc`, `createMealPlanDoc`, `createShoppingListDoc`, `createRatingDoc`) and read/write helpers (`saveUserFavourite`, `fetchUserFavourites`, `saveUserMealPlan`, `fetchUserMealPlan`, `saveUserShoppingList`, `fetchUserShoppingList`, `saveRecipeRating`, `fetchRecipeRatings`, ...). Persons 3 and 4 should call these instead of writing Firestore code themselves.
 
 **`js/api.js` (Person 2)**
 `searchRecipes(query)`, `getRecipeById(id)`, `listCategories()`, `filterByCategory(category)`, `normalizeRecipe(meal)`.
@@ -121,11 +128,12 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 ## Current status vs plan (check before you build)
 
-- Favourites and the weekly plan are stored in `localStorage` only for now. Firestore sync (`users/{uid}/favourites`, `mealPlan`) is still to do (Persons 3 and 4). Preferences already sync to Firestore.
+- `schema.js` has the Firestore helpers, but no page imports them yet. Favourites and the weekly plan are still stored in `localStorage` only. Firestore sync (`users/{uid}/favourites`, `mealPlan`) is still to do (Persons 3 and 4). Preferences already sync to Firestore.
 - The shopping list on `planner.html` is still sample markup. It needs to be built from the plan using `combineIngredients` (Person 4).
 - Ratings and comments are not built yet (no `ratings.js`; the rule is in place).
 - `planner.js` still seeds a demo plan on first load. Remove before final.
 - "Generate from Favourites" in the planner is an extra we added.
+- Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
 
 ## Shared UI/UX rules
 
@@ -137,7 +145,7 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 ## Out of scope (only if everything else is done)
 
-"Fill my week" smart auto-planner, substitution suggestions, search by ingredients on hand, cooking mode, dark mode.
+"Fill my week" smart auto-planner, substitution suggestions, search by ingredients on hand, cooking mode, dark mode. (Multi-language support was moved into scope and is built.)
 
 ## Timeline
 
