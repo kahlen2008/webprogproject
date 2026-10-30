@@ -65,26 +65,26 @@ function renderDietChips() {
   const chips = DIET_OPTIONS.map((opt) => {
     const checked = !state.noDietPreference && state.diets.has(opt.value);
     return `
-      <button type="button" role="checkbox" class="choice-chip diet-chip flex items-center gap-3 p-3.5 sm:p-4 rounded-2xl border ${checked ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-200 bg-white'} text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
+      <button type="button" role="checkbox" class="choice-chip diet-chip flex items-center gap-2.5 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border ${checked ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-200 bg-white'} text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
         data-value="${escapeHtml(opt.value)}" aria-checked="${checked}" aria-pressed="${checked}">
-        <span class="chip-checkbox flex-shrink-0 w-5 h-5 rounded-md border-2 ${checked ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
+        <span class="chip-checkbox flex-shrink-0 w-4.5 h-4.5 rounded-md border-2 ${checked ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
           ${CHECK_SVG}
         </span>
         <span class="flex-1 min-w-0">
-          <span class="flex items-center gap-1.5 text-sm font-semibold text-stone-900 group-hover:text-[#ca5c2e] transition-colors">
+          <span class="flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-stone-900 group-hover:text-[#ca5c2e] transition-colors">
             ${opt.icon ? `<span class="text-base">${opt.icon}</span>` : ""}
             <span>${escapeHtml(opt.label)}</span>
           </span>
-          <span class="block text-xs text-stone-500 mt-0.5 leading-snug">${escapeHtml(opt.description)}</span>
+          <span class="block text-[11px] sm:text-xs text-stone-500 mt-0.5 leading-tight">${escapeHtml(opt.description)}</span>
         </span>
       </button>`;
   }).join("");
 
   const checkedNone = state.noDietPreference;
   const none = `
-    <button type="button" role="checkbox" class="choice-chip diet-chip sm:col-span-2 md:col-span-3 flex items-center justify-center gap-3 p-3.5 rounded-2xl border border-dashed ${checkedNone ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-300 bg-white'} text-sm font-semibold text-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
+    <button type="button" role="checkbox" class="choice-chip diet-chip sm:col-span-2 md:col-span-3 flex items-center justify-center gap-2.5 p-2 sm:p-2.5 rounded-xl sm:rounded-2xl border border-dashed ${checkedNone ? 'border-[#ca5c2e] bg-[#fbf2ec]' : 'border-stone-300 bg-white'} text-xs sm:text-sm font-semibold text-stone-700 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition group"
       data-value="${NO_PREFERENCE}" aria-checked="${checkedNone}" aria-pressed="${checkedNone}">
-      <span class="chip-checkbox flex-shrink-0 w-5 h-5 rounded-md border-2 ${checkedNone ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
+      <span class="chip-checkbox flex-shrink-0 w-4.5 h-4.5 rounded-md border-2 ${checkedNone ? 'border-[#ca5c2e] bg-[#ca5c2e]' : 'border-stone-300 bg-white group-hover:border-stone-400'} flex items-center justify-center transition-colors shadow-xs">
         ${CHECK_SVG}
       </span>
       <span>No preference, I eat everything</span>
