@@ -325,7 +325,7 @@ async function renderFavouritesList(filterText = "") {
 
     container.innerHTML = `
       <div class="py-10 text-center text-xs text-stone-500 space-y-1">
-        <p class="font-medium text-stone-700">No favourites match "${filterText}"</p>
+        <p class="font-medium text-stone-700">${/[^\u0000-\u007f]/.test(filterText) ? `<span>No favourites match </span><span translate="no" class="notranslate">"${filterText}"</span>` : `No favourites match "${filterText}"`}</p>
         <p class="text-stone-400">Try a different search term or browse all recipes.</p>
       </div>
     `;
@@ -382,7 +382,7 @@ async function performSearch(query) {
   container.innerHTML = `
     <div class="py-12 text-center text-xs text-stone-400 flex flex-col items-center justify-center gap-2">
       <svg class="w-6 h-6 animate-spin text-[#ca5c2e]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-      <span>Searching for "${query}"...</span>
+      <span>${/[^\u0000-\u007f]/.test(query) ? `<span>Searching: </span><span translate="no" class="notranslate">"${query}"</span>...` : `Searching for "${query}"...`}</span>
     </div>
   `;
 
@@ -391,7 +391,7 @@ async function performSearch(query) {
     if (!results || results.length === 0) {
       container.innerHTML = `
         <div class="py-10 text-center space-y-1.5">
-          <p class="text-xs font-bold text-stone-700">No recipes found for "${query}"</p>
+          <p class="text-xs font-bold text-stone-700">${/[^\u0000-\u007f]/.test(query) ? `<span>No recipes found: </span><span translate="no" class="notranslate">"${query}"</span>` : `No recipes found for "${query}"`}</p>
           <p class="text-xs text-stone-400">Try searching for keywords like "Pasta", "Chicken", or "Curry".</p>
         </div>
       `;

@@ -16,6 +16,7 @@ import {
 import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { showToast } from "./utils.js";
 import { needsOnboarding } from "./preferences.js";
+import "./i18n.js";
 
 // Where to send someone right after they sign up or log in.
 function postAuthDestination() {

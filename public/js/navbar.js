@@ -2,6 +2,7 @@
 // Supports both Firebase Auth and local demo user state.
 
 import { onAuthChange, logout, getCurrentUser } from "./auth.js";
+import { createLanguageSwitcherHtml, bindLanguageSwitcher } from "./i18n.js";
 
 const LINKS = [
   ["index.html", "Home"],
@@ -112,7 +113,7 @@ export function renderNavbar(user) {
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         <!-- Brand Logo -->
-        <a href="index.html" class="flex items-center gap-2 text-xl tracking-tight select-none">
+        <a href="index.html" translate="no" class="flex items-center gap-2 text-xl tracking-tight select-none notranslate">
           ${logoSvg}
           <span class="font-normal text-stone-800">Recipe</span><span class="font-extrabold text-stone-900 -ml-1">Plan</span>
         </a>
@@ -124,6 +125,7 @@ export function renderNavbar(user) {
 
         <!-- Right Side: Account & Mobile Toggle -->
         <div class="flex items-center gap-3">
+          ${createLanguageSwitcherHtml("nav")}
           ${userDisplayHtml}
 
           <!-- Mobile Hamburger Toggle -->
@@ -147,6 +149,7 @@ export function renderNavbar(user) {
   `;
 
   // Setup event listeners
+  bindLanguageSwitcher("nav");
   const menuBtn = document.getElementById("menu-button");
   const mobileMenu = document.getElementById("mobile-menu");
   if (menuBtn && mobileMenu) {

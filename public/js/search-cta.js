@@ -8,6 +8,7 @@ function initRotatingSearchPlaceholder() {
   if (!form || !input) return;
 
   const defaultPlaceholder = "Search for a recipe, ingredient or cuisine...";
+  input.dataset.origPlaceholder = defaultPlaceholder;
   const suggestions = [
     'Search "Pasta"...',
     'Search "Chicken Curry"...',
@@ -59,7 +60,8 @@ function initRotatingSearchPlaceholder() {
   form.addEventListener("submit", handleFormSubmit);
 
   function tick() {
-    if (isFocused || input.value.length > 0) return;
+    const activeLang = localStorage.getItem("recipeplan_lang") || "en";
+    if (isFocused || input.value.length > 0 || activeLang !== "en") return;
 
     const currentText = suggestions[suggestionIndex];
 

@@ -202,7 +202,13 @@ async function renderRecipeCards(recipesList) {
 async function runSearch(query, title = "Search Results") {
   if (!results) return;
   results.innerHTML = "";
-  if (sectionTitle) sectionTitle.textContent = title;
+  if (sectionTitle) {
+    if (query && /[^\u0000-\u007f]/.test(query)) {
+      sectionTitle.innerHTML = `<span>Search results: </span><span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`;
+    } else {
+      sectionTitle.innerHTML = `<span>${escapeHtml(title)}</span>`;
+    }
+  }
   if (message) {
     message.className = "text-sm text-stone-500 py-2 flex items-center gap-2";
     message.innerHTML = `
@@ -219,7 +225,10 @@ async function runSearch(query, title = "Search Results") {
     if (!recipes || recipes.length === 0) {
       if (message) {
         message.className = "text-sm text-stone-500 py-4 text-center";
-        message.textContent = `No recipes found for "${query}". Try another keyword or browse popular categories.`;
+        const safeQ = /[^\u0000-\u007f]/.test(query)
+          ? `<span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`
+          : `"${escapeHtml(query)}"`;
+        message.innerHTML = `<span>No recipes found for ${safeQ}. Try another keyword or browse popular categories.</span>`;
       }
       return;
     }
@@ -233,7 +242,7 @@ async function runSearch(query, title = "Search Results") {
 async function runCategoryFilter(category) {
   if (!results) return;
   results.innerHTML = "";
-  if (sectionTitle) sectionTitle.textContent = `${category} Recipes`;
+  if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(category)} Recipes</span>`;
   if (message) {
     message.className = "text-sm text-stone-500 py-2 flex items-center gap-2";
     message.innerHTML = `Loading ${category} recipes...`;
@@ -266,6 +275,7 @@ if (searchForm) {
     if (query) {
       activeCategory = null;
       categoryChips.forEach((c) => c.classList.remove("active"));
+      window.history.replaceState(null, "", `?search=${encodeURIComponent(query)}`);
       runSearch(query, `Recipes matching "${query}"`);
       const recipesSection = document.getElementById("recipes-section");
       if (recipesSection) {
@@ -284,6 +294,7 @@ if (searchForm) {
       if (activeCategory === cat) {
         activeCategory = null;
         chip.classList.remove("active");
+        window.history.replaceState(null, "", window.location.pathname);
         runSearch("", "Latest Recipes");
         return;
       }
@@ -298,6 +309,7 @@ if (searchForm) {
         }
       });
 
+      window.history.replaceState(null, "", `?category=${encodeURIComponent(cat)}`);
       runCategoryFilter(cat);
 
       // Scroll smoothly down to the recipes section
@@ -373,6 +385,7 @@ if (searchForm) {
         matchingChip.classList.add("active");
         runCategoryFilter(defaultCategory);
       } else {
+        window.history.replaceState(null, "", window.location.pathname);
         runSearch("", "Latest Recipes");
       }
     } else {

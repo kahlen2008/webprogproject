@@ -1,5 +1,6 @@
 // Talks to TheMealDB (free recipe API, no key needed). Owner: Person 2.
 import { toTitleCase, cleanInstructionText, combineIngredients } from "./utils.js";
+import { translateQueryToEnglish } from "./i18n.js";
 // Everyone else gets recipes from here, so keep the recipe object shape stable:
 //
 // {
@@ -63,7 +64,8 @@ export function normalizeRecipe(meal) {
 }
 
 export async function searchRecipes(query) {
-  const data = await fetchJson(`search.php?s=${encodeURIComponent(query)}`);
+  const englishQuery = await translateQueryToEnglish(query);
+  const data = await fetchJson(`search.php?s=${encodeURIComponent(englishQuery)}`);
   return (data.meals || []).map(normalizeRecipe);
 }
 
