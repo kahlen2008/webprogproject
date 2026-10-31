@@ -225,8 +225,8 @@ export function createRecipeCard(recipe, options = {}) {
       <div class="card-heart-slot absolute top-3 right-3" data-recipe-id="${recipeId}"></div>
     </div>
     <div class="p-3.5 sm:p-4 flex flex-col gap-2.5">
-      <h3 class="font-bold text-stone-900 text-base leading-snug line-clamp-1 hover:text-[#ca5c2e] transition">
-        <a href="recipe.html?id=${encodeURIComponent(recipe.id)}">${recipeName}</a>
+      <h3 class="font-bold text-stone-900 group-hover:text-[#ca5c2e] text-base leading-snug line-clamp-1 transition">
+        <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="text-stone-900 group-hover:text-[#ca5c2e] transition">${recipeName}</a>
       </h3>
       <div class="flex items-center justify-between">
         <span class="inline-block bg-[#f5ebe4] text-[#a04e28] text-xs font-semibold px-2.5 py-0.5 rounded-full">
