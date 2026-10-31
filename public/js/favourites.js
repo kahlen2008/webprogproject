@@ -284,15 +284,18 @@ function renderLoggedOutEmptyState() {
             </svg>
           </a>
         </div>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-          ${STARTER_RECIPES.map((recipe) => {
-            const card = createRecipeCard(recipe, { isFavouritePage: false });
-            return card.outerHTML;
-          }).join("")}
-        </div>
+        <ul id="logged-out-starter-recipes-list" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0 m-0"></ul>
       </div>
     </div>
   `;
+
+  const starterGrid = messageEl.querySelector("#logged-out-starter-recipes-list");
+  if (starterGrid) {
+    STARTER_RECIPES.forEach((recipe) => {
+      const card = createRecipeCard(recipe, { isFavouritePage: false });
+      starterGrid.appendChild(card);
+    });
+  }
 }
 
 function renderEmptyState() {

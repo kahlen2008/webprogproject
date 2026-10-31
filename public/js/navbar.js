@@ -115,7 +115,7 @@ export function renderNavbar(user) {
         <!-- Brand Logo -->
         <a href="index.html" translate="no" class="flex items-center gap-2 text-xl tracking-tight select-none notranslate">
           ${logoSvg}
-          <span class="font-normal text-stone-800">Recipe</span><span class="font-extrabold text-stone-900 -ml-1">Plan</span>
+          <span class="font-normal text-stone-800">Recipe<span class="font-extrabold text-stone-900">Plan</span></span>
         </a>
 
         <!-- Desktop Navigation Links -->
