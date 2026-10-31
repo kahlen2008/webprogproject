@@ -188,8 +188,6 @@ export function createRecipeCard(recipe, options = {}) {
   const formattedName = toTitleCase(recipe.name);
   const recipeName = escapeHtml(formattedName);
   const recipeImage = escapeHtml(recipe.image || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&q=80");
-  const isMealDbImg = /^https:\/\/www\.themealdb\.com\/images\/media\/meals\/[^/]+\.jpg$/i.test(recipe.image || "");
-  const cardThumb = isMealDbImg ? `${recipeImage}/preview` : recipeImage;
   const isPriority = Boolean(options.priority);
   const imgLoadingAttrs = isPriority
     ? 'fetchpriority="high" decoding="async"'
@@ -220,7 +218,7 @@ export function createRecipeCard(recipe, options = {}) {
   item.innerHTML = `
     <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
       <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="block w-full h-full overflow-hidden">
-        <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="${cardThumb}" width="320" height="240" alt="${recipeName}" ${imgLoadingAttrs} onerror="this.onerror=null;this.src='${recipeImage}'">
+        <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="${recipeImage}" alt="${recipeName}" ${imgLoadingAttrs}>
       </a>
       <div class="card-heart-slot absolute top-3 right-3" data-recipe-id="${recipeId}"></div>
     </div>
