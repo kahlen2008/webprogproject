@@ -211,7 +211,7 @@ export function setLanguage(langCode) {
     translatePlaceholders(normalized);
   } else {
     // Ensure script is loaded; if already loading, reload to apply cookie
-    initGoogleTranslate();
+    initGoogleTranslate(true);
     setTimeout(() => {
       const retryCombo = document.querySelector(".goog-te-combo");
       if (retryCombo) {
@@ -299,8 +299,8 @@ export async function translateQueryToEnglish(query) {
 }
 
 // Mount hidden Google Translate element and load script
-export function initGoogleTranslate() {
-  const currentLang = getCurrentLanguage();
+export function initGoogleTranslate(forceLoad = false) {
+  const currentLang = getCurrentLanguage(); if (!forceLoad && (!currentLang || currentLang === "en")) return;
   if (currentLang && currentLang !== "en") {
     setGoogTransCookie(currentLang);
     document.documentElement.setAttribute("lang", currentLang);
@@ -457,7 +457,7 @@ export function bindLanguageSwitcher(idPrefix = "nav") {
     const isHidden = dropdown.classList.contains("hidden");
     document.querySelectorAll("[id$='-lang-dropdown']").forEach((d) => d.classList.add("hidden"));
     if (isHidden) {
-      dropdown.classList.remove("hidden");
+      initGoogleTranslate(true); dropdown.classList.remove("hidden");
       btn.setAttribute("aria-expanded", "true");
       if (searchInput) {
         searchInput.value = "";
@@ -507,11 +507,11 @@ export function ensureStandaloneLanguageSwitcher() {
 if (typeof document !== "undefined") {
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", () => {
-      initGoogleTranslate();
+      initGoogleTranslate(false);
       ensureStandaloneLanguageSwitcher();
     });
   } else {
-    initGoogleTranslate();
+    initGoogleTranslate(false);
     ensureStandaloneLanguageSwitcher();
   }
 }
