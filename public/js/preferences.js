@@ -4,8 +4,6 @@
 // IMPORTANT: TheMealDB has no allergen data. Everything here is keyword matching
 // on ingredient names, so it is a best-effort warning, not a guarantee.
 
-import { auth, db } from "./firebase-config.js";
-import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { getRecipeById } from "./api.js";
 import { escapeHtml } from "./utils.js";
 
@@ -190,7 +188,6 @@ function readJson(key, fallback) {
 }
 
 function currentUid() {
-  if (auth && auth.currentUser) return auth.currentUser.uid;
   return readJson(USER_KEY, null)?.uid || null;
 }
 
@@ -225,6 +222,10 @@ export async function savePreferences(partial) {
   const uid = currentUid();
   if (uid) {
     try {
+      const [{ db }, { doc, setDoc }] = await Promise.all([
+        import("./firebase-config.js"),
+        import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+      ]);
       await setDoc(doc(db, "users", uid), partial, { merge: true });
     } catch (err) {
       console.warn("Could not save preferences to Firestore:", err);
@@ -236,6 +237,10 @@ export async function savePreferences(partial) {
 export async function syncPreferencesFromCloud(uid = currentUid(), timeoutMs = 3000) {
   if (!uid) return getPreferences();
   try {
+    const [{ db }, { doc, getDoc }] = await Promise.all([
+      import("./firebase-config.js"),
+      import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+    ]);
     const snap = await Promise.race([
       getDoc(doc(db, "users", uid)),
       new Promise((_, reject) => setTimeout(() => reject(new Error("timeout")), timeoutMs)),

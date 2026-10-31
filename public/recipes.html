@@ -9,41 +9,21 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://www.themealdb.com" crossorigin>
+  <link rel="modulepreload" href="js/navbar.js">
+  <link rel="modulepreload" href="js/i18n.js">
+  <link rel="modulepreload" href="js/recipes.js">
+  <link rel="modulepreload" href="js/api.js">
+  <link rel="modulepreload" href="js/utils.js">
+  <link rel="modulepreload" href="js/preferences.js">
+  <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
 
-  <!-- Tailwind CSS v3 via CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script>
-    tailwind.config = {
-      theme: {
-        extend: {
-          colors: {
-            brand: {
-              DEFAULT: '#ca5c2e',
-              dark: '#b34d23',
-              light: '#fdf8f4',
-              surface: '#faf6f0',
-              cream: '#faf7f2',
-              pill: '#f5ebe4',
-              pillText: '#a04e28',
-              border: '#ede4da',
-            }
-          },
-          fontFamily: {
-            sans: ['Inter', 'system-ui', 'sans-serif'],
-            heading: ['Outfit', 'Inter', 'sans-serif'],
-          }
-        }
-      }
-    }
-  </script>
-
-  <link rel="stylesheet" href="css/base.css">
-  <link rel="stylesheet" href="css/components.css">
-  <link rel="stylesheet" href="css/recipes.css">
+  <link rel="stylesheet" href="css/tailwind.css">
 </head>
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
-  <header id="navbar" class="w-full sticky top-0 z-40"></header>
+  <header id="navbar" class="w-full sticky top-0 z-40 min-h-[64px] bg-[#fcf9f5]/90 border-b border-[#ede4da]"></header>
 
   <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 space-y-10">
     
@@ -90,7 +70,7 @@
         <!-- Category: Chicken -->
         <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Chicken">
           <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1598515214211-89d3c73ae83b?auto=format&fit=crop&w=300&q=80" alt="Chicken" class="w-full h-full object-cover">
+            <img src="images/cat-chicken.webp" alt="Chicken" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
           <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Chicken</span>
         </button>
@@ -98,7 +78,7 @@
         <!-- Category: Beef -->
         <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Beef">
           <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1544025162-d76694265947?auto=format&fit=crop&w=300&q=80" alt="Beef" class="w-full h-full object-cover">
+            <img src="images/cat-beef.webp" alt="Beef" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
           <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Beef</span>
         </button>
@@ -114,7 +94,7 @@
         <!-- Category: Vegetarian -->
         <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Vegetarian">
           <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=300&q=80" alt="Vegetarian" class="w-full h-full object-cover">
+            <img src="images/cat-vegetarian.webp" alt="Vegetarian" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
           <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Vegetarian</span>
         </button>
@@ -122,7 +102,7 @@
         <!-- Category: Dessert -->
         <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Dessert">
           <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1551024709-8f23befc6f87?auto=format&fit=crop&w=300&q=80" alt="Dessert" class="w-full h-full object-cover">
+            <img src="images/cat-dessert.webp" alt="Dessert" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
           <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Dessert</span>
         </button>
@@ -130,7 +110,7 @@
         <!-- Category: Seafood -->
         <button type="button" class="category-chip flex flex-col items-center gap-2 group focus:outline-none" data-category="Seafood">
           <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full overflow-hidden border-2 border-white shadow-md group-hover:scale-105 group-hover:ring-4 group-hover:ring-[#ca5c2e]/20 transition duration-300">
-            <img src="https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=300&q=80" alt="Seafood" class="w-full h-full object-cover">
+            <img src="images/cat-seafood.webp" alt="Seafood" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
           <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Seafood</span>
         </button>
@@ -155,7 +135,7 @@
       <p id="results-message" class="hidden text-sm font-medium text-stone-500" aria-live="polite"></p>
       
       <!-- Recipe Cards Grid -->
-      <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0"></ul>
+      <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0 min-h-[680px]"></ul>
     </section>
   </main>
 

@@ -3,8 +3,6 @@
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal } from "./utils.js";
-import { addFavourite, removeFavourite, isFavourite } from "./favourites.js";
-import { getCurrentUser } from "./auth.js";
 import {
   getPreferences,
   savePreferences,
@@ -14,6 +12,15 @@ import {
   describeResult,
   confirmIfFlagged,
 } from "./preferences.js";
+
+function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem("recipeplan_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // ---------- Home page: Search & Category Filter ----------
 const searchForm = document.getElementById("search-form");
@@ -193,8 +200,8 @@ async function renderRecipeCards(recipesList) {
     message.className = "hidden";
   }
 
-  visible.forEach(({ recipe, result }) => {
-    const card = createRecipeCard(recipe);
+  visible.forEach(({ recipe, result }, index) => {
+    const card = createRecipeCard(recipe, { priority: index < 2 });
     decorateCard(card, result);
     results.appendChild(card);
   });
@@ -731,8 +738,8 @@ async function showRecipe(id) {
           
           <!-- Image Column -->
           <div class="md:col-span-5">
-            <div class="overflow-hidden rounded-2xl border border-[#efe6dc] shadow-sm bg-stone-100">
-              <img id="main-recipe-image" class="w-full aspect-[4/3] object-cover" src="${safeImage}" alt="${safeName}">
+            <div class="overflow-hidden rounded-2xl border border-[#efe6dc] shadow-sm bg-stone-100 aspect-[4/3]">
+              <img id="main-recipe-image" class="w-full h-full aspect-[4/3] object-cover" src="${safeImage}" width="480" height="360" fetchpriority="high" decoding="async" alt="${safeName}">
             </div>
           </div>
 
@@ -853,9 +860,12 @@ async function showRecipe(id) {
 
     // Verify against isFavourite in background if logged in
     if (currentUser) {
-      isFavourite(recipe.id).then((serverFaved) => {
-        if (serverFaved !== isFaved) updateFavDisplay(serverFaved);
-      }).catch(() => {});
+      import("./favourites.js")
+        .then(({ isFavourite }) => isFavourite(recipe.id))
+        .then((serverFaved) => {
+          if (serverFaved !== isFaved) updateFavDisplay(serverFaved);
+        })
+        .catch(() => {});
     }
 
     // Instant optimistic toggle on click (0ms delay)
@@ -876,10 +886,10 @@ async function showRecipe(id) {
 
       if (nextState) {
         showToast(`Saved "${recipe.name}" to favourites!`);
-        addFavourite(recipe).catch(console.warn);
+        import("./favourites.js").then(({ addFavourite }) => addFavourite(recipe)).catch(console.warn);
       } else {
         showToast(`Removed "${recipe.name}" from favourites`);
-        removeFavourite(recipe.id).catch(console.warn);
+        import("./favourites.js").then(({ removeFavourite }) => removeFavourite(recipe.id)).catch(console.warn);
       }
     });
 

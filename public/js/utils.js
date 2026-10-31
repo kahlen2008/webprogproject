@@ -1,12 +1,12 @@
 // Shared helpers for RecipePlan with modern Tailwind aesthetics.
-import { getCurrentUser } from "./auth.js";
-import { db } from "./firebase-config.js";
-import {
-  doc,
-  setDoc,
-  deleteDoc,
-  serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+function getCurrentUser() {
+  try {
+    const raw = localStorage.getItem("recipeplan_user");
+    return raw ? JSON.parse(raw) : null;
+  } catch (e) {
+    return null;
+  }
+}
 
 // Makes text safe to put inside HTML (stops a recipe name from breaking the page).
 export function escapeHtml(text) {
@@ -188,6 +188,12 @@ export function createRecipeCard(recipe, options = {}) {
   const formattedName = toTitleCase(recipe.name);
   const recipeName = escapeHtml(formattedName);
   const recipeImage = escapeHtml(recipe.image || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=600&q=80");
+  const isMealDbImg = /^https:\/\/www\.themealdb\.com\/images\/media\/meals\/[^/]+\.jpg$/i.test(recipe.image || "");
+  const cardThumb = isMealDbImg ? `${recipeImage}/preview` : recipeImage;
+  const isPriority = Boolean(options.priority);
+  const imgLoadingAttrs = isPriority
+    ? 'fetchpriority="high" decoding="async"'
+    : 'loading="lazy" decoding="async"';
   const recipeCategory = escapeHtml(recipe.category || "Main");
 
   // Determine action button (favorite heart vs delete trash)
@@ -212,9 +218,9 @@ export function createRecipeCard(recipe, options = {}) {
   const actionHtml = isFavouritePage ? deleteButtonHtml : heartButtonHtml;
 
   item.innerHTML = `
-    <div class="relative overflow-hidden bg-stone-100">
-      <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="block overflow-hidden">
-        <img class="w-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="${recipeImage}" alt="${recipeName}" loading="lazy">
+    <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
+      <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="block w-full h-full overflow-hidden">
+        <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="${cardThumb}" width="320" height="240" alt="${recipeName}" ${imgLoadingAttrs} onerror="this.onerror=null;this.src='${recipeImage}'">
       </a>
       <div class="card-heart-slot absolute top-3 right-3" data-recipe-id="${recipeId}"></div>
     </div>
@@ -267,7 +273,14 @@ export function createRecipeCard(recipe, options = {}) {
           favBtn.classList.remove("text-[#ca5c2e]", "text-red-500");
           showToast(`Removed "${recipe.name}" from favourites`);
           if (user && user.uid) {
-            deleteDoc(doc(db, "users", user.uid, "favourites", String(recipe.id))).catch(console.warn);
+            Promise.all([
+              import("./firebase-config.js"),
+              import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+            ])
+              .then(([{ db }, { doc, deleteDoc }]) =>
+                deleteDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)))
+              )
+              .catch(console.warn);
           }
         } else {
           const favItem = {
@@ -284,14 +297,21 @@ export function createRecipeCard(recipe, options = {}) {
           favBtn.classList.add("text-[#ca5c2e]");
           showToast(`Saved "${recipe.name}" to favourites!`);
           if (user && user.uid) {
-            setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
-              id: String(recipe.id),
-              name: recipe.name || "",
-              image: recipe.image || "",
-              category: recipe.category || "Main",
-              area: recipe.area || "",
-              savedAt: serverTimestamp(),
-            }).catch(console.warn);
+            Promise.all([
+              import("./firebase-config.js"),
+              import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+            ])
+              .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
+                setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
+                  id: String(recipe.id),
+                  name: recipe.name || "",
+                  image: recipe.image || "",
+                  category: recipe.category || "Main",
+                  area: recipe.area || "",
+                  savedAt: serverTimestamp(),
+                })
+              )
+              .catch(console.warn);
           }
         }
         localStorage.setItem("recipeplan_favourites", JSON.stringify(storedFavs));
