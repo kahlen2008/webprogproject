@@ -153,6 +153,7 @@ const MINOR_WORDS = new Set([
 ]);
 
 // Converts any text into proper Title Case (capitalizing words except minor words like and, with, of, etc.)
+// Properly handles parenthesized words like (Cabbage Roll) and hyphenated words.
 export function toTitleCase(str) {
   if (!str) return "";
   return String(str)
@@ -163,17 +164,18 @@ export function toTitleCase(str) {
       if (word.includes("-")) {
         return word
           .split("-")
-          .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+          .map((part) => part.replace(/^([^\p{L}\d]*)(\p{L})/u, (m, prefix, letter) => prefix + letter.toUpperCase()))
           .join("-");
       }
       const cleanWord = word.replace(/^[^\w]+|[^\w]+$/g, "");
       const isFirst = index === 0;
       const isLast = index === arr.length - 1;
+      const startsWithPunct = /^[^\p{L}\d]/u.test(word);
 
-      if (!isFirst && !isLast && MINOR_WORDS.has(cleanWord)) {
+      if (!isFirst && !isLast && !startsWithPunct && MINOR_WORDS.has(cleanWord)) {
         return word;
       }
-      return word.charAt(0).toUpperCase() + word.slice(1);
+      return word.replace(/^([^\p{L}\d]*)(\p{L})/u, (m, prefix, letter) => prefix + letter.toUpperCase());
     })
     .join(" ");
 }
