@@ -91,16 +91,31 @@ async function loadProfileForUser(user) {
     if (snap.exists()) {
       const data = snap.data();
       if (data.displayName) currentProfile.displayName = data.displayName;
-      if (data.diets) currentProfile.diets = data.diets;
-      if (data.allergies) currentProfile.allergies = data.allergies;
+      if (data.diets !== undefined) currentProfile.diets = data.diets;
+      if (data.allergies !== undefined) currentProfile.allergies = data.allergies;
       if (data.hideFlagged !== undefined) currentProfile.hideFlagged = data.hideFlagged;
+
+      // Keep local profile cache in sync with cloud
+      try {
+        const cached = JSON.parse(localStorage.getItem("recipeplan_profile") || "{}");
+        localStorage.setItem("recipeplan_profile", JSON.stringify({
+          ...cached,
+          displayName: currentProfile.displayName,
+          email: currentProfile.email,
+          photoURL: currentProfile.photoURL,
+          diets: currentProfile.diets,
+          allergies: currentProfile.allergies,
+          hideFlagged: currentProfile.hideFlagged,
+        }));
+      } catch (e) {}
+
       renderProfile();
     } else {
       // First time loading, check localStorage
       const cached = localStorage.getItem("recipeplan_profile");
       if (cached) {
         const parsed = JSON.parse(cached);
-        if (parsed.email === user.email) {
+        if (!parsed.email || parsed.email === user.email) {
           currentProfile.diets = parsed.diets || [];
           currentProfile.allergies = parsed.allergies || [];
           if (parsed.hideFlagged !== undefined) currentProfile.hideFlagged = parsed.hideFlagged;

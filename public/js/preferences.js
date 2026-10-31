@@ -224,9 +224,11 @@ export async function savePreferences(partial) {
 
   const uid = currentUid();
   if (uid) {
-    setDoc(doc(db, "users", uid), partial, { merge: true }).catch((err) => {
+    try {
+      await setDoc(doc(db, "users", uid), partial, { merge: true });
+    } catch (err) {
       console.warn("Could not save preferences to Firestore:", err);
-    });
+    }
   }
 }
 

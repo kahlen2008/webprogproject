@@ -62,17 +62,6 @@ export function onAuthChange(callback) {
 export async function signup(name, email, password) {
   try {
     const credential = await createUserWithEmailAndPassword(auth, email, password);
-    await updateProfile(credential.user, { displayName: name });
-    await setDoc(doc(db, "users", credential.user.uid), {
-      displayName: name,
-      email: email,
-      diets: [],
-      allergies: [],
-      hideFlagged: false,
-      onboardingComplete: false,
-      onboardingStep: 1,
-      createdAt: serverTimestamp(),
-    });
     const userObj = {
       uid: credential.user.uid,
       displayName: name,
@@ -90,6 +79,22 @@ export async function signup(name, email, password) {
       onboardingComplete: false,
       onboardingStep: 1
     }));
+
+    // Update profile and create initial firestore record in parallel
+    Promise.all([
+      updateProfile(credential.user, { displayName: name }).catch(console.warn),
+      setDoc(doc(db, "users", credential.user.uid), {
+        displayName: name,
+        email: email,
+        diets: [],
+        allergies: [],
+        hideFlagged: false,
+        onboardingComplete: false,
+        onboardingStep: 1,
+        createdAt: serverTimestamp(),
+      }).catch(console.warn),
+    ]);
+
     return credential.user;
   } catch (err) {
     console.error("Signup error:", err);
@@ -262,14 +267,29 @@ function showFormError(form, msg) {
   if (box) box.textContent = msg;
 }
 
-// Password show/hide toggle
+// Password show/hide toggle with dynamic eye / eye-off icon states
 const togglePwBtn = document.getElementById("toggle-password-btn");
 const pwInput = document.getElementById("password");
 if (togglePwBtn && pwInput) {
+  const eyeOpenSvg = `
+    <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+      <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+  `;
+  const eyeOffSvg = `
+    <svg class="w-4 h-4 eye-icon" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path>
+      <line x1="1" y1="1" x2="23" y2="23" stroke-linecap="round" stroke-linejoin="round"></line>
+    </svg>
+  `;
+
   togglePwBtn.addEventListener("click", () => {
-    const isPw = pwInput.type === "password";
-    pwInput.type = isPw ? "text" : "password";
-    togglePwBtn.classList.toggle("text-[#ca5c2e]", isPw);
+    const isCurrentlyPassword = pwInput.type === "password";
+    pwInput.type = isCurrentlyPassword ? "text" : "password";
+    togglePwBtn.innerHTML = isCurrentlyPassword ? eyeOffSvg : eyeOpenSvg;
+    togglePwBtn.classList.toggle("text-[#ca5c2e]", isCurrentlyPassword);
+    togglePwBtn.setAttribute("aria-label", isCurrentlyPassword ? "Hide password" : "Show password");
   });
 }
 
@@ -338,11 +358,49 @@ if (signupForm) {
     event.preventDefault();
     showFormError(signupForm, "");
 
+    const nameVal = signupForm.name.value.trim();
+    if (!nameVal) {
+      showFormError(signupForm, "Please enter your display name.");
+      signupForm.name.focus();
+      return;
+    }
+
+    const emailVal = signupForm.email.value.trim();
+    if (!emailVal) {
+      showFormError(signupForm, "Please enter your email address.");
+      signupForm.email.focus();
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailVal)) {
+      showFormError(signupForm, "Please enter a valid email address.");
+      signupForm.email.focus();
+      return;
+    }
+
     const passwordVal = signupForm.password.value;
     const pwError = validatePasswordRequirements(passwordVal);
     if (pwError) {
       showFormError(signupForm, pwError);
+      signupForm.password.focus();
       return;
+    }
+
+    const submitBtn = signupForm.querySelector('button[type="submit"]');
+    const originalText = submitBtn ? submitBtn.innerHTML : "";
+    if (submitBtn) {
+      submitBtn.disabled = true;
+      submitBtn.classList.add("opacity-75", "cursor-wait");
+      submitBtn.innerHTML = `
+        <span class="inline-flex items-center gap-2">
+          <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
+            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+          </svg>
+          Creating account...
+        </span>
+      `;
     }
 
     try {
@@ -351,6 +409,11 @@ if (signupForm) {
       const redirect = params.get("redirect");
       window.location.href = redirect ? `onboarding.html?redirect=${encodeURIComponent(redirect)}` : "onboarding.html";
     } catch (error) {
+      if (submitBtn) {
+        submitBtn.disabled = false;
+        submitBtn.classList.remove("opacity-75", "cursor-wait");
+        submitBtn.innerHTML = originalText;
+      }
       showFormError(signupForm, friendlyAuthError(error));
     }
   });
