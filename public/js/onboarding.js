@@ -242,6 +242,12 @@ els.customChips.addEventListener("click", (e) => {
 
 // ---------- Navigation ----------
 function goHome() {
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get("redirect");
+  if (redirect && !redirect.startsWith("http://") && !redirect.startsWith("https://") && !redirect.startsWith("//")) {
+    window.location.replace(redirect);
+    return;
+  }
   window.location.replace("index.html");
 }
 

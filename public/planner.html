@@ -46,8 +46,11 @@
 
   <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10 space-y-6">
     
-    <!-- Planner Header & Toolbar -->
-    <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div id="planner-logged-out-empty-state" class="hidden"></div>
+
+    <div id="planner-main-content" class="space-y-6">
+      <!-- Planner Header & Toolbar -->
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
       <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">Weekly Meal Plan</h1>
 
       <!-- Date Range Navigator -->
@@ -133,6 +136,7 @@
         </label>
       </div>
     </section>
+    </div>
 
   </main>
 

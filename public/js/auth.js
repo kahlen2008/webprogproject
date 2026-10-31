@@ -20,6 +20,13 @@ import "./i18n.js";
 
 // Where to send someone right after they sign up or log in.
 function postAuthDestination() {
+  const params = new URLSearchParams(window.location.search);
+  const redirect = params.get("redirect");
+  if (redirect) {
+    if (!redirect.startsWith("http://") && !redirect.startsWith("https://") && !redirect.startsWith("//")) {
+      return redirect;
+    }
+  }
   return needsOnboarding() ? "onboarding.html" : "index.html";
 }
 
@@ -183,6 +190,9 @@ export async function loginWithGoogle() {
 export async function logout() {
   localStorage.removeItem("recipeplan_user");
   localStorage.removeItem("recipeplan_profile");
+  localStorage.removeItem("recipeplan_favourites");
+  window.dispatchEvent(new CustomEvent("favourites-changed"));
+  window.dispatchEvent(new CustomEvent("auth-changed"));
   try {
     await signOut(auth);
   } catch (e) {}
@@ -337,7 +347,9 @@ if (signupForm) {
 
     try {
       await signup(signupForm.name.value, signupForm.email.value, passwordVal);
-      window.location.href = "onboarding.html";
+      const params = new URLSearchParams(window.location.search);
+      const redirect = params.get("redirect");
+      window.location.href = redirect ? `onboarding.html?redirect=${encodeURIComponent(redirect)}` : "onboarding.html";
     } catch (error) {
       showFormError(signupForm, friendlyAuthError(error));
     }

@@ -1,10 +1,11 @@
 // Weekly Meal planner and shopping list logic matching RecipePlan mockup.
 // Owner: Person 4.
 
-import { showToast, toTitleCase } from "./utils.js";
+import { showToast, toTitleCase, showAuthPromptModal } from "./utils.js";
 import { getFavourites } from "./favourites.js";
 import { confirmIfFlagged } from "./preferences.js";
 import { searchRecipes } from "./api.js";
+import { getCurrentUser } from "./auth.js";
 
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const MEALS = ["Breakfast", "Lunch", "Dinner"];
@@ -128,7 +129,75 @@ export async function generateFromFavourites() {
   showToast("Meal plan populated from your favourites!");
 }
 
+export function updatePlannerAuthUI() {
+  const user = getCurrentUser();
+  const emptyStateEl = document.getElementById("planner-logged-out-empty-state");
+  const mainContentEl = document.getElementById("planner-main-content");
+
+  if (!user) {
+    if (mainContentEl) mainContentEl.classList.add("hidden");
+    if (emptyStateEl) {
+      emptyStateEl.classList.remove("hidden");
+      const destination = (window.location.pathname.split("/").pop() || "planner.html") + window.location.search;
+      const loginHref = `login.html?redirect=${encodeURIComponent(destination)}`;
+      const signupHref = `signup.html?redirect=${encodeURIComponent(destination)}`;
+
+      emptyStateEl.innerHTML = `
+        <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-[#fcf8f4] to-[#f8f0e5] border border-[#eee2d5] p-8 sm:p-14 text-center shadow-xs">
+          <div class="absolute -top-20 -left-20 w-56 h-56 bg-[#ca5c2e]/5 rounded-full blur-3xl pointer-events-none"></div>
+          <div class="absolute -bottom-20 -right-20 w-56 h-56 bg-[#f3c292]/10 rounded-full blur-3xl pointer-events-none"></div>
+
+          <div class="relative z-10 max-w-xl mx-auto space-y-6">
+            <div class="relative inline-block mx-auto">
+              <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-[#fbebe3] to-[#fae2d5] border border-[#f5cfb8] flex items-center justify-center mx-auto shadow-inner ring-8 ring-[#ca5c2e]/5">
+                <svg class="w-10 h-10 sm:w-11 sm:h-11 text-[#ca5c2e] drop-shadow-sm transition-transform duration-300 hover:scale-110" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                  <rect x="3" y="4" width="18" height="18" rx="3" ry="3"></rect>
+                  <line x1="16" y1="2" x2="16" y2="6"></line>
+                  <line x1="8" y1="2" x2="8" y2="6"></line>
+                  <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+              </div>
+              <span class="absolute -top-1 -right-1 w-7 h-7 bg-white rounded-full border border-[#eee2d5] shadow-xs flex items-center justify-center text-xs select-none">🗓️</span>
+              <span class="absolute -bottom-1 -left-1 w-7 h-7 bg-white rounded-full border border-[#eee2d5] shadow-xs flex items-center justify-center text-xs select-none">✨</span>
+            </div>
+
+            <div class="space-y-2.5">
+              <h2 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-heading">
+                Log in to plan your week
+              </h2>
+              <p class="text-sm sm:text-base text-stone-600 leading-relaxed max-w-md mx-auto">
+                Save recipes you love, plan your meals and get a shopping list, all in one place.
+              </p>
+            </div>
+
+            <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+              <a 
+                href="${loginHref}" 
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <span>Log In</span>
+              </a>
+              <a 
+                href="${signupHref}" 
+                class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-[#fbf2ec] text-stone-800 hover:text-[#ca5c2e] border border-[#ede4da] text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full transition-all duration-200 shadow-2xs hover:shadow-xs active:scale-[0.98]"
+              >
+                <span>Sign up free</span>
+              </a>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+    return false;
+  } else {
+    if (emptyStateEl) emptyStateEl.classList.add("hidden");
+    if (mainContentEl) mainContentEl.classList.remove("hidden");
+    return true;
+  }
+}
+
 export async function renderPlannerTable() {
+  updatePlannerAuthUI();
   const host = document.getElementById("planner-table-body");
   if (!host) return;
 
@@ -472,6 +541,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const openDrawerBtn = document.getElementById("open-add-drawer-btn");
   if (openDrawerBtn) {
     openDrawerBtn.addEventListener("click", () => {
+      const user = getCurrentUser();
+      if (!user) {
+        showAuthPromptModal({
+          title: "Log in to plan your meals",
+          description: "Create a free account to add recipes to your weekly planner and build your shopping list.",
+          redirectUrl: "planner.html",
+          icon: "planner"
+        });
+        return;
+      }
       openMealDrawer("Mon", "Breakfast");
     });
   }
@@ -480,6 +559,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const generateBtn = document.getElementById("generate-plan-btn");
   if (generateBtn) {
     generateBtn.addEventListener("click", () => {
+      const user = getCurrentUser();
+      if (!user) {
+        showAuthPromptModal({
+          title: "Log in to plan your meals",
+          description: "Create a free account to add recipes to your weekly planner and build your shopping list.",
+          redirectUrl: "planner.html",
+          icon: "planner"
+        });
+        return;
+      }
       generateFromFavourites();
     });
   }
@@ -568,4 +657,11 @@ document.addEventListener("DOMContentLoaded", () => {
       showToast("Viewing week: 30 Nov – 6 Dec 2026");
     });
   }
+
+  window.addEventListener("auth-changed", () => {
+    renderPlannerTable();
+  });
+  window.addEventListener("storage", (e) => {
+    if (e.key === "recipeplan_user") renderPlannerTable();
+  });
 });

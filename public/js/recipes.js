@@ -2,8 +2,9 @@
 // Matches the design and interactions shown in RecipePlan mockup.
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal } from "./utils.js";
 import { addFavourite, removeFavourite, isFavourite } from "./favourites.js";
+import { getCurrentUser } from "./auth.js";
 import {
   getPreferences,
   savePreferences,
@@ -828,12 +829,15 @@ async function showRecipe(id) {
     const favIcon = document.getElementById("fav-icon");
     const favLabel = document.getElementById("fav-btn-label");
 
-    // Initialize favourite state (optimistic instant load from cache)
+    // Initialize favourite state (optimistic instant load from cache only if logged in)
     let isFaved = false;
-    try {
-      const stored = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-      isFaved = stored.some((f) => String(f.id) === String(recipe.id));
-    } catch (e) {}
+    const currentUser = getCurrentUser();
+    if (currentUser) {
+      try {
+        const stored = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+        isFaved = stored.some((f) => String(f.id) === String(recipe.id));
+      } catch (e) {}
+    }
 
     const updateFavDisplay = (faved) => {
       isFaved = Boolean(faved);
@@ -847,13 +851,26 @@ async function showRecipe(id) {
     };
     updateFavDisplay(isFaved);
 
-    // Verify against isFavourite in background if needed
-    isFavourite(recipe.id).then((serverFaved) => {
-      if (serverFaved !== isFaved) updateFavDisplay(serverFaved);
-    }).catch(() => {});
+    // Verify against isFavourite in background if logged in
+    if (currentUser) {
+      isFavourite(recipe.id).then((serverFaved) => {
+        if (serverFaved !== isFaved) updateFavDisplay(serverFaved);
+      }).catch(() => {});
+    }
 
     // Instant optimistic toggle on click (0ms delay)
     favBtn.addEventListener("click", () => {
+      const user = getCurrentUser();
+      if (!user) {
+        showAuthPromptModal({
+          title: "Log in to save favourites",
+          description: "Your saved recipes will be waiting for you on any device.",
+          redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
+          icon: "heart"
+        });
+        return;
+      }
+
       const nextState = !isFaved;
       updateFavDisplay(nextState);
 
@@ -870,6 +887,17 @@ async function showRecipe(id) {
     const addPlanBtn = document.getElementById("add-plan-btn");
     if (addPlanBtn) {
       addPlanBtn.addEventListener("click", async () => {
+        const user = getCurrentUser();
+        if (!user) {
+          showAuthPromptModal({
+            title: "Log in to plan your meals",
+            description: "Create a free account to add recipes to your weekly planner and build your shopping list.",
+            redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
+            icon: "planner"
+          });
+          return;
+        }
+
         if (!(await confirmIfFlagged(recipe))) return;
         // Save to meal plan in localStorage
         try {

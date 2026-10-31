@@ -61,6 +61,92 @@ export function showToast(message, milliseconds = 3000) {
   }, milliseconds);
 }
 
+/**
+ * Shows a friendly, benefits-oriented popup modal prompting unauthenticated users to log in or sign up.
+ * Supports redirecting back to the current recipe/page after successful authentication.
+ *
+ * @param {Object} options
+ * @param {string} options.title - e.g. "Log in to save favourites"
+ * @param {string} options.description - e.g. "Your saved recipes will be waiting for you on any device."
+ * @param {string} [options.redirectUrl] - The destination URL to return to after logging in (defaults to current page)
+ * @param {string} [options.icon] - 'heart' | 'planner'
+ */
+export function showAuthPromptModal({ title, description, redirectUrl, icon = "heart" }) {
+  // Remove any existing auth prompt modal
+  document.getElementById("auth-prompt-modal")?.remove();
+
+  const destination = redirectUrl || (window.location.pathname.split("/").pop() || "index.html") + window.location.search;
+  const loginHref = `login.html?redirect=${encodeURIComponent(destination)}`;
+  const signupHref = `signup.html?redirect=${encodeURIComponent(destination)}`;
+
+  const modal = document.createElement("div");
+  modal.id = "auth-prompt-modal";
+  modal.className = "fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-xs opacity-0 transition-opacity duration-200";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+
+  const iconSvg = icon === "planner" 
+    ? `<svg class="w-7 h-7 text-[#ca5c2e]" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="3" ry="3"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>`
+    : `<svg class="w-7 h-7 text-[#ca5c2e]" fill="currentColor" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+
+  modal.innerHTML = `
+    <div class="relative bg-white rounded-3xl max-w-sm w-full p-6 sm:p-7 shadow-2xl border border-[#efe6dc] text-center transform scale-95 opacity-0 transition-all duration-200">
+      <button type="button" id="auth-prompt-close" class="absolute top-4 right-4 p-1.5 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition focus:outline-none" aria-label="Close dialog">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+
+      <div class="w-14 h-14 rounded-2xl bg-[#ca5c2e]/10 border border-[#ca5c2e]/20 flex items-center justify-center mx-auto mb-4 shadow-2xs">
+        ${iconSvg}
+      </div>
+
+      <h3 class="text-lg sm:text-xl font-extrabold text-stone-900 tracking-tight font-heading mb-2">
+        ${escapeHtml(title)}
+      </h3>
+      <p class="text-xs sm:text-sm text-stone-600 leading-relaxed mb-6">
+        ${escapeHtml(description)}
+      </p>
+
+      <div class="space-y-2.5">
+        <a href="${loginHref}" class="w-full inline-flex items-center justify-center py-3 px-4 rounded-xl bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-sm font-semibold transition shadow-xs hover:shadow active:scale-[0.99]">
+          Log in
+        </a>
+        <a href="${signupHref}" class="w-full inline-flex items-center justify-center py-2.5 px-4 rounded-xl bg-white hover:bg-stone-50 border border-[#ede4da] text-stone-700 text-sm font-semibold transition shadow-2xs active:scale-[0.99]">
+          Create account
+        </a>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(modal);
+
+  const dialog = modal.querySelector(".relative");
+  requestAnimationFrame(() => {
+    modal.classList.remove("opacity-0");
+    modal.classList.add("opacity-100");
+    dialog.classList.remove("scale-95", "opacity-0");
+    dialog.classList.add("scale-100", "opacity-100");
+  });
+
+  const cleanup = () => {
+    document.removeEventListener("keydown", onKey);
+    modal.classList.remove("opacity-100");
+    modal.classList.add("opacity-0");
+    dialog.classList.remove("scale-100", "opacity-100");
+    dialog.classList.add("scale-95", "opacity-0");
+    setTimeout(() => modal.remove(), 200);
+  };
+
+  const onKey = (e) => {
+    if (e.key === "Escape") cleanup();
+  };
+  document.addEventListener("keydown", onKey);
+
+  modal.addEventListener("click", (e) => {
+    if (e.target === modal) cleanup();
+  });
+  modal.querySelector("#auth-prompt-close")?.addEventListener("click", cleanup);
+}
+
 const MINOR_WORDS = new Set([
   "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into",
   "near", "nor", "of", "on", "onto", "or", "per", "the", "to", "with", "via"
@@ -154,7 +240,18 @@ export function createRecipeCard(recipe, options = {}) {
       favBtn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
-        
+
+        const user = getCurrentUser();
+        if (!user) {
+          showAuthPromptModal({
+            title: "Log in to save favourites",
+            description: "Your saved recipes will be waiting for you on any device.",
+            redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
+            icon: "heart"
+          });
+          return;
+        }
+
         let storedFavs = [];
         try {
           storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
@@ -163,7 +260,6 @@ export function createRecipeCard(recipe, options = {}) {
         const exists = storedFavs.some((f) => String(f.id) === String(recipe.id));
         const icon = favBtn.querySelector(".heart-icon");
 
-        const user = getCurrentUser();
         if (exists) {
           storedFavs = storedFavs.filter((f) => String(f.id) !== String(recipe.id));
           icon.setAttribute("fill", "none");
@@ -202,14 +298,17 @@ export function createRecipeCard(recipe, options = {}) {
         window.dispatchEvent(new CustomEvent("favourites-changed"));
       });
 
-      // Check initial favourite state
+      // Check initial favourite state (only if user is logged in)
       try {
-        const storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-        if (storedFavs.some((f) => String(f.id) === String(recipe.id))) {
-          const icon = favBtn.querySelector(".heart-icon");
-          icon.setAttribute("fill", "#ca5c2e");
-          icon.classList.add("text-[#ca5c2e]");
-          favBtn.classList.add("text-[#ca5c2e]");
+        const user = getCurrentUser();
+        if (user) {
+          const storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+          if (storedFavs.some((f) => String(f.id) === String(recipe.id))) {
+            const icon = favBtn.querySelector(".heart-icon");
+            icon.setAttribute("fill", "#ca5c2e");
+            icon.classList.add("text-[#ca5c2e]");
+            favBtn.classList.add("text-[#ca5c2e]");
+          }
         }
       } catch (err) {}
     }
@@ -223,10 +322,13 @@ export function createRecipeCard(recipe, options = {}) {
  * Keeps them up-to-date even when navigating back via browser history / bfcache.
  */
 export function syncAllCardHearts() {
+  const user = getCurrentUser();
   let storedFavs = [];
-  try {
-    storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-  } catch (err) {}
+  if (user) {
+    try {
+      storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+    } catch (err) {}
+  }
   const favIdSet = new Set(storedFavs.map((f) => String(f.id)));
 
   document.querySelectorAll(".favourite-btn[data-id]").forEach((btn) => {

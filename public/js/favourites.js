@@ -220,7 +220,88 @@ const STARTER_RECIPES = [
   },
 ];
 
+function renderLoggedOutEmptyState() {
+  if (!messageEl) return;
+  const destination = (window.location.pathname.split("/").pop() || "favourites.html") + window.location.search;
+  const loginHref = `login.html?redirect=${encodeURIComponent(destination)}`;
+  const signupHref = `signup.html?redirect=${encodeURIComponent(destination)}`;
+
+  messageEl.innerHTML = `
+    <div class="space-y-10 sm:space-y-12">
+      <!-- Warm Culinary Hero Card -->
+      <div class="relative overflow-hidden rounded-3xl bg-gradient-to-br from-white via-[#fcf8f4] to-[#f8f0e5] border border-[#eee2d5] p-8 sm:p-12 text-center shadow-xs">
+        <div class="absolute -top-20 -left-20 w-56 h-56 bg-[#ca5c2e]/5 rounded-full blur-3xl pointer-events-none"></div>
+        <div class="absolute -bottom-20 -right-20 w-56 h-56 bg-[#f3c292]/10 rounded-full blur-3xl pointer-events-none"></div>
+
+        <div class="relative z-10 max-w-xl mx-auto space-y-6">
+          <div class="relative inline-block mx-auto">
+            <div class="w-20 h-20 sm:w-24 sm:h-24 rounded-full bg-gradient-to-tr from-[#fbebe3] to-[#fae2d5] border border-[#f5cfb8] flex items-center justify-center mx-auto shadow-inner ring-8 ring-[#ca5c2e]/5">
+              <svg class="w-10 h-10 sm:w-11 sm:h-11 text-[#ca5c2e] drop-shadow-sm transition-transform duration-300 hover:scale-110" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"></path>
+              </svg>
+            </div>
+            <span class="absolute -top-1 -right-1 w-7 h-7 bg-white rounded-full border border-[#eee2d5] shadow-xs flex items-center justify-center text-xs select-none">✨</span>
+            <span class="absolute -bottom-1 -left-1 w-7 h-7 bg-white rounded-full border border-[#eee2d5] shadow-xs flex items-center justify-center text-xs select-none">❤️</span>
+          </div>
+
+          <div class="space-y-2.5">
+            <h2 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight font-heading">
+              Log in to see your favourites
+            </h2>
+            <p class="text-sm sm:text-base text-stone-600 leading-relaxed max-w-md mx-auto">
+              Save recipes you love, plan your meals and get a shopping list, all in one place.
+            </p>
+          </div>
+
+          <div class="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+            <a 
+              href="${loginHref}" 
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full transition-all duration-200 shadow-sm hover:shadow-md hover:scale-[1.02] active:scale-[0.98]"
+            >
+              <span>Log In</span>
+            </a>
+            <a 
+              href="${signupHref}" 
+              class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-white hover:bg-[#fbf2ec] text-stone-800 hover:text-[#ca5c2e] border border-[#ede4da] text-sm sm:text-base font-semibold px-8 py-3.5 rounded-full transition-all duration-200 shadow-2xs hover:shadow-xs active:scale-[0.98]"
+            >
+              <span>Sign up free</span>
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- Popular Starter Recipes Section -->
+      <div class="space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-lg sm:text-xl font-bold text-stone-900 font-heading">Popular Recipes to Get You Started</h3>
+            <p class="text-xs sm:text-sm text-stone-500">Tap the heart on any card to save it straight to your collection.</p>
+          </div>
+          <a href="recipes.html" class="inline-flex items-center gap-1 text-xs sm:text-sm font-semibold text-[#ca5c2e] hover:text-[#b34d23] transition group">
+            <span>Browse all</span>
+            <svg class="w-3.5 h-3.5 group-hover:translate-x-0.5 transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
+            </svg>
+          </a>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          ${STARTER_RECIPES.map((recipe) => {
+            const card = createRecipeCard(recipe, { isFavouritePage: false });
+            return card.outerHTML;
+          }).join("")}
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderEmptyState() {
+  const user = getCurrentUser();
+  if (!user) {
+    renderLoggedOutEmptyState();
+    return;
+  }
+
   if (!messageEl) return;
   messageEl.innerHTML = `
     <div class="space-y-10 sm:space-y-12">
@@ -440,6 +521,14 @@ let isInitialLoad = true;
 async function renderFavourites() {
   if (!listEl) return;
 
+  const user = getCurrentUser();
+  if (!user) {
+    isInitialLoad = false;
+    listEl.innerHTML = "";
+    renderEmptyState();
+    return;
+  }
+
   // 1. Show animated brand spinner on initial page load
   if (isInitialLoad) {
     renderLoadingSpinner();
@@ -479,6 +568,12 @@ async function renderFavourites() {
 
 if (listEl) {
   renderFavourites();
+  window.addEventListener("auth-changed", () => {
+    renderFavourites();
+  });
+  window.addEventListener("storage", (e) => {
+    if (e.key === "recipeplan_user") renderFavourites();
+  });
   window.addEventListener("preferences-changed", () => {
     renderFavourites();
   });
