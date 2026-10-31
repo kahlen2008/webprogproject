@@ -1,7 +1,7 @@
 // Navbar that changes when the user logs in or out.
 // Supports both Firebase Auth and local demo user state.
 
-import { onAuthChange, logout, getCurrentUser } from "./auth.js";
+
 import { createLanguageSwitcherHtml, bindLanguageSwitcher } from "./i18n.js";
 
 const LINKS = [
@@ -174,6 +174,7 @@ export function renderNavbar(user) {
   if (logoutBtn) {
     logoutBtn.addEventListener("click", async () => {
       try {
+        const { logout } = await import("./auth.js");
         await logout();
       } catch (err) {}
       localStorage.removeItem("recipeplan_user");
@@ -223,9 +224,17 @@ renderFooter();
 renderNavbar(null);
 
 try {
-  onAuthChange((user) => {
-    renderNavbar(user);
-  });
+  const syncAuth = () => {
+    import("./auth.js")
+      .then(({ onAuthChange }) => onAuthChange((user) => renderNavbar(user)))
+      .catch(() => {});
+  };
+
+  if (typeof requestIdleCallback === "function") {
+    requestIdleCallback(syncAuth, { timeout: 2000 });
+  } else {
+    setTimeout(syncAuth, 1200);
+  }
 } catch (error) {
   // Graceful fallback for offline / mock testing
   renderNavbar(null);
