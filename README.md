@@ -13,6 +13,7 @@
 
 ## 📖 Table of Contents
 
+- [Project Proposal](#-project-proposal)
 - [Overview &amp; The Problem It Solves](#-overview--the-problem-it-solves)
 - [Key Features](#-key-features)
 - [Team &amp; Responsibilities](#-team--responsibilities)
@@ -24,6 +25,78 @@
 - [Deployment](#-deployment)
 - [Design System &amp; Aesthetic Guidelines](#-design-system--aesthetic-guidelines)
 - [Contributing &amp; Git Workflow](#-contributing--git-workflow)
+
+---
+
+## 📝 Project Proposal
+
+**Team 3 · K0126002 Web Programming, Fall 2026 · Gachon University**
+Live site: <https://kahlen2008.github.io/webprogproject/> · Proposal page (video and slides): <https://kahlen2008.github.io/webprogproject/proposal/>
+
+### Team
+
+| Member | Student ID | Role | GitHub |
+| --- | --- | --- | --- |
+| Kahlen Ong | 202699471 | Lead Developer | [kahlen2008](https://github.com/kahlen2008) |
+| Shrestha Puja | 202537250 | API Integration | _add username_ |
+| Sunar Roshani | 202537197 | QA & Testing | _add username_ |
+| Aale Aaditi | 202537195 | Designer | _add username_ |
+
+### Project concept
+
+**RecipePlan** is a recipe finder and weekly meal planner. Users search recipes, tell the site their diet and allergies once, save favourites, plan a week of meals and get one combined shopping list. Everything is saved to their account, so it follows them from phone to laptop.
+
+### The problem it solves
+
+- **Deciding what to eat takes effort.** Recipes are spread across many sites and apps, so people search, compare and forget what they found. RecipePlan gives one place to search, save and revisit recipes.
+- **Diets and allergies make browsing slower and riskier.** Someone who avoids peanuts, dairy or meat has to read every ingredient list by hand. RecipePlan stores those preferences once and flags or hides recipes that conflict with them. The warnings come from keywords in ingredient names, so they are a helper and not a safety guarantee, and the site says so.
+- **Planning and shopping are usually separate chores.** People plan meals in one place and write a shopping list in another, and often miss items or buy duplicates. RecipePlan builds one merged shopping list from the weekly plan.
+- **Notes and bookmarks stay on one device.** Accounts keep favourites and plans available on every device.
+
+### Target users
+
+People who cook at home, such as students, busy workers and households with dietary needs or allergies.
+
+### Core features
+
+| Feature | What it does | Priority |
+| --- | --- | --- |
+| Accounts and onboarding | Sign up and log in with email or Google (password: 8+ characters, a number and a special character), then choose diet and allergies in a two-step setup | MVP |
+| Recipe search and filters | Search TheMealDB by name and filter by category, with a recipe page showing ingredients and instructions | MVP |
+| Diet and allergy warnings | Badges and banners on recipes that clash with the user's profile, with an option to hide flagged recipes | MVP |
+| Favourites | Save recipes with a heart button and see them on a favourites page | MVP |
+| Weekly meal planner and shopping list | Plan breakfast, lunch and dinner for seven days, then get one combined shopping list with checkboxes and a print view | MVP |
+| Language switcher | Use the site in 130+ languages, and non-English searches are translated to English before they query TheMealDB | Bonus |
+| Ratings and comments | Star ratings and comments on each recipe | Bonus |
+| Serving size scaler | Change the number of servings and the ingredient amounts update | Bonus |
+| More filters | Filter by cuisine, diet and cooking time | Bonus |
+
+### Technology stack
+
+- **HTML, CSS and JavaScript:** plain HTML and ES-module JavaScript, with no framework or build step.
+- **Styling:** Tailwind CSS v3 from the CDN, with Inter and Outfit from Google Fonts.
+- **External API:** [TheMealDB](https://www.themealdb.com/api.php), base URL `https://www.themealdb.com/api/json/v1/1`.
+- **Libraries and services:** Firebase Authentication, Cloud Firestore and a Google Translate engine for the language switcher.
+- **Hosting:** GitHub Pages, deployed from the `public/` folder by a GitHub Actions workflow.
+- **Repository:** <https://github.com/kahlen2008/webprogproject>, with a `main` branch for the stable version and a `dev` branch for daily work.
+
+### UI wireframes
+
+The proposal slides show the two key screens: the **homepage**, with the search bar, category chips and recipe result cards, and the **weekly planner**, with the seven-day grid and the shopping list underneath. Each recipe card shows a photo, the name, a heart button and any allergy warning.
+
+### Project timeline
+
+| Week | Dates | Goal |
+| --- | --- | --- |
+| 10 | Nov 3 to Nov 9 | Finalise the design, connect the API and Firebase, and set up the page structure |
+| 11 | Nov 10 to Nov 16 | Build the core features: accounts, onboarding, search, favourites and the planner |
+| 12 | Nov 17 to Nov 23 | Finish all MVP features, add the shopping list, and start polishing |
+| 13 | Nov 24 to Nov 30 | Code review, bug fixing, responsive and accessibility checks, and preparing the presentation |
+| 14 | Dec 1 to Dec 7 | Final presentation and live demo |
+
+### Repository setup
+
+The repository has a README, a `.gitignore` that excludes `.env` files, all four members as collaborators, and a `main` and `dev` branch workflow. Person 4 merges tested `dev` work into `main`.
 
 ---
 
@@ -61,12 +134,10 @@ RecipePlan was developed collaboratively by a 4-person team. Each member holds e
 
 | Member                       | Role & Module                              | Responsibilities                                                                                                                                                   | Key Files                                                                                                            |
 | ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
-| **Kahlen - 202699471** | **Accounts, Profile & Security**     | User authentication (Email/Password, Google OAuth), 2-step onboarding questionnaire, profile editing, password security rules, and Firestore user document schema. | `login.htmlsignup.html``onboarding.htmlprofile.html``js/auth.jsjs/navbar.js``js/firebase-config.jsfirestore.rules` |
-| **Person 2**           | **Recipe Discovery & Design System** | Homepage search, category/cuisine filtering, recipe detail views, serving-size scaler, TheMealDB API integration, and core Tailwind/CSS design system.             | `index.htmlrecipe.html``css/base.csscss/components.css``css/recipes.cssjs/api.js``js/recipes.js`                   |
-| **Person 3**           | **Favourites & Quality Assurance**   | Favourites collection view, heart toggles, star ratings/feedback, cross-device Firestore data sync, and responsive layout testing.                                 | `favourites.htmlcss/favourites.css``js/favourites.jsjs/ratings.js`                                                 |
-| **Person 4**           | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, Firebase Hosting deployment, and documentation.            | `planner.htmlcss/planner.css``js/planner.jsfirebase.json``README.md`                                               |
-
-*(Note: Replace "Person 1–4" with your group members' actual names).*
+| **Kahlen Ong - 202699471** | **Accounts, Profile & Security**     | User authentication (Email/Password, Google OAuth), 2-step onboarding questionnaire, profile editing, password security rules, and Firestore user document schema. | `login.htmlsignup.html``onboarding.htmlprofile.html``js/auth.jsjs/navbar.js``js/firebase-config.jsfirestore.rules` |
+| **Shrestha Puja - 202537250** | **Recipe Discovery & Design System** | Homepage search, category/cuisine filtering, recipe detail views, serving-size scaler, TheMealDB API integration, and core Tailwind/CSS design system.             | `index.htmlrecipe.html``css/base.csscss/components.css``css/recipes.cssjs/api.js``js/recipes.js`                   |
+| **Sunar Roshani - 202537197** | **Favourites & Quality Assurance**   | Favourites collection view, heart toggles, star ratings/feedback, cross-device Firestore data sync, and responsive layout testing.                                 | `favourites.htmlcss/favourites.css``js/favourites.jsjs/ratings.js`                                                 |
+| **Aale Aaditi - 202537195** | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, Firebase Hosting deployment, and documentation.            | `planner.htmlcss/planner.css``js/planner.jsfirebase.json``README.md`                                               |
 
 ---
 
@@ -77,7 +148,7 @@ RecipePlan was developed collaboratively by a 4-person team. Each member holds e
 - **Authentication:** Google Firebase Authentication (Email/Password & Google Identity Services)
 - **Database:** Google Cloud Firestore (NoSQL cloud database)
 - **Recipe Data API:** [TheMealDB REST API](https://www.themealdb.com/api.php)
-- **Hosting & CI/CD:** Firebase Hosting with automated GitHub Actions continuous deployment (`deploy.yml`)
+- **Hosting & CI/CD:** GitHub Pages with automated GitHub Actions deployment (`deploy.yml`)
 - **Typography:** Google Fonts (`Outfit` for headings, `Inter` for clean body typography)
 
 ---
