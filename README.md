@@ -38,7 +38,7 @@ Live site: <https://kahlen2008.github.io/webprogproject/> · Proposal page (vide
 | Member | Student ID | Responsible for | GitHub |
 | --- | --- | --- | --- |
 | Kahlen Ong | 202699471 | Sign up, login and Google sign-in, password rules, the two-step diet and allergy onboarding, the profile page, diet and allergy warnings, the language switcher and the Firestore security rules | [kahlen2008](https://github.com/kahlen2008) |
-| Shrestha Puja | 202537250 | Recipe search and filters, the TheMealDB connection, the recipe detail page and the shared design (colours, buttons and recipe cards) | [ps8023724-sys](https://github.com/ps8023724-sys) |
+| Shrestha Puja | 202537250 | Recipe search and filters, the TheMealDB connection, the recipe detail page, cooking mode (step-by-step instructions), and the shared design (colours, buttons and recipe cards) | [ps8023724-sys](https://github.com/ps8023724-sys) |
 | Sunar Roshani | 202537197 | Favourites, star ratings and comments, and testing the whole site on phone and desktop | [roshani123sunar](https://github.com/roshani123sunar) |
 | Aale Aaditi | 202537195 | The weekly meal planner, the combined shopping list, deployment to GitHub Pages and the README | [aadi-eee](https://github.com/aadi-eee) |
 
@@ -66,6 +66,7 @@ People who cook at home, such as students, busy workers and households with diet
 | Diet and allergy warnings | Badges and banners on recipes that clash with the user's profile, with an option to hide flagged recipes | MVP |
 | Favourites | Save recipes with a heart button and see them on a favourites page | MVP |
 | Weekly meal planner and shopping list | Plan breakfast, lunch and dinner for seven days, then get one combined shopping list with checkboxes and a print view | MVP |
+| Cooking mode | Dedicated cooking view with step-by-step instructions, clear progress tracking, and ingredient checklists for active kitchen preparation | Bonus |
 | Language switcher | Use the site in 130+ languages, and non-English searches are translated to English before they query TheMealDB | Bonus |
 | Ratings and comments | Star ratings and comments on each recipe | Bonus |
 | Serving size scaler | Change the number of servings and the ingredient amounts update | Bonus |

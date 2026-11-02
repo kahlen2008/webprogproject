@@ -7,7 +7,7 @@ Open [`index.html`](index.html) for the video, the slides and the team. The same
 ## Who is responsible for what
 
 - **Kahlen Ong (202699471):** sign up, login and Google sign-in, password rules, diet and allergy onboarding, profile page, diet and allergy warnings, language switcher, Firestore security rules
-- **Shrestha Puja (202537250):** recipe search and filters, TheMealDB connection, recipe detail page, shared design
+- **Shrestha Puja (202537250):** recipe search and filters, TheMealDB connection, recipe detail page, cooking mode (step-by-step instructions), shared design
 - **Sunar Roshani (202537197):** favourites, star ratings and comments, testing
 - **Aale Aaditi (202537195):** weekly meal planner, shopping list, deployment, README
 
@@ -37,6 +37,7 @@ People who cook at home: students, busy workers, and households with dietary nee
 | Diet and allergy warnings | Badges and banners on recipes that clash with the user's profile, an option to hide flagged recipes, and a confirm prompt before adding one to the planner. | MVP |
 | Favourites | Save a recipe with a heart button and see all saved recipes on a favourites page. | MVP |
 | Weekly meal planner and shopping list | Plan breakfast, lunch and dinner for seven days, then get one combined shopping list with checkboxes and a print view. | MVP |
+| Cooking mode | Dedicated cooking view with step-by-step instructions, clear progress tracking, and ingredient checklists for active kitchen preparation. | Bonus |
 | Language switcher | Use the site in 130+ languages. Non-English searches are translated to English before they query TheMealDB. | Bonus |
 | Ratings and comments | Star ratings and comments on each recipe. | Bonus |
 | Serving size scaler | Change the number of servings and the ingredient amounts update. | Bonus |
@@ -46,7 +47,7 @@ People who cook at home: students, busy workers, and households with dietary nee
 
 **Built:** accounts and Google sign-in, the two-step onboarding, the profile page, recipe search with category filters, diet and allergy warnings, a favourites page, the weekly planner with a recipe picker, and the language switcher.
 
-**Still to do:** saving favourites and the weekly plan to Firestore so they sync across devices, building the shopping list from the plan, ratings and comments, and the serving size scaler.
+**Still to do:** saving favourites and the weekly plan to Firestore so they sync across devices, building the shopping list from the plan, ratings and comments, the serving size scaler, and cooking mode (step-by-step instructions).
 
 ## Technology stack
 

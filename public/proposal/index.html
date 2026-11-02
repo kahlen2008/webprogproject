@@ -7,7 +7,9 @@
   <style>
     :root { --brand:#ca5c2e; --ink:#292524; --muted:#78716c; --bg:#faf7f2; --card:#fff; --line:#ede4da; }
     * { box-sizing: border-box; }
-    body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--ink); line-height:1.55; }
+    body { margin:0; font-family: Inter, system-ui, -apple-system, "Segoe UI", Arial, sans-serif; background:var(--bg); color:var(--ink); line-height:1.55; text-wrap: pretty; }
+    h1, h2, h3 { text-wrap: balance; }
+    p, li, td, th { text-wrap: pretty; }
     main { max-width: 960px; margin: 0 auto; padding: 32px 16px 64px; }
     h1 { font-size: 2rem; margin: 0 0 4px; letter-spacing:-.5px; }
     h1 span { color: var(--brand); }
@@ -67,7 +69,7 @@
       <thead><tr><th>Member</th><th>Student ID</th><th>Responsible for</th><th>GitHub</th></tr></thead>
       <tbody>
         <tr><td>Kahlen Ong</td><td>202699471</td><td>Sign up, login and Google sign-in, password rules, two-step diet and allergy onboarding, profile page, diet and allergy warnings, language switcher, Firestore security rules</td><td><a href="https://github.com/kahlen2008">kahlen2008</a></td></tr>
-        <tr><td>Shrestha Puja</td><td>202537250</td><td>Recipe search and filters, TheMealDB connection, recipe detail page, shared design (colours, buttons, recipe cards)</td><td><a href="https://github.com/ps8023724-sys">ps8023724-sys</a></td></tr>
+        <tr><td>Shrestha Puja</td><td>202537250</td><td>Recipe search and filters, TheMealDB connection, recipe detail page, cooking mode (step-by-step instructions), shared design (colours, buttons, recipe cards)</td><td><a href="https://github.com/ps8023724-sys">ps8023724-sys</a></td></tr>
         <tr><td>Sunar Roshani</td><td>202537197</td><td>Favourites, star ratings and comments, testing on phone and desktop</td><td><a href="https://github.com/roshani123sunar">roshani123sunar</a></td></tr>
         <tr><td>Aale Aaditi</td><td>202537195</td><td>Weekly meal planner, combined shopping list, deployment to GitHub Pages, README</td><td><a href="https://github.com/aadi-eee">aadi-eee</a></td></tr>
       </tbody>
@@ -84,10 +86,10 @@
     <h3>Target users</h3>
     <p>People who cook at home: students, busy workers, and households with dietary needs or allergies. They want to decide quickly what to cook, avoid ingredients they cannot eat, and shop once for the week.</p>
     <h3>Core features</h3>
-    <div class='tw'><table><thead><tr><th>Feature</th><th>What it does</th><th>Priority</th></tr></thead><tbody><tr><td>Accounts and onboarding</td><td>Sign up and log in with email or Google. Passwords need 8+ characters, a number and a special character. After sign-up, a two-step page asks for diet, then allergies.</td><td>MVP</td></tr><tr><td>Recipe search and filters</td><td>Search TheMealDB by name, filter by category, and open a recipe page with ingredients and instructions.</td><td>MVP</td></tr><tr><td>Diet and allergy warnings</td><td>Badges and banners on recipes that clash with the user's profile, an option to hide flagged recipes, and a confirm prompt before adding one to the planner.</td><td>MVP</td></tr><tr><td>Favourites</td><td>Save a recipe with a heart button and see all saved recipes on a favourites page.</td><td>MVP</td></tr><tr><td>Weekly meal planner and shopping list</td><td>Plan breakfast, lunch and dinner for seven days, then get one combined shopping list with checkboxes and a print view.</td><td>MVP</td></tr><tr><td>Language switcher</td><td>Use the site in 130+ languages. Non-English searches are translated to English before they query TheMealDB.</td><td>Bonus</td></tr><tr><td>Ratings and comments</td><td>Star ratings and comments on each recipe.</td><td>Bonus</td></tr><tr><td>Serving size scaler</td><td>Change the number of servings and the ingredient amounts update.</td><td>Bonus</td></tr><tr><td>More filters</td><td>Filter by cuisine, diet and cooking time.</td><td>Bonus</td></tr></tbody></table></div>
+    <div class='tw'><table><thead><tr><th>Feature</th><th>What it does</th><th>Priority</th></tr></thead><tbody><tr><td>Accounts and onboarding</td><td>Sign up and log in with email or Google. Passwords need 8+ characters, a number and a special character. After sign-up, a two-step page asks for diet, then allergies.</td><td>MVP</td></tr><tr><td>Recipe search and filters</td><td>Search TheMealDB by name, filter by category, and open a recipe page with ingredients and instructions.</td><td>MVP</td></tr><tr><td>Diet and allergy warnings</td><td>Badges and banners on recipes that clash with the user's profile, an option to hide flagged recipes, and a confirm prompt before adding one to the planner.</td><td>MVP</td></tr><tr><td>Favourites</td><td>Save a recipe with a heart button and see all saved recipes on a favourites page.</td><td>MVP</td></tr><tr><td>Weekly meal planner and shopping list</td><td>Plan breakfast, lunch and dinner for seven days, then get one combined shopping list with checkboxes and a print view.</td><td>MVP</td></tr><tr><td>Cooking mode</td><td>Dedicated cooking view with step-by-step instructions, clear progress tracking, and ingredient checklists for active kitchen preparation.</td><td>Bonus</td></tr><tr><td>Language switcher</td><td>Use the site in 130+ languages. Non-English searches are translated to English before they query TheMealDB.</td><td>Bonus</td></tr><tr><td>Ratings and comments</td><td>Star ratings and comments on each recipe.</td><td>Bonus</td></tr><tr><td>Serving size scaler</td><td>Change the number of servings and the ingredient amounts update.</td><td>Bonus</td></tr><tr><td>More filters</td><td>Filter by cuisine, diet and cooking time.</td><td>Bonus</td></tr></tbody></table></div>
     <h3>Progress so far (Nov 2)</h3>
     <p><strong>Built:</strong> accounts and Google sign-in, the two-step onboarding, the profile page, recipe search with category filters, diet and allergy warnings, a favourites page, the weekly planner with a recipe picker, and the language switcher.</p>
-    <p><strong>Still to do:</strong> saving favourites and the weekly plan to Firestore so they sync across devices, building the shopping list from the plan, ratings and comments, and the serving size scaler.</p>
+    <p><strong>Still to do:</strong> saving favourites and the weekly plan to Firestore so they sync across devices, building the shopping list from the plan, ratings and comments, the serving size scaler, and cooking mode (step-by-step instructions).</p>
     <h3>Technology stack</h3>
     <ul><li><strong>HTML, CSS and JavaScript:</strong> plain HTML and ES-module JavaScript, with no framework or build step.</li><li><strong>Styling:</strong> Tailwind CSS v3 from the CDN, with Inter and Outfit from Google Fonts.</li><li><strong>External API:</strong> <a href="https://www.themealdb.com/api.php">TheMealDB</a>, base URL <code>https://www.themealdb.com/api/json/v1/1</code>.</li><li><strong>Services:</strong> Firebase Authentication for accounts, Cloud Firestore for each user's data, and a Google Translate engine for the language switcher.</li><li><strong>Hosting:</strong> GitHub Pages, deployed from the <code>public/</code> folder by a GitHub Actions workflow.</li><li><strong>Repository:</strong> <a href="https://github.com/kahlen2008/webprogproject">github.com/kahlen2008/webprogproject</a>, with a <code>main</code> branch for the stable version and a <code>dev</code> branch for daily work.</li></ul>
     <h3>UI wireframes</h3>
@@ -100,10 +102,27 @@
   </section>
 
   <section>
-    <h2>🔗 Links</h2>
+    <h2>🔗 Links &amp; Documentation</h2>
     <ul>
       <li><a href="../index.html">← Back to the RecipePlan main page</a></li>
-      <li><a href="https://github.com/kahlen2008/webprogproject">GitHub repository (source code)</a></li>
+      <li><a href="https://github.com/kahlen2008/webprogproject" target="_blank" rel="noopener">GitHub repository (source code)</a></li>
+    </ul>
+
+    <h3>📄 Core Documentation Markdown Files</h3>
+    <p class="note">The repository includes three primary documentation markdown files in its root directory, each serving a distinct purpose:</p>
+    <ul>
+      <li>
+        <a href="https://github.com/kahlen2008/webprogproject/blob/main/README.md" target="_blank" rel="noopener"><code>README.md</code></a> — <strong>Project Overview &amp; Setup Guide:</strong>
+        The primary documentation and homepage for the project repository. It outlines what RecipePlan is, lists all team members and their responsibilities, details the technology stack and folder architecture, and provides instructions for running the site locally and deploying to GitHub Pages.
+      </li>
+      <li>
+        <a href="https://github.com/kahlen2008/webprogproject/blob/main/PROJECT_NOTES.md" target="_blank" rel="noopener"><code>PROJECT_NOTES.md</code></a> — <strong>Team Conventions &amp; Technical Rules:</strong>
+        The shared technical handbook for all team members. It defines coding and styling guidelines (brand colors and typography), Git workflow standards (branching between <code>main</code> and <code>dev</code>), data schemas, API endpoints, and development rules to keep the codebase consistent.
+      </li>
+      <li>
+        <a href="https://github.com/kahlen2008/webprogproject/blob/main/Recipe%20Finder%20%26%20Meal%20Planner%20Team%20Use%20Cases.md" target="_blank" rel="noopener"><code>Recipe Finder &amp; Meal Planner Team Use Cases.md</code></a> — <strong>Comprehensive Use Cases &amp; Feature Specifications:</strong>
+        The in-depth product specification and functional requirements document. It details user personas, the core problems addressed, complete step-by-step user flows for each individual feature (accounts, search, warnings, favourites, weekly planner, shopping list), and project scope boundaries.
+      </li>
     </ul>
   </section>
 </main>
