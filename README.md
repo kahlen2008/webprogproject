@@ -35,12 +35,12 @@ Live site: <https://kahlen2008.github.io/webprogproject/> · Proposal page (vide
 
 ### Team
 
-| Member | Student ID | Role | GitHub |
+| Member | Student ID | Responsible for | GitHub |
 | --- | --- | --- | --- |
-| Kahlen Ong | 202699471 | Lead Developer | [kahlen2008](https://github.com/kahlen2008) |
-| Shrestha Puja | 202537250 | API Integration | _add username_ |
-| Sunar Roshani | 202537197 | QA & Testing | _add username_ |
-| Aale Aaditi | 202537195 | Designer | _add username_ |
+| Kahlen Ong | 202699471 | Sign up, login and Google sign-in, password rules, the two-step diet and allergy onboarding, the profile page, diet and allergy warnings, the language switcher and the Firestore security rules | [kahlen2008](https://github.com/kahlen2008) |
+| Shrestha Puja | 202537250 | Recipe search and filters, the TheMealDB connection, the recipe detail page and the shared design (colours, buttons and recipe cards) | _add username_ |
+| Sunar Roshani | 202537197 | Favourites, star ratings and comments, and testing the whole site on phone and desktop | _add username_ |
+| Aale Aaditi | 202537195 | The weekly meal planner, the combined shopping list, deployment to GitHub Pages and the README | _add username_ |
 
 ### Project concept
 
