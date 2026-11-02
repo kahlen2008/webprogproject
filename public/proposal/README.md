@@ -77,4 +77,4 @@ The slides show two key screens.
 
 ## Repository setup
 
-The repository has a README, a `.gitignore` that excludes `.env` files, all four members as collaborators, and a `main` and `dev` branch workflow. Aale merges tested `dev` work into `main`.
+The repository includes a comprehensive README, a `.gitignore` that excludes sensitive files, all four team members as active collaborators, and a dual-branch workflow: `main` serves as the production branch for stable releases and deployments, while `dev` serves as the working integration branch for ongoing feature development, staging, and pre-release testing.
