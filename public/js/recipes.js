@@ -176,11 +176,134 @@ function syncHideToggle() {
   }
 }
 
+// Cards rendered for the current view, kept so the allergen filter can animate in place.
+let currentChecked = [];
+const cardCache = new Map();
+let finishFilterAnimation = null;
+
+function getOrCreateCard({ recipe, result }) {
+  const id = String(recipe.id);
+  let card = cardCache.get(id);
+  if (!card) {
+    card = createRecipeCard(recipe, { priority: false });
+    decorateCard(card, result);
+    card.dataset.cardId = id;
+    cardCache.set(id, card);
+  }
+  return card;
+}
+
+// Shows/hides allergen recipes with a smooth FLIP transition (same feel as removing a favourite).
+// Returns false when it can't animate, so the caller falls back to a normal re-render.
+function applyHideFilterAnimated(hide) {
+  if (!results) return false;
+  if (finishFilterAnimation) finishFilterAnimation();
+
+  const visible = hide ? currentChecked.filter((item) => !item.result.hasAllergen) : currentChecked;
+  const attached = Array.from(results.querySelectorAll(".recipe-card"));
+  const reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (!currentChecked.length || !attached.length || !visible.length || reduceMotion) return false;
+
+  const keepIds = new Set(visible.map((item) => String(item.recipe.id)));
+  const listRect = results.getBoundingClientRect();
+  const firstRects = new Map(attached.map((c) => [c, c.getBoundingClientRect()]));
+  const previousPosition = results.style.position;
+  results.style.position = "relative";
+
+  // Leaving cards: replace with absolute ghosts that fade out at their exact spot
+  const ghosts = [];
+  attached.forEach((card) => {
+    if (keepIds.has(card.dataset.cardId)) return;
+    const rect = firstRects.get(card);
+    const ghost = card.cloneNode(true);
+    ghost.style.position = "absolute";
+    ghost.style.left = `${rect.left - listRect.left}px`;
+    ghost.style.top = `${rect.top - listRect.top}px`;
+    ghost.style.width = `${rect.width}px`;
+    ghost.style.height = `${rect.height}px`;
+    ghost.style.margin = "0";
+    ghost.style.zIndex = "30";
+    ghost.style.pointerEvents = "none";
+    ghost.style.transition = "opacity 0.25s cubic-bezier(0.4, 0, 0.2, 1), transform 0.25s cubic-bezier(0.4, 0, 0.2, 1)";
+    results.appendChild(ghost);
+    ghosts.push(ghost);
+    card.remove();
+  });
+
+  // Put the visible cards in their original order (new ones are created on demand)
+  const entering = [];
+  visible.forEach((item) => {
+    const card = getOrCreateCard(item);
+    if (!card.isConnected) entering.push(card);
+    results.appendChild(card);
+  });
+
+  // Invert: shift staying cards back to where they were; hide entering cards
+  const shifting = [];
+  visible.forEach((item) => {
+    const card = cardCache.get(String(item.recipe.id));
+    if (entering.includes(card)) return;
+    const first = firstRects.get(card);
+    if (!first) return;
+    const last = card.getBoundingClientRect();
+    const dx = first.left - last.left;
+    const dy = first.top - last.top;
+    if (dx !== 0 || dy !== 0) {
+      card.style.transition = "none";
+      card.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+      shifting.push(card);
+    }
+  });
+  entering.forEach((card) => {
+    card.style.transition = "none";
+    card.style.opacity = "0";
+    card.style.transform = "scale(0.85)";
+  });
+
+  void results.offsetHeight; // commit the inverted positions
+
+  const cleanup = () => {
+    clearTimeout(timer);
+    ghosts.forEach((g) => g.remove());
+    [...shifting, ...entering].forEach((c) => {
+      c.style.transition = "";
+      c.style.transform = "";
+      c.style.opacity = "";
+    });
+    results.style.position = previousPosition;
+    finishFilterAnimation = null;
+  };
+  const timer = setTimeout(cleanup, 380);
+  finishFilterAnimation = cleanup;
+
+  // Play: ghosts fade out, staying cards glide, returning cards fade in
+  requestAnimationFrame(() => {
+    ghosts.forEach((g) => {
+      g.style.opacity = "0";
+      g.style.transform = "scale(0.85)";
+    });
+    shifting.forEach((c) => {
+      c.style.transition = "transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)";
+      c.style.transform = "translate3d(0, 0, 0)";
+    });
+    entering.forEach((c) => {
+      c.style.transition = "opacity 0.3s ease-out, transform 0.35s cubic-bezier(0.2, 0.8, 0.2, 1)";
+      c.style.opacity = "1";
+      c.style.transform = "scale(1)";
+    });
+  });
+
+  return true;
+}
+
 async function renderRecipeCards(recipesList) {
   if (!results) return;
+  if (finishFilterAnimation) finishFilterAnimation();
   results.innerHTML = "";
   const prefs = getPreferences();
   const checked = await checkRecipes(recipesList, prefs);
+  currentChecked = checked;
+  cardCache.clear();
   const visible = prefs.hideFlagged
     ? checked.filter((item) => !item.result.hasAllergen)
     : checked;
@@ -203,12 +326,20 @@ async function renderRecipeCards(recipesList) {
   visible.forEach(({ recipe, result }, index) => {
     const card = createRecipeCard(recipe, { priority: index < 2 });
     decorateCard(card, result);
+    card.dataset.cardId = String(recipe.id);
+    cardCache.set(String(recipe.id), card);
     results.appendChild(card);
   });
 }
 
+// Remembers the last search so toggling "Hide allergen recipes" re-runs the same search.
+let lastSearchQuery = "";
+let lastSearchTitle = "Latest Recipes";
+
 async function runSearch(query, title = "Search Results") {
   if (!results) return;
+  lastSearchQuery = query;
+  lastSearchTitle = title;
   results.innerHTML = "";
   if (sectionTitle) {
     if (query && /[^\u0000-\u007f]/.test(query)) {
@@ -343,12 +474,17 @@ if (searchForm) {
 
   if (hideToggle) {
     hideToggle.addEventListener("change", async () => {
-      await savePreferences({ hideFlagged: hideToggle.checked });
+      // savePreferences updates localStorage synchronously, so animate right away
+      const saving = savePreferences({ hideFlagged: hideToggle.checked });
+      if (applyHideFilterAnimated(hideToggle.checked)) {
+        await saving;
+        return;
+      }
+      await saving;
       if (activeCategory) {
         runCategoryFilter(activeCategory);
       } else {
-        const title = sectionTitle ? sectionTitle.textContent : "Latest Recipes";
-        runSearch("", title);
+        runSearch(lastSearchQuery, lastSearchTitle);
       }
     });
   }
