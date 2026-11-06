@@ -353,11 +353,27 @@ async function renderRecipeCards(recipesList) {
 let lastSearchQuery = "";
 let lastSearchTitle = "Latest Recipes";
 
+function renderRecipesLoading(text = "Loading delicious recipes...") {
+  if (!results) return;
+  results.innerHTML = `
+    <li class="col-span-full py-20 text-center text-stone-500 flex flex-col items-center justify-center gap-3">
+      <svg class="animate-spin w-8 h-8 text-[#ca5c2e]" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      <span class="text-sm font-medium text-stone-600">${escapeHtml(text)}</span>
+    </li>
+  `;
+  if (message) {
+    message.innerHTML = "";
+    message.className = "hidden";
+  }
+}
+
 async function runSearch(query, title = "Search Results") {
   if (!results) return;
   lastSearchQuery = query;
   lastSearchTitle = title;
-  results.innerHTML = "";
   if (sectionTitle) {
     if (query && /[^\u0000-\u007f]/.test(query)) {
       sectionTitle.innerHTML = `<span>Search results: </span><span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`;
@@ -365,22 +381,14 @@ async function runSearch(query, title = "Search Results") {
       sectionTitle.innerHTML = `<span>${escapeHtml(title)}</span>`;
     }
   }
-  if (message) {
-    message.className = "text-sm text-stone-500 py-2 flex items-center gap-2";
-    message.innerHTML = `
-      <svg class="animate-spin w-4 h-4 text-[#ca5c2e]" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-      </svg>
-      Loading delicious recipes...
-    `;
-  }
+  renderRecipesLoading("Loading delicious recipes...");
 
   try {
     const recipes = await searchRecipes(query);
     if (!recipes || recipes.length === 0) {
+      results.innerHTML = "";
       if (message) {
-        message.className = "text-sm text-stone-500 py-4 text-center";
+        message.className = "text-sm text-stone-500 py-12 text-center";
         const safeQ = /[^\u0000-\u007f]/.test(query)
           ? `<span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`
           : `"${escapeHtml(query)}"`;
@@ -397,26 +405,24 @@ async function runSearch(query, title = "Search Results") {
 
 async function runCategoryFilter(category) {
   if (!results) return;
-  results.innerHTML = "";
   if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(category)} Recipes</span>`;
-  if (message) {
-    message.className = "text-sm text-stone-500 py-2 flex items-center gap-2";
-    message.innerHTML = `Loading ${category} recipes...`;
-  }
+  renderRecipesLoading(`Loading ${category} recipes...`);
 
   try {
     const recipes = await filterByCategory(category);
     if (!recipes || recipes.length === 0) {
+      results.innerHTML = "";
       if (message) {
-        message.className = "text-sm text-stone-500 py-4 text-center";
+        message.className = "text-sm text-stone-500 py-12 text-center";
         message.textContent = `No recipes found in ${category}.`;
       }
       return;
     }
     await renderRecipeCards(recipes.slice(0, 12));
   } catch (error) {
+    results.innerHTML = "";
     if (message) {
-      message.className = "text-sm text-stone-500 py-4 text-center";
+      message.className = "text-sm text-stone-500 py-12 text-center";
       message.textContent = "Could not load recipes right now.";
     }
   }
