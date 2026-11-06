@@ -2,6 +2,7 @@
 // Matches the design and interactions shown in RecipePlan mockup.
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
+import { estimateNutrition } from "./nutrition.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal } from "./utils.js";
 import {
   getPreferences,
@@ -53,24 +54,40 @@ const FALLBACK_RECIPES_BY_ID = {
       { name: "brown rice", measure: "3 cups cooked" }
     ]
   },
-  "greek-salad": {
-    id: "greek-salad",
-    name: "Classic Greek Salad",
-    image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80",
-    category: "Vegetarian",
-    area: "Greek",
-    description: "A crisp, colourful Mediterranean salad packed with ripe vine tomatoes, crisp cucumbers, red onions, Kalamata olives and creamy feta cheese dressed with extra virgin olive oil and oregano.",
-    instructions: "Wash and chop the ripe vine tomatoes and crisp cucumbers into bite-sized chunks.\r\nThinly slice the red onion and place into a large salad bowl with the chopped tomatoes and cucumbers.\r\nAdd the pitted Kalamata olives and gently toss together.\r\nCut the block of Greek feta cheese into cubes (or crumble gently over the salad bowl).\r\nDrizzle generously with high-quality extra virgin olive oil and a splash of red wine vinegar.\r\nSeason with dried Greek oregano, sea salt and freshly cracked black pepper. Toss gently and serve fresh.",
+  "52855": {
+    id: "52855",
+    name: "Banana Pancakes",
+    image: "https://www.themealdb.com/images/media/meals/sywswr1511383814.jpg",
+    category: "Dessert",
+    area: "American",
+    description: "Fluffy, naturally sweet banana pancakes made with ripe bananas, eggs, and a touch of vanilla, topped with fresh raspberries and pecans.",
+    instructions: "In a bowl, mash the banana with a fork until it resembles a thick purée. Stir in the eggs, baking powder and vanilla.\r\nHeat a large non-stick frying pan or pancake pan over a medium heat and brush with half the oil. Using half the batter, spoon two pancakes into the pan, cook for 1-2 mins each side, then tip onto a plate. Repeat the process with the remaining oil and batter. Top the pancakes with the pecans and raspberries.",
     ingredients: [
-      { name: "Ripe Vine Tomatoes", measure: "4 large" },
-      { name: "English Cucumber", measure: "1 medium" },
-      { name: "Red Onion", measure: "1/2 sliced" },
-      { name: "Kalamata Olives", measure: "1/2 cup pitted" },
-      { name: "Greek Feta Cheese", measure: "200g" },
-      { name: "Extra Virgin Olive Oil", measure: "3 tbsp" },
-      { name: "Red Wine Vinegar", measure: "1 tbsp" },
-      { name: "Dried Greek Oregano", measure: "1 tsp" },
-      { name: "Sea Salt & Black Pepper", measure: "To taste" }
+      { name: "Banana", measure: "1 large" },
+      { name: "Eggs", measure: "2 medium" },
+      { name: "Baking Powder", measure: "pinch" },
+      { name: "Vanilla Extract", measure: "sprinkling" },
+      { name: "Oil", measure: "1 tsp" },
+      { name: "Pecan Nuts", measure: "25g" },
+      { name: "Raspberries", measure: "125g" }
+    ]
+  },
+  "53011": {
+    id: "53011",
+    name: "Chicken Quinoa Greek Salad",
+    image: "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg",
+    category: "Chicken",
+    area: "Greek",
+    description: "A fresh Mediterranean salad bowl packed with fluffy quinoa, tender griddled spiced chicken fillets, Kalamata olives, juicy tomatoes, and feta cheese.",
+    instructions: "Cook the quinoa following pack instructions, then rinse in cold water and drain thoroughly.\r\nMeanwhile, mix butter, chilli and garlic into a paste. Toss chicken fillets in 2 tsp olive oil with seasoning. Lay in a hot griddle pan and cook for 3-4 mins each side until cooked through. Transfer to a plate, dot with spicy butter and set aside.\r\nNext, tip tomatoes, olives, onion, feta and mint into a bowl. Toss in cooked quinoa. Stir through remaining olive oil, lemon juice and zest, and season well. Top with chicken fillets and drizzle with juices.",
+    ingredients: [
+      { name: "Quinoa", measure: "225g" },
+      { name: "Chicken Breast", measure: "400g" },
+      { name: "Black Olives", measure: "Handful" },
+      { name: "Red Onions", measure: "1 chopped" },
+      { name: "Feta", measure: "100g" },
+      { name: "Olive Oil", measure: "2 tbsp" },
+      { name: "Lemon", measure: "Juice of 1/2" }
     ]
   },
   "53194": {
@@ -336,11 +353,27 @@ async function renderRecipeCards(recipesList) {
 let lastSearchQuery = "";
 let lastSearchTitle = "Latest Recipes";
 
+function renderRecipesLoading(text = "Loading delicious recipes...") {
+  if (!results) return;
+  results.innerHTML = `
+    <li class="col-span-full py-20 text-center text-stone-500 flex flex-col items-center justify-center gap-3">
+      <svg class="animate-spin w-8 h-8 text-[#ca5c2e]" fill="none" viewBox="0 0 24 24">
+        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+      </svg>
+      <span class="text-sm font-medium text-stone-600">${escapeHtml(text)}</span>
+    </li>
+  `;
+  if (message) {
+    message.innerHTML = "";
+    message.className = "hidden";
+  }
+}
+
 async function runSearch(query, title = "Search Results") {
   if (!results) return;
   lastSearchQuery = query;
   lastSearchTitle = title;
-  results.innerHTML = "";
   if (sectionTitle) {
     if (query && /[^\u0000-\u007f]/.test(query)) {
       sectionTitle.innerHTML = `<span>Search results: </span><span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`;
@@ -348,22 +381,14 @@ async function runSearch(query, title = "Search Results") {
       sectionTitle.innerHTML = `<span>${escapeHtml(title)}</span>`;
     }
   }
-  if (message) {
-    message.className = "text-sm text-stone-500 py-2 flex items-center gap-2";
-    message.innerHTML = `
-      <svg class="animate-spin w-4 h-4 text-[#ca5c2e]" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-      </svg>
-      Loading delicious recipes...
-    `;
-  }
+  renderRecipesLoading("Loading delicious recipes...");
 
   try {
     const recipes = await searchRecipes(query);
     if (!recipes || recipes.length === 0) {
+      results.innerHTML = "";
       if (message) {
-        message.className = "text-sm text-stone-500 py-4 text-center";
+        message.className = "text-sm text-stone-500 py-12 text-center";
         const safeQ = /[^\u0000-\u007f]/.test(query)
           ? `<span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`
           : `"${escapeHtml(query)}"`;
@@ -380,26 +405,24 @@ async function runSearch(query, title = "Search Results") {
 
 async function runCategoryFilter(category) {
   if (!results) return;
-  results.innerHTML = "";
   if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(category)} Recipes</span>`;
-  if (message) {
-    message.className = "text-sm text-stone-500 py-2 flex items-center gap-2";
-    message.innerHTML = `Loading ${category} recipes...`;
-  }
+  renderRecipesLoading(`Loading ${category} recipes...`);
 
   try {
     const recipes = await filterByCategory(category);
     if (!recipes || recipes.length === 0) {
+      results.innerHTML = "";
       if (message) {
-        message.className = "text-sm text-stone-500 py-4 text-center";
+        message.className = "text-sm text-stone-500 py-12 text-center";
         message.textContent = `No recipes found in ${category}.`;
       }
       return;
     }
     await renderRecipeCards(recipes.slice(0, 12));
   } catch (error) {
+    results.innerHTML = "";
     if (message) {
-      message.className = "text-sm text-stone-500 py-4 text-center";
+      message.className = "text-sm text-stone-500 py-12 text-center";
       message.textContent = "Could not load recipes right now.";
     }
   }
@@ -554,17 +577,18 @@ async function showRecipe(id) {
   `;
 
   try {
-    // Aliases for legacy demo IDs that were erroneously mapped to unrelated TheMealDB items
-    if (id === "52838") id = "53194"; // Tom Yum Soup (legacy id 52838 was Viennese Schnitzel)
-    if (id === "52773") id = "52772"; // Teriyaki Chicken Casserole (legacy id 52773 was Honey Teriyaki Salmon)
-    if (id === "52855") id = "greek-salad"; // Classic Greek Salad (legacy id 52855 was Banana Pancakes)
-    if (id === "52891") id = "52860"; // Chocolate Brownies (legacy id 52891 was Blackberry Fool)
+    // Graceful alias for any legacy mock id bookmark
+    if (id === "greek-salad") id = "53011"; // Chicken Quinoa Greek Salad
 
     let recipe = null;
-    if (FALLBACK_RECIPES_BY_ID[String(id)]) {
-      recipe = FALLBACK_RECIPES_BY_ID[String(id)];
-    } else {
+    try {
       recipe = await getRecipeById(id);
+    } catch (e) {
+      console.warn("Live API lookup failed, falling back:", e);
+    }
+
+    if (!recipe && FALLBACK_RECIPES_BY_ID[String(id)]) {
+      recipe = FALLBACK_RECIPES_BY_ID[String(id)];
     }
 
     // Fallback if API lookup fails or offline
@@ -845,6 +869,34 @@ async function showRecipe(id) {
       })
       .join("");
 
+    // Rough nutrition estimate (TheMealDB has no nutrition data).
+    const nutrition = estimateNutrition(recipe.ingredients || []);
+    const per = nutrition.perServing;
+    const macroBox = (label, value) => `
+      <div style="flex:1;min-width:0;text-align:center" class="rounded-xl bg-white border border-[#efe6dc] px-2 py-2.5">
+        <div class="text-base font-bold text-stone-900">${value}</div>
+        <div class="text-xs text-stone-500">${label}</div>
+      </div>`;
+    const skippedNote = nutrition.skipped.length
+      ? ` Not counted: ${escapeHtml(nutrition.skipped.map(capitalizeIngredient).join(", "))}.`
+      : "";
+    const nutritionHtml = `
+      <div class="rounded-2xl border border-[#efe6dc] bg-[#faf7f2] p-4 sm:p-5 space-y-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <h3 class="text-base font-bold text-stone-900">Nutrition (estimate)</h3>
+          <span class="text-sm text-stone-500">per serving</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${macroBox("kcal", `≈ ${per.kcal}`)}
+          ${macroBox("protein", `${per.protein}g`)}
+          ${macroBox("carbs", `${per.carbs}g`)}
+          ${macroBox("fat", `${per.fat}g`)}
+        </div>
+        <p class="text-xs text-stone-500 leading-relaxed">
+          Worked out from the ingredient amounts for about ${nutrition.servings} serving${nutrition.servings === 1 ? "" : "s"} (≈ ${nutrition.total.kcal} kcal in total). This is a rough guide, not exact.${skippedNote}
+        </p>
+      </div>`;
+
     const safeImage = escapeHtml(recipe.image);
     const safeName = escapeHtml(titleCasedName);
     const safeCategory = escapeHtml(recipe.category || "Main");
@@ -950,10 +1002,11 @@ async function showRecipe(id) {
           
           <!-- Ingredients Column -->
           <div class="md:col-span-5 space-y-4">
-            <h2 class="text-xl font-bold text-stone-900">Ingredients (2 servings)</h2>
+            <h2 class="text-xl font-bold text-stone-900">Ingredients (about ${nutrition.servings} serving${nutrition.servings === 1 ? "" : "s"})</h2>
             <ul class="space-y-2 list-none p-0 m-0">
               ${ingredientsHtml}
-            </ul>
+            </ul>            ${nutritionHtml}
+
           </div>
 
           <!-- Instructions Column -->
