@@ -53,24 +53,40 @@ const FALLBACK_RECIPES_BY_ID = {
       { name: "brown rice", measure: "3 cups cooked" }
     ]
   },
-  "greek-salad": {
-    id: "greek-salad",
-    name: "Classic Greek Salad",
-    image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=600&q=80",
-    category: "Vegetarian",
-    area: "Greek",
-    description: "A crisp, colourful Mediterranean salad packed with ripe vine tomatoes, crisp cucumbers, red onions, Kalamata olives and creamy feta cheese dressed with extra virgin olive oil and oregano.",
-    instructions: "Wash and chop the ripe vine tomatoes and crisp cucumbers into bite-sized chunks.\r\nThinly slice the red onion and place into a large salad bowl with the chopped tomatoes and cucumbers.\r\nAdd the pitted Kalamata olives and gently toss together.\r\nCut the block of Greek feta cheese into cubes (or crumble gently over the salad bowl).\r\nDrizzle generously with high-quality extra virgin olive oil and a splash of red wine vinegar.\r\nSeason with dried Greek oregano, sea salt and freshly cracked black pepper. Toss gently and serve fresh.",
+  "52855": {
+    id: "52855",
+    name: "Banana Pancakes",
+    image: "https://www.themealdb.com/images/media/meals/sywswr1511383814.jpg",
+    category: "Dessert",
+    area: "American",
+    description: "Fluffy, naturally sweet banana pancakes made with ripe bananas, eggs, and a touch of vanilla, topped with fresh raspberries and pecans.",
+    instructions: "In a bowl, mash the banana with a fork until it resembles a thick purée. Stir in the eggs, baking powder and vanilla.\r\nHeat a large non-stick frying pan or pancake pan over a medium heat and brush with half the oil. Using half the batter, spoon two pancakes into the pan, cook for 1-2 mins each side, then tip onto a plate. Repeat the process with the remaining oil and batter. Top the pancakes with the pecans and raspberries.",
     ingredients: [
-      { name: "Ripe Vine Tomatoes", measure: "4 large" },
-      { name: "English Cucumber", measure: "1 medium" },
-      { name: "Red Onion", measure: "1/2 sliced" },
-      { name: "Kalamata Olives", measure: "1/2 cup pitted" },
-      { name: "Greek Feta Cheese", measure: "200g" },
-      { name: "Extra Virgin Olive Oil", measure: "3 tbsp" },
-      { name: "Red Wine Vinegar", measure: "1 tbsp" },
-      { name: "Dried Greek Oregano", measure: "1 tsp" },
-      { name: "Sea Salt & Black Pepper", measure: "To taste" }
+      { name: "Banana", measure: "1 large" },
+      { name: "Eggs", measure: "2 medium" },
+      { name: "Baking Powder", measure: "pinch" },
+      { name: "Vanilla Extract", measure: "sprinkling" },
+      { name: "Oil", measure: "1 tsp" },
+      { name: "Pecan Nuts", measure: "25g" },
+      { name: "Raspberries", measure: "125g" }
+    ]
+  },
+  "53011": {
+    id: "53011",
+    name: "Chicken Quinoa Greek Salad",
+    image: "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg",
+    category: "Chicken",
+    area: "Greek",
+    description: "A fresh Mediterranean salad bowl packed with fluffy quinoa, tender griddled spiced chicken fillets, Kalamata olives, juicy tomatoes, and feta cheese.",
+    instructions: "Cook the quinoa following pack instructions, then rinse in cold water and drain thoroughly.\r\nMeanwhile, mix butter, chilli and garlic into a paste. Toss chicken fillets in 2 tsp olive oil with seasoning. Lay in a hot griddle pan and cook for 3-4 mins each side until cooked through. Transfer to a plate, dot with spicy butter and set aside.\r\nNext, tip tomatoes, olives, onion, feta and mint into a bowl. Toss in cooked quinoa. Stir through remaining olive oil, lemon juice and zest, and season well. Top with chicken fillets and drizzle with juices.",
+    ingredients: [
+      { name: "Quinoa", measure: "225g" },
+      { name: "Chicken Breast", measure: "400g" },
+      { name: "Black Olives", measure: "Handful" },
+      { name: "Red Onions", measure: "1 chopped" },
+      { name: "Feta", measure: "100g" },
+      { name: "Olive Oil", measure: "2 tbsp" },
+      { name: "Lemon", measure: "Juice of 1/2" }
     ]
   },
   "53194": {
@@ -554,17 +570,18 @@ async function showRecipe(id) {
   `;
 
   try {
-    // Aliases for legacy demo IDs that were erroneously mapped to unrelated TheMealDB items
-    if (id === "52838") id = "53194"; // Tom Yum Soup (legacy id 52838 was Viennese Schnitzel)
-    if (id === "52773") id = "52772"; // Teriyaki Chicken Casserole (legacy id 52773 was Honey Teriyaki Salmon)
-    if (id === "52855") id = "greek-salad"; // Classic Greek Salad (legacy id 52855 was Banana Pancakes)
-    if (id === "52891") id = "52860"; // Chocolate Brownies (legacy id 52891 was Blackberry Fool)
+    // Graceful alias for any legacy mock id bookmark
+    if (id === "greek-salad") id = "53011"; // Chicken Quinoa Greek Salad
 
     let recipe = null;
-    if (FALLBACK_RECIPES_BY_ID[String(id)]) {
-      recipe = FALLBACK_RECIPES_BY_ID[String(id)];
-    } else {
+    try {
       recipe = await getRecipeById(id);
+    } catch (e) {
+      console.warn("Live API lookup failed, falling back:", e);
+    }
+
+    if (!recipe && FALLBACK_RECIPES_BY_ID[String(id)]) {
+      recipe = FALLBACK_RECIPES_BY_ID[String(id)];
     }
 
     // Fallback if API lookup fails or offline

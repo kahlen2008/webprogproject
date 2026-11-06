@@ -10,26 +10,26 @@ import { getCurrentUser } from "./auth.js";
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const MEALS = ["Breakfast", "Lunch", "Dinner"];
 
-// Default weekly plan matching mockup image
+// Default weekly plan using authentic TheMealDB recipes
 const DEMO_PLAN = {
   Mon: {
-    Breakfast: { name: "Greek Yogurt Parfait", image: "https://images.unsplash.com/photo-1488477181946-6428a0291777?auto=format&fit=crop&w=150&h=150&q=80" },
-    Lunch: { name: "Chicken Salad", image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=150&h=150&q=80" },
-    Dinner: { name: "Spaghetti Carbonara", image: "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=150&h=150&q=80" }
+    Breakfast: { id: "52855", name: "Banana Pancakes", image: "https://www.themealdb.com/images/media/meals/sywswr1511383814.jpg" },
+    Lunch: { id: "53011", name: "Chicken Quinoa Greek Salad", image: "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg" },
+    Dinner: { id: "52982", name: "Spaghetti alla Carbonara", image: "https://www.themealdb.com/images/media/meals/llcbn01574260722.jpg" }
   },
   Tue: {
-    Breakfast: { name: "Banana Pancakes", image: "https://images.unsplash.com/photo-1528207776546-365bb710ee93?auto=format&fit=crop&w=150&h=150&q=80" },
-    Lunch: { name: "Beef Tacos", image: "https://images.unsplash.com/photo-1551504734-5ee1c4a1479b?auto=format&fit=crop&w=150&h=150&q=80" },
-    Dinner: { name: "Tom Yum Soup", image: "https://images.unsplash.com/photo-1565680018434-b513d5e5fd47?auto=format&fit=crop&w=150&h=150&q=80" }
+    Breakfast: { id: "52957", name: "Fruit and Cream Cheese Breakfast Pastries", image: "https://www.themealdb.com/images/media/meals/1543774956.jpg" },
+    Lunch: { id: "52830", name: "Crock Pot Chicken Baked Tacos", image: "https://www.themealdb.com/images/media/meals/ypxvwv1505333929.jpg" },
+    Dinner: { id: "53194", name: "Tom Yum Soup with Prawns", image: "https://www.themealdb.com/images/media/meals/l50vz41763422681.jpg" }
   },
   Wed: {
-    Breakfast: { name: "Avocado Toast", image: "https://images.unsplash.com/photo-1588137378633-dea1336ce1e2?auto=format&fit=crop&w=150&h=150&q=80" },
-    Lunch: { name: "Teriyaki Chicken Casserole", image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg" },
-    Dinner: null
+    Breakfast: { id: "52854", name: "Pancakes", image: "https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg" },
+    Lunch: { id: "52772", name: "Teriyaki Chicken Casserole", image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg" },
+    Dinner: { id: "52844", name: "Lasagne", image: "https://www.themealdb.com/images/media/meals/wtsvxx1511296896.jpg" }
   },
   Thu: {
     Breakfast: null,
-    Lunch: { name: "Greek Salad", image: "https://images.unsplash.com/photo-1540420773420-3366772f4999?auto=format&fit=crop&w=150&h=150&q=80" },
+    Lunch: { id: "52874", name: "Beef and Mustard Pie", image: "https://www.themealdb.com/images/media/meals/sytuqu1511553755.jpg" },
     Dinner: null
   },
   Fri: { Breakfast: null, Lunch: null, Dinner: null },
@@ -62,11 +62,73 @@ export async function getPlan() {
     const raw = localStorage.getItem("recipeplan_weekly_plan");
     if (!raw) {
       localStorage.setItem("recipeplan_weekly_plan", JSON.stringify(DEMO_PLAN));
-      return DEMO_PLAN;
+      return JSON.parse(JSON.stringify(DEMO_PLAN));
     }
-    return JSON.parse(raw);
+    const plan = JSON.parse(raw);
+    let changed = false;
+
+    // Migrate any legacy mock recipes or un-ID'd entries from previous demo data
+    DAYS.forEach((day) => {
+      if (!plan[day]) return;
+      MEALS.forEach((meal) => {
+        const item = plan[day][meal];
+        if (!item) return;
+
+        if (item.id === "greek-salad" || item.name === "Greek Salad") {
+          item.id = "53011";
+          item.name = "Chicken Quinoa Greek Salad";
+          item.image = "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg";
+          changed = true;
+        } else if (item.name === "Banana Pancakes") {
+          if (item.id !== "52855") {
+            item.id = "52855";
+            item.image = "https://www.themealdb.com/images/media/meals/sywswr1511383814.jpg";
+            changed = true;
+          }
+        } else if (item.name === "Chicken Salad" && (!item.id || item.id === "0")) {
+          item.id = "53011";
+          item.name = "Chicken Quinoa Greek Salad";
+          item.image = "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg";
+          changed = true;
+        } else if (item.name === "Spaghetti Carbonara" && (!item.id || item.id === "0")) {
+          item.id = "52982";
+          item.name = "Spaghetti alla Carbonara";
+          item.image = "https://www.themealdb.com/images/media/meals/llcbn01574260722.jpg";
+          changed = true;
+        } else if (item.name === "Tom Yum Soup" && (!item.id || item.id === "0")) {
+          item.id = "53194";
+          item.name = "Tom Yum Soup with Prawns";
+          item.image = "https://www.themealdb.com/images/media/meals/l50vz41763422681.jpg";
+          changed = true;
+        } else if (item.name === "Beef Tacos" && (!item.id || item.id === "0")) {
+          item.id = "52830";
+          item.name = "Crock Pot Chicken Baked Tacos";
+          item.image = "https://www.themealdb.com/images/media/meals/ypxvwv1505333929.jpg";
+          changed = true;
+        } else if (item.name === "Greek Yogurt Parfait" && (!item.id || item.id === "0")) {
+          item.id = "52957";
+          item.name = "Fruit and Cream Cheese Breakfast Pastries";
+          item.image = "https://www.themealdb.com/images/media/meals/1543774956.jpg";
+          changed = true;
+        } else if (item.name === "Avocado Toast" && (!item.id || item.id === "0")) {
+          item.id = "52854";
+          item.name = "Pancakes";
+          item.image = "https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg";
+          changed = true;
+        } else if (item.name === "Teriyaki Chicken Casserole" && (!item.id || item.id === "0")) {
+          item.id = "52772";
+          item.image = "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg";
+          changed = true;
+        }
+      });
+    });
+
+    if (changed) {
+      localStorage.setItem("recipeplan_weekly_plan", JSON.stringify(plan));
+    }
+    return plan;
   } catch (e) {
-    return DEMO_PLAN;
+    return JSON.parse(JSON.stringify(DEMO_PLAN));
   }
 }
 
