@@ -1,10 +1,11 @@
 // Weekly Meal planner and shopping list logic matching RecipePlan mockup.
 // Owner: Person 4.
 
-import { showToast, toTitleCase, showAuthPromptModal } from "./utils.js";
+import { showToast, toTitleCase, showAuthPromptModal, escapeHtml } from "./utils.js";
 import { getFavourites } from "./favourites.js";
 import { confirmIfFlagged } from "./preferences.js";
-import { searchRecipes } from "./api.js";
+import { searchRecipes, getRecipeById } from "./api.js";
+import { estimateNutrition } from "./nutrition.js";
 import { getCurrentUser } from "./auth.js";
 
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
@@ -258,65 +259,195 @@ export function updatePlannerAuthUI() {
   }
 }
 
+// Per-serving calorie estimate for one planned recipe, cached by recipe id.
+// TheMealDB has no nutrition data, so this comes from nutrition.js.
+const kcalCache = new Map();
+
+async function getRecipeKcal(id) {
+  if (!id || id === "0") return null;
+  if (kcalCache.has(id)) return kcalCache.get(id);
+  const promise = getRecipeById(id)
+    .then((recipe) => (recipe ? estimateNutrition(recipe.ingredients).perServing.kcal : null))
+    .catch(() => null);
+  kcalCache.set(id, promise);
+  return promise;
+}
+
+// Fills the "Total (est.)" column with each day's estimated calories.
+async function fillDayCalorieTotals(plan) {
+  await Promise.all(
+    DAYS.map(async (day) => {
+      const cells = document.querySelectorAll(`.day-kcal-total[data-day="${day}"]`);
+      if (cells.length === 0) return;
+      const items = MEALS.map((meal) => plan[day]?.[meal]).filter(Boolean);
+      if (items.length === 0) return;
+
+      const values = await Promise.all(items.map((item) => getRecipeKcal(item.id)));
+      const known = values.filter((v) => typeof v === "number");
+      if (known.length === 0) return;
+
+      const total = known.reduce((a, b) => a + b, 0);
+      const missing = items.length - known.length;
+      const title = missing
+        ? `Estimate for ${known.length} of ${items.length} meals (per serving)`
+        : "Estimated per serving from ingredient amounts";
+      cells.forEach((cell) => {
+        cell.textContent = `≈ ${total.toLocaleString()} kcal`;
+        cell.className = "day-kcal-total inline-flex items-center rounded-full bg-[#fbf2ec] text-[#ca5c2e] text-xs font-semibold px-2.5 py-1";
+        cell.title = title;
+      });
+    })
+  );
+}
+
+// Which week is shown: 0 = this week, -1 = last week, 1 = next week.
+// The saved plan is a single repeating week, so this only changes the dates shown.
+let weekOffset = 0;
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const FALLBACK_MEAL_IMG = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=160&q=80";
+
+// Dates (Mon to Sun) for the week being shown.
+function getWeekDates(offset = weekOffset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + offset * 7);
+  return DAYS.map((_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+}
+
+function formatShortDate(d) {
+  return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
+}
+
+function updateWeekLabel() {
+  const label = document.getElementById("week-label");
+  if (!label) return;
+  const dates = getWeekDates();
+  const last = dates[6];
+  label.textContent = `${formatShortDate(dates[0])} – ${formatShortDate(last)} ${last.getFullYear()}`;
+}
+
+function isToday(d) {
+  const t = new Date();
+  return d.getFullYear() === t.getFullYear() && d.getMonth() === t.getMonth() && d.getDate() === t.getDate();
+}
+
+// One filled meal: photo, name on up to two lines, remove button in the corner.
+function mealTileHtml(item, day, meal, compact = false) {
+  const hasLink = item.id && item.id !== "0";
+  const link = hasLink ? `recipe.html?id=${encodeURIComponent(item.id)}` : "#";
+  const name = escapeHtml(toTitleCase(item.name || ""));
+  const img = escapeHtml(item.image || FALLBACK_MEAL_IMG);
+  const size = compact ? "w-12 h-12" : "w-16 h-16";
+  return `
+    <div class="relative group h-full">
+      <a href="${link}" class="flex items-center gap-3 h-full bg-white border border-[#efe6dc] rounded-2xl p-2 pr-7 shadow-xs hover:border-[#ca5c2e]/50 hover:shadow-sm transition" title="View recipe">
+        <img src="${img}" alt="${name}" loading="lazy" class="${size} rounded-xl object-cover flex-shrink-0 bg-stone-100">
+        <span class="text-sm font-semibold text-stone-800 group-hover:text-[#ca5c2e] leading-snug line-clamp-2">${name}</span>
+      </a>
+      <button type="button" class="remove-plan-item absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 border border-stone-200 text-stone-400 hover:text-red-500 hover:border-red-200 flex items-center justify-center text-sm leading-none shadow-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" data-day="${day}" data-meal="${meal}" title="Remove meal" aria-label="Remove ${name} from ${day} ${meal}">&times;</button>
+    </div>
+  `;
+}
+
+// Empty slot: same size as a filled tile, dashed, clearly clickable.
+function emptySlotHtml(day, meal, compact = false) {
+  const height = compact ? "min-h-[64px]" : "min-h-[82px]";
+  return `
+    <button type="button" class="add-slot-btn w-full h-full ${height} flex items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-stone-200 text-stone-400 text-sm font-medium hover:border-[#ca5c2e]/50 hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition" data-day="${day}" data-meal="${meal}">
+      <span class="text-lg leading-none">+</span> Add ${meal.toLowerCase()}
+    </button>
+  `;
+}
+
 export async function renderPlannerTable() {
   updatePlannerAuthUI();
+  updateWeekLabel();
   const host = document.getElementById("planner-table-body");
-  if (!host) return;
+  const cardsHost = document.getElementById("planner-cards");
+  if (!host && !cardsHost) return;
 
   const plan = await getPlan();
-  host.innerHTML = "";
+  const dates = getWeekDates();
 
-  DAYS.forEach((day) => {
-    const row = document.createElement("tr");
-    row.className = "border-b border-stone-100 hover:bg-[#faf7f2]/50 transition";
+  // Desktop / tablet: table
+  if (host) {
+    host.innerHTML = "";
+    DAYS.forEach((day, i) => {
+      const today = isToday(dates[i]);
+      const row = document.createElement("tr");
+      row.className = today ? "bg-[#fbf2ec]/60" : "hover:bg-[#faf7f2]/50 transition";
 
-    let cellsHtml = `
-      <td class="py-3 px-4 font-bold text-stone-800 text-sm align-middle whitespace-nowrap bg-stone-50/50">
-        ${day}
-      </td>
-    `;
+      let cellsHtml = `
+        <td class="py-3 px-4 align-middle whitespace-nowrap ${today ? "border-l-4 border-[#ca5c2e]" : "border-l-4 border-transparent"}">
+          <div class="font-bold text-sm ${today ? "text-[#ca5c2e]" : "text-stone-800"}">${day}</div>
+          <div class="text-xs ${today ? "text-[#ca5c2e]/80 font-semibold" : "text-stone-400"}">${today ? "Today" : formatShortDate(dates[i])}</div>
+        </td>
+      `;
 
-    MEALS.forEach((meal) => {
-      const item = plan[day]?.[meal];
-      if (item) {
-        const link = item.id && item.id !== "0" ? `recipe.html?id=${item.id}` : "#";
-        cellsHtml += `
-          <td class="py-2.5 px-3 align-middle">
-            <div class="inline-flex items-center gap-2.5 bg-white border border-[#efe6dc] rounded-xl p-1.5 pr-3 shadow-xs group max-w-[210px] hover:border-[#ca5c2e]/40 transition">
-              <img src="${item.image || "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=80&q=80"}" alt="${item.name}" class="w-9 h-9 rounded-lg object-cover flex-shrink-0">
-              <a href="${link}" class="text-xs font-semibold text-stone-800 hover:text-[#ca5c2e] truncate leading-tight" title="View recipe">${toTitleCase(item.name)}</a>
-              <button type="button" class="remove-plan-item text-stone-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition ml-auto flex-shrink-0 text-base leading-none" data-day="${day}" data-meal="${meal}" title="Remove meal">&times;</button>
-            </div>
-          </td>
-        `;
-      } else {
-        cellsHtml += `
-          <td class="py-2.5 px-3 align-middle">
-            <button type="button" class="add-slot-btn text-xs text-stone-400 hover:text-[#ca5c2e] hover:bg-[#fbf2ec] px-3 py-2 rounded-xl transition flex items-center gap-1 font-medium border border-transparent hover:border-[#f3ddd0]" data-day="${day}" data-meal="${meal}">
-              <span class="text-sm font-bold text-stone-400 hover:text-[#ca5c2e]">+</span> Add
-            </button>
-          </td>
-        `;
-      }
+      MEALS.forEach((meal) => {
+        const item = plan[day]?.[meal];
+        cellsHtml += `<td class="py-2.5 px-2 align-middle">${item ? mealTileHtml(item, day, meal) : emptySlotHtml(day, meal)}</td>`;
+      });
+
+      cellsHtml += `
+        <td class="py-2.5 px-4 align-middle whitespace-nowrap">
+          <span class="day-kcal-total text-xs font-semibold text-stone-400" data-day="${day}">–</span>
+        </td>
+      `;
+
+      row.innerHTML = cellsHtml;
+      host.appendChild(row);
     });
+  }
 
-    row.innerHTML = cellsHtml;
-    host.appendChild(row);
-  });
+  // Phones: one card per day, meals stacked
+  if (cardsHost) {
+    cardsHost.innerHTML = DAYS.map((day, i) => {
+      const today = isToday(dates[i]);
+      const mealsHtml = MEALS.map((meal) => {
+        const item = plan[day]?.[meal];
+        return `
+          <div>
+            <div class="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1">${meal}</div>
+            ${item ? mealTileHtml(item, day, meal, true) : emptySlotHtml(day, meal, true)}
+          </div>
+        `;
+      }).join("");
+      return `
+        <section class="bg-white rounded-2xl border ${today ? "border-[#ca5c2e] ring-2 ring-[#ca5c2e]/15" : "border-[#efe6dc]"} shadow-xs p-4 space-y-3">
+          <div class="flex items-baseline justify-between gap-2">
+            <h3 class="font-bold ${today ? "text-[#ca5c2e]" : "text-stone-900"}">
+              ${day} <span class="text-sm font-medium ${today ? "text-[#ca5c2e]/80" : "text-stone-400"}">· ${today ? "Today" : formatShortDate(dates[i])}</span>
+            </h3>
+            <span class="day-kcal-total text-xs font-semibold text-stone-400" data-day="${day}">–</span>
+          </div>
+          ${mealsHtml}
+        </section>
+      `;
+    }).join("");
+  }
 
-  // Attach delete handlers
-  host.querySelectorAll(".remove-plan-item").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const { day, meal } = btn.dataset;
-      removeFromPlan(day, meal);
+  fillDayCalorieTotals(plan);
+
+  [host, cardsHost].filter(Boolean).forEach((root) => {
+    root.querySelectorAll(".remove-plan-item").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const { day, meal } = btn.dataset;
+        removeFromPlan(day, meal);
+      });
     });
-  });
-
-  // Attach add handlers -> opens slide-over drawer
-  host.querySelectorAll(".add-slot-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const { day, meal } = btn.dataset;
-      openMealDrawer(day, meal);
+    root.querySelectorAll(".add-slot-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const { day, meal } = btn.dataset;
+        openMealDrawer(day, meal);
+      });
     });
   });
 }
@@ -711,12 +842,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const weekLabel = document.getElementById("week-label");
   if (prevWeekBtn && nextWeekBtn && weekLabel) {
     prevWeekBtn.addEventListener("click", () => {
-      weekLabel.textContent = "16 Nov – 22 Nov 2026";
-      showToast("Viewing week: 16 Nov – 22 Nov 2026");
+      weekOffset--;
+      renderPlannerTable();
     });
     nextWeekBtn.addEventListener("click", () => {
-      weekLabel.textContent = "30 Nov – 6 Dec 2026";
-      showToast("Viewing week: 30 Nov – 6 Dec 2026");
+      weekOffset++;
+      renderPlannerTable();
     });
   }
 

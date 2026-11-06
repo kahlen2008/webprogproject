@@ -2,6 +2,7 @@
 // Matches the design and interactions shown in RecipePlan mockup.
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
+import { estimateNutrition } from "./nutrition.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal } from "./utils.js";
 import {
   getPreferences,
@@ -862,6 +863,34 @@ async function showRecipe(id) {
       })
       .join("");
 
+    // Rough nutrition estimate (TheMealDB has no nutrition data).
+    const nutrition = estimateNutrition(recipe.ingredients || []);
+    const per = nutrition.perServing;
+    const macroBox = (label, value) => `
+      <div style="flex:1;min-width:0;text-align:center" class="rounded-xl bg-white border border-[#efe6dc] px-2 py-2.5">
+        <div class="text-base font-bold text-stone-900">${value}</div>
+        <div class="text-xs text-stone-500">${label}</div>
+      </div>`;
+    const skippedNote = nutrition.skipped.length
+      ? ` Not counted: ${escapeHtml(nutrition.skipped.map(capitalizeIngredient).join(", "))}.`
+      : "";
+    const nutritionHtml = `
+      <div class="rounded-2xl border border-[#efe6dc] bg-[#faf7f2] p-4 sm:p-5 space-y-3">
+        <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+          <h3 class="text-base font-bold text-stone-900">Nutrition (estimate)</h3>
+          <span class="text-sm text-stone-500">per serving</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          ${macroBox("kcal", `≈ ${per.kcal}`)}
+          ${macroBox("protein", `${per.protein}g`)}
+          ${macroBox("carbs", `${per.carbs}g`)}
+          ${macroBox("fat", `${per.fat}g`)}
+        </div>
+        <p class="text-xs text-stone-500 leading-relaxed">
+          Worked out from the ingredient amounts for about ${nutrition.servings} serving${nutrition.servings === 1 ? "" : "s"} (≈ ${nutrition.total.kcal} kcal in total). This is a rough guide, not exact.${skippedNote}
+        </p>
+      </div>`;
+
     const safeImage = escapeHtml(recipe.image);
     const safeName = escapeHtml(titleCasedName);
     const safeCategory = escapeHtml(recipe.category || "Main");
@@ -967,10 +996,11 @@ async function showRecipe(id) {
           
           <!-- Ingredients Column -->
           <div class="md:col-span-5 space-y-4">
-            <h2 class="text-xl font-bold text-stone-900">Ingredients (2 servings)</h2>
+            <h2 class="text-xl font-bold text-stone-900">Ingredients (about ${nutrition.servings} serving${nutrition.servings === 1 ? "" : "s"})</h2>
             <ul class="space-y-2 list-none p-0 m-0">
               ${ingredientsHtml}
-            </ul>
+            </ul>            ${nutritionHtml}
+
           </div>
 
           <!-- Instructions Column -->
