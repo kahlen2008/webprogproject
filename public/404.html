@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page Not Found (404) | RecipePlan</title>
+  <meta name="description" content="Oops! The page or recipe you are looking for cannot be found. Return to RecipePlan to explore delicious meals and plan your week.">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Tailwind CSS v3 via CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              DEFAULT: '#ca5c2e',
+              dark: '#b34d23',
+              light: '#fdf8f4',
+              surface: '#faf6f0',
+              cream: '#faf7f2',
+              pill: '#f5ebe4',
+              pillText: '#a04e28',
+              border: '#ede4da',
+            }
+          },
+          fontFamily: {
+            sans: ['Inter', 'system-ui', 'sans-serif'],
+            heading: ['Outfit', 'Inter', 'sans-serif'],
+          }
+        }
+      }
+    }
+  </script>
+
+  <link rel="stylesheet" href="css/base.css">
+  <link rel="stylesheet" href="css/components.css">
+</head>
+<body class="bg-[#faf7f2] text-stone-800 min-h-screen sm:h-screen sm:overflow-hidden flex flex-col justify-between font-sans antialiased overflow-x-hidden w-full max-w-full">
+  <!-- Global Navigation Header (rendered by js/navbar.js) -->
+  <header id="navbar" class="w-full sticky top-0 z-40 flex-shrink-0"></header>
+
+  <!-- Main 404 Content (compact and centered to prevent scrolling) -->
+  <main class="flex-1 flex items-center justify-center max-w-2xl mx-auto w-full px-3.5 sm:px-4 py-4 sm:py-6">
+    <div class="w-full rounded-3xl bg-[#fbf2ec] border border-[#ede4da] p-4 sm:p-8 text-center shadow-xs">
+
+      <div class="max-w-lg mx-auto space-y-4">
+        
+        <!-- Culinary Illustration Badge -->
+        <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full bg-white border border-[#ede4da] flex items-center justify-center mx-auto shadow-xs ring-4 ring-[#ca5c2e]/10">
+          <!-- Kitchen Cloche / Serving Platter Icon -->
+          <svg class="w-8 h-8 sm:w-10 sm:h-10 text-[#ca5c2e] drop-shadow-sm transition-transform duration-300 hover:scale-105" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v2m-8 12h16a1 1 0 0 0 1-1c0-4.97-4.03-9-9-9s-9 4.03-9 9a1 1 0 0 0 1 1z"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2 19h20"></path>
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 2c.5.8.5 1.2 0 2m6-2c.5.8.5 1.2 0 2"></path>
+          </svg>
+        </div>
+
+        <!-- Heading & Error Code -->
+        <div class="space-y-1.5">
+          <div class="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider bg-[#f5ebe4] text-[#a04e28] border border-[#eedfce]">
+            <span>Error 404</span>
+            <span class="text-stone-300">&bull;</span>
+            <span>Recipe Missing</span>
+          </div>
+
+          <h1 class="text-xl sm:text-2xl md:text-3xl font-extrabold text-stone-900 tracking-tight leading-tight font-heading">
+            Oops! This recipe is missing from the kitchen
+          </h1>
+
+          <p class="text-xs sm:text-sm text-stone-600 leading-relaxed max-w-sm sm:max-w-md mx-auto">
+            The page you are looking for took a wrong turn or got moved. Let's find you something delicious instead!
+          </p>
+        </div>
+
+        <!-- Compact Search Bar -->
+        <form action="recipes.html" method="GET" class="w-full max-w-sm mx-auto relative flex items-center bg-white rounded-full border border-[#ede4da] shadow-xs focus-within:border-[#ca5c2e] focus-within:ring-2 focus-within:ring-[#ca5c2e]/15 transition p-0.5 sm:p-1">
+          <label for="recipe-search" class="sr-only">Search recipes</label>
+          <input 
+            type="search" 
+            id="recipe-search" 
+            name="search" 
+            placeholder="Search thousands of recipes..." 
+            class="w-full min-w-0 pl-3.5 pr-2 py-1.5 text-xs sm:text-sm bg-transparent text-stone-800 placeholder-stone-400 focus:outline-none"
+            required
+          >
+          <button 
+            type="submit" 
+            class="flex-shrink-0 w-8 h-8 bg-[#ca5c2e] hover:bg-[#b34d23] text-white rounded-full flex items-center justify-center transition shadow-2xs active:scale-95 focus:outline-none" 
+            aria-label="Search"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8"></circle>
+              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+            </svg>
+          </button>
+        </form>
+
+        <!-- Navigation Action Buttons -->
+        <div class="flex flex-wrap items-center justify-center gap-2 pt-1">
+          <a 
+            href="index.html" 
+            class="inline-flex items-center justify-center gap-1.5 bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-full transition-all duration-200 shadow-xs hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path>
+            </svg>
+            <span>Back to Home</span>
+          </a>
+
+          <a 
+            href="recipes.html" 
+            class="inline-flex items-center justify-center gap-1.5 bg-white hover:bg-[#fbf2ec] text-stone-800 hover:text-[#ca5c2e] border border-[#ede4da] text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-full transition-all duration-200 shadow-2xs hover:shadow-xs hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+            </svg>
+            <span>Browse Recipes</span>
+          </a>
+
+          <a 
+            href="planner.html" 
+            class="inline-flex items-center justify-center gap-1.5 bg-white hover:bg-[#fbf2ec] text-stone-800 hover:text-[#ca5c2e] border border-[#ede4da] text-xs sm:text-sm font-semibold px-4 sm:px-5 py-2.5 rounded-full transition-all duration-200 shadow-2xs hover:shadow-xs hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+              <line x1="16" y1="2" x2="16" y2="6"></line>
+              <line x1="8" y1="2" x2="8" y2="6"></line>
+              <line x1="3" y1="10" x2="21" y2="10"></line>
+            </svg>
+            <span>Meal Planner</span>
+          </a>
+        </div>
+
+        <!-- Popular Category Shortcuts -->
+        <div class="pt-3 border-t border-[#ede4da]/70 space-y-2">
+          <div class="flex items-center justify-center gap-2">
+            <span class="h-px bg-[#ede4da] w-6 sm:w-12"></span>
+            <span class="text-[11px] font-bold uppercase tracking-wider text-stone-400">Popular Categories</span>
+            <span class="h-px bg-[#ede4da] w-6 sm:w-12"></span>
+          </div>
+          <div class="flex flex-wrap items-center justify-center gap-1.5">
+            <a href="recipes.html?category=Pasta" class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold bg-white border border-[#ede4da] text-stone-700 hover:border-[#ca5c2e] hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition shadow-2xs hover:scale-105 active:scale-95">
+              <span>🍝</span> Pasta
+            </a>
+            <a href="recipes.html?category=Chicken" class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold bg-white border border-[#ede4da] text-stone-700 hover:border-[#ca5c2e] hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition shadow-2xs hover:scale-105 active:scale-95">
+              <span>🍗</span> Chicken
+            </a>
+            <a href="recipes.html?category=Vegetarian" class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold bg-white border border-[#ede4da] text-stone-700 hover:border-[#ca5c2e] hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition shadow-2xs hover:scale-105 active:scale-95">
+              <span>🥗</span> Vegetarian
+            </a>
+            <a href="recipes.html?category=Breakfast" class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold bg-white border border-[#ede4da] text-stone-700 hover:border-[#ca5c2e] hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition shadow-2xs hover:scale-105 active:scale-95">
+              <span>🥞</span> Breakfast
+            </a>
+            <a href="recipes.html?category=Dessert" class="inline-flex items-center gap-1 px-2.5 sm:px-3 py-1 rounded-full text-xs font-semibold bg-white border border-[#ede4da] text-stone-700 hover:border-[#ca5c2e] hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition shadow-2xs hover:scale-105 active:scale-95">
+              <span>🍰</span> Dessert
+            </a>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- Global Footer (rendered by js/navbar.js) -->
+  <footer id="site-footer" class="flex-shrink-0"></footer>
+
+  <!-- Scripts -->
+  <script type="module" src="js/navbar.js"></script>
+</body>
+</html>

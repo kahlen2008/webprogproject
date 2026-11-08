@@ -72,9 +72,9 @@ export function renderNavbar(user) {
     const avatarUrl = activeUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ca5c2e&color=fff`;
 
     userDisplayHtml = `
-      <div class="relative group">
-        <button id="user-menu-btn" type="button" class="flex items-center gap-2.5 pl-2 pr-1 py-1 rounded-full hover:bg-stone-100 transition focus:outline-none" aria-haspopup="true">
-          <img class="w-8 h-8 rounded-full object-cover border border-stone-200" src="${avatarUrl}" alt="${displayName}">
+      <div class="relative group flex-shrink-0">
+        <button id="user-menu-btn" type="button" class="flex items-center gap-1.5 sm:gap-2.5 pl-1.5 sm:pl-2 pr-1 py-1 rounded-full hover:bg-stone-100 transition focus:outline-none" aria-haspopup="true">
+          <img class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-stone-200 flex-shrink-0" src="${avatarUrl}" alt="${displayName}">
           <span class="text-sm font-semibold text-stone-800 hidden sm:inline" id="navbar-name">${displayName}</span>
           ${chevronDownSvg}
         </button>
@@ -101,35 +101,35 @@ export function renderNavbar(user) {
     `;
   } else {
     userDisplayHtml = `
-      <div class="flex items-center gap-3">
-        <a href="login.html" class="text-sm font-semibold text-stone-700 hover:text-[#ca5c2e] px-2 py-1.5 transition">Login</a>
-        <a href="signup.html" class="text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b34d23] px-4 py-2 rounded-xl transition shadow-sm">Sign Up</a>
+      <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
+        <a href="login.html" class="text-xs sm:text-sm font-semibold text-stone-700 hover:text-[#ca5c2e] px-1.5 sm:px-2 py-1.5 transition">Login</a>
+        <a href="signup.html" class="text-xs sm:text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b34d23] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl transition shadow-sm whitespace-nowrap">Sign Up</a>
       </div>
     `;
   }
 
   host.innerHTML = `
     <div class="w-full bg-[#fcf9f5]/90 backdrop-blur-md border-b border-[#ede4da]">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="relative max-w-7xl mx-auto px-3 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
         
         <!-- Brand Logo -->
-        <a href="index.html" translate="no" class="flex items-center gap-2 text-xl tracking-tight select-none notranslate">
+        <a href="index.html" translate="no" class="flex items-center gap-2 text-xl tracking-tight select-none notranslate z-10 flex-shrink-0">
           ${logoSvg}
           <span class="font-normal text-stone-800">Recipe<span class="font-extrabold text-stone-900">Plan</span></span>
         </a>
 
-        <!-- Desktop Navigation Links -->
-        <nav class="hidden md:flex items-center gap-8" aria-label="Main">
+        <!-- Desktop Navigation Links (Centered) -->
+        <nav class="hidden md:flex items-center gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" aria-label="Main">
           ${linksHtml}
         </nav>
 
         <!-- Right Side: Account & Mobile Toggle -->
-        <div class="flex items-center gap-3">
+        <div class="flex items-center gap-1.5 sm:gap-3 z-10 flex-shrink-0">
           ${createLanguageSwitcherHtml("nav")}
           ${userDisplayHtml}
 
           <!-- Mobile Hamburger Toggle -->
-          <button id="menu-button" type="button" class="md:hidden p-1.5 rounded-xl hover:bg-stone-100 text-stone-700" aria-label="Open Menu">
+          <button id="menu-button" type="button" class="md:hidden p-1.5 rounded-xl hover:bg-stone-100 text-stone-700 flex-shrink-0" aria-label="Open Menu">
             ${menuSvg}
           </button>
         </div>

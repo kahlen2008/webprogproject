@@ -355,7 +355,7 @@ export function createLanguageSwitcherHtml(idPrefix = "nav") {
       <button
         type="button"
         id="${idPrefix}-lang-btn"
-        class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-[#ede4da] bg-white/90 hover:bg-stone-50 hover:border-[#ca5c2e]/40 text-xs font-semibold text-stone-700 transition focus:outline-none shadow-2xs"
+        class="inline-flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-1.5 rounded-xl border border-[#ede4da] bg-white/90 hover:bg-stone-50 hover:border-[#ca5c2e]/40 text-xs font-semibold text-stone-700 transition focus:outline-none shadow-2xs flex-shrink-0"
         aria-label="Select Language"
         aria-expanded="false"
       >
@@ -364,7 +364,7 @@ export function createLanguageSwitcherHtml(idPrefix = "nav") {
           <line x1="2" y1="12" x2="22" y2="12"></line>
           <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
         </svg>
-        <span class="lang-current-label max-w-[85px] truncate">${current.native}</span>
+        <span class="lang-current-label ${idPrefix === "nav" ? "hidden sm:inline" : ""} max-w-[85px] truncate">${current.native}</span>
         <svg class="w-3.5 h-3.5 text-stone-400 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
           <polyline points="6 9 12 15 18 9"></polyline>
         </svg>
