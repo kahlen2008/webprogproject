@@ -153,12 +153,27 @@ export async function addToPlan(day, meal, recipe, skipConfirm = false) {
   return true;
 }
 
-export async function removeFromPlan(day, meal) {
+export async function removeFromPlan(day, meal, options = {}) {
   const plan = await getPlan();
-  if (plan[day]) {
+  if (plan[day] && plan[day][meal]) {
+    const previousItem = { ...plan[day][meal] };
     plan[day][meal] = null;
     await savePlan(plan);
     renderPlannerTable();
+
+    if (!options.silent) {
+      const recipeName = toTitleCase(previousItem.name || "Recipe");
+      showToast(`Removed "${recipeName}" from ${day} ${meal}`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            await addToPlan(day, meal, previousItem, true);
+            showToast(`Restored "${recipeName}" to ${day} ${meal}!`);
+          }
+        }
+      });
+    }
   }
 }
 

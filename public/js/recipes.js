@@ -1077,7 +1077,17 @@ async function showRecipe(id) {
         showToast(`Saved "${recipe.name}" to favourites!`);
         import("./favourites.js").then(({ addFavourite }) => addFavourite(recipe)).catch(console.warn);
       } else {
-        showToast(`Removed "${recipe.name}" from favourites`);
+        showToast(`Removed "${recipe.name}" from favourites`, {
+          duration: 5000,
+          action: {
+            label: "Undo",
+            onClick: () => {
+              updateFavDisplay(true);
+              import("./favourites.js").then(({ addFavourite }) => addFavourite(recipe)).catch(console.warn);
+              showToast(`Restored "${recipe.name}" to favourites!`);
+            },
+          },
+        });
         import("./favourites.js").then(({ removeFavourite }) => removeFavourite(recipe.id)).catch(console.warn);
       }
     });

@@ -426,6 +426,20 @@ function renderCardsFast(favs) {
         const cardRect = card.getBoundingClientRect();
         const listRect = listEl.getBoundingClientRect();
 
+        const triggerRemovalToast = () => {
+          showToast(`Removed "${recipe.name}" from favourites`, {
+            duration: 5000,
+            action: {
+              label: "Undo",
+              onClick: async () => {
+                await addFavourite(recipe);
+                await renderFavourites();
+                showToast(`Restored "${recipe.name}" to favourites!`);
+              },
+            },
+          });
+        };
+
         // If this was the last card, animate it out and show empty state
         if (siblingCards.length === 0) {
           card.style.transition = "opacity 0.22s ease-out, transform 0.22s ease-out";
@@ -435,7 +449,7 @@ function renderCardsFast(favs) {
             await removeFavourite(recipe.id);
             card.remove();
             renderEmptyState();
-            showToast(`Removed "${recipe.name}" from favourites`);
+            triggerRemovalToast();
           }, 200);
           return;
         }
@@ -497,7 +511,7 @@ function renderCardsFast(favs) {
 
         // 6. Delete in background and notify
         await removeFavourite(recipe.id);
-        showToast(`Removed "${recipe.name}" from favourites`);
+        triggerRemovalToast();
       });
     }
 

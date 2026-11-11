@@ -16,16 +16,29 @@ export function escapeHtml(text) {
 }
 
 // Shows an elegant toast message at the top right of the screen with smooth spring transitions.
-export function showToast(message, milliseconds = 3000) {
+// Supports an optional action button (e.g. { label: "Undo", onClick: () => ... }).
+export function showToast(message, optionsOrMs = 3000, legacyAction = null) {
+  let milliseconds = 3000;
+  let action = null;
+
+  if (typeof optionsOrMs === "number") {
+    milliseconds = optionsOrMs;
+    action = legacyAction;
+  } else if (optionsOrMs && typeof optionsOrMs === "object") {
+    milliseconds = optionsOrMs.duration || (optionsOrMs.action ? 5000 : 3000);
+    action = optionsOrMs.action;
+  }
+
   const existing = document.querySelector(".custom-toast");
   if (existing) {
+    if (existing._toastTimer) clearTimeout(existing._toastTimer);
     existing.style.opacity = "0";
     existing.style.transform = "translate3d(20px, -10px, 0) scale(0.95)";
     setTimeout(() => existing.remove(), 250);
   }
 
   const toast = document.createElement("div");
-  toast.className = "custom-toast fixed top-20 right-4 sm:right-6 bg-stone-900/95 backdrop-blur-md text-white px-5 py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-medium z-50 border border-stone-800/80 pointer-events-auto select-none";
+  toast.className = "custom-toast fixed top-20 right-4 sm:right-6 bg-stone-900/95 backdrop-blur-md text-white px-4 sm:px-5 py-2.5 sm:py-3 rounded-2xl shadow-2xl flex items-center gap-3 text-sm font-medium z-50 border border-stone-800/80 pointer-events-auto select-none max-w-[calc(100vw-2rem)]";
   toast.setAttribute("role", "status");
   
   // Initial state for entrance transition
@@ -34,14 +47,39 @@ export function showToast(message, milliseconds = 3000) {
   toast.style.transition = "transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.35s cubic-bezier(0.16, 1, 0.3, 1)";
   toast.style.willChange = "transform, opacity";
 
+  const actionHtml = action && action.label ? `
+    <button 
+      type="button" 
+      class="toast-action-btn ml-auto px-2.5 py-1 text-xs font-bold text-[#f58d5f] hover:text-white bg-white/10 hover:bg-[#ca5c2e] rounded-lg transition-all focus:outline-none whitespace-nowrap cursor-pointer shadow-2xs"
+    >
+      ${escapeHtml(action.label)}
+    </button>
+  ` : "";
+
   toast.innerHTML = `
     <span class="w-5 h-5 rounded-full bg-[#ca5c2e] flex items-center justify-center flex-shrink-0 shadow-sm">
       <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
         <polyline points="20 6 9 17 4 12"></polyline>
       </svg>
     </span>
-    <span class="leading-tight">${escapeHtml(message)}</span>
+    <span class="leading-tight truncate">${escapeHtml(message)}</span>
+    ${actionHtml}
   `;
+
+  if (action && typeof action.onClick === "function") {
+    const btn = toast.querySelector(".toast-action-btn");
+    if (btn) {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (toast._toastTimer) clearTimeout(toast._toastTimer);
+        toast.style.opacity = "0";
+        toast.style.transform = "translate3d(20px, -8px, 0) scale(0.96)";
+        setTimeout(() => toast.remove(), 250);
+        action.onClick();
+      });
+    }
+  }
 
   document.body.appendChild(toast);
 
@@ -54,7 +92,7 @@ export function showToast(message, milliseconds = 3000) {
   });
 
   // Smooth exit
-  setTimeout(() => {
+  toast._toastTimer = setTimeout(() => {
     toast.style.opacity = "0";
     toast.style.transform = "translate3d(20px, -8px, 0) scale(0.96)";
     setTimeout(() => toast.remove(), 400);
@@ -271,7 +309,49 @@ export function createRecipeCard(recipe, options = {}) {
           icon.setAttribute("fill", "none");
           icon.classList.remove("text-[#ca5c2e]", "text-red-500");
           favBtn.classList.remove("text-[#ca5c2e]", "text-red-500");
-          showToast(`Removed "${recipe.name}" from favourites`);
+          showToast(`Removed "${recipe.name}" from favourites`, {
+            duration: 5000,
+            action: {
+              label: "Undo",
+              onClick: () => {
+                let currentFavs = [];
+                try {
+                  currentFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+                } catch (err) {}
+                const favItem = {
+                  id: String(recipe.id),
+                  name: recipe.name || "",
+                  image: recipe.image || "",
+                  category: recipe.category || "Main",
+                  area: recipe.area || "",
+                  savedAt: new Date().toISOString(),
+                };
+                currentFavs = currentFavs.filter((f) => String(f.id) !== String(recipe.id));
+                currentFavs.unshift(favItem);
+                localStorage.setItem("recipeplan_favourites", JSON.stringify(currentFavs));
+                window.dispatchEvent(new CustomEvent("favourites-changed"));
+
+                icon.setAttribute("fill", "#ca5c2e");
+                icon.classList.add("text-[#ca5c2e]");
+                favBtn.classList.add("text-[#ca5c2e]");
+
+                if (user && user.uid) {
+                  Promise.all([
+                    import("./firebase-config.js"),
+                    import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+                  ])
+                    .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
+                      setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
+                        ...favItem,
+                        savedAt: serverTimestamp(),
+                      })
+                    )
+                    .catch(console.warn);
+                }
+                showToast(`Restored "${recipe.name}" to favourites!`);
+              },
+            },
+          });
           if (user && user.uid) {
             Promise.all([
               import("./firebase-config.js"),
