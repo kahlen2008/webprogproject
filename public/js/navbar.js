@@ -22,16 +22,17 @@ export function renderNavbar(user) {
 
   host.classList.add("sticky", "top-0", "z-40");
 
-  // Check demo user from localStorage if Firebase auth has not set one
-  let activeUser = user;
-  if (!activeUser) {
-    try {
-      const stored = localStorage.getItem("recipeplan_user");
-      if (stored) {
-        activeUser = JSON.parse(stored);
-      }
-    } catch (e) {}
-  }
+  // Check cached user and profile from localStorage
+  let cachedUser = null;
+  let cachedProfile = null;
+  try {
+    const storedUser = localStorage.getItem("recipeplan_user");
+    if (storedUser) cachedUser = JSON.parse(storedUser);
+    const storedProfile = localStorage.getItem("recipeplan_profile");
+    if (storedProfile) cachedProfile = JSON.parse(storedProfile);
+  } catch (e) {}
+
+  let activeUser = user || cachedUser;
 
   const page = currentPage();
   const linksHtml = LINKS.map(([href, label]) => {
@@ -68,8 +69,27 @@ export function renderNavbar(user) {
 
   let userDisplayHtml = "";
   if (activeUser) {
-    const displayName = activeUser.displayName || activeUser.email?.split("@")[0] || "User";
-    const avatarUrl = activeUser.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ca5c2e&color=fff`;
+    const sameAccount =
+      (!cachedProfile?.email && !cachedUser?.email) ||
+      cachedProfile?.email === activeUser.email ||
+      cachedUser?.email === activeUser.email ||
+      cachedUser?.uid === activeUser.uid;
+
+    const displayName =
+      (sameAccount ? cachedProfile?.displayName || cachedUser?.displayName : "") ||
+      activeUser.displayName ||
+      activeUser.email?.split("@")[0] ||
+      "User";
+
+    const rawPhoto =
+      activeUser.photoURL && !String(activeUser.photoURL).includes("ui-avatars.com/api/")
+        ? activeUser.photoURL
+        : (sameAccount ? cachedProfile?.photoURL || cachedUser?.photoURL : "");
+
+    const avatarUrl =
+      rawPhoto && !String(rawPhoto).includes("ui-avatars.com/api/")
+        ? rawPhoto
+        : `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=ca5c2e&color=fff`;
 
     userDisplayHtml = `
       <div class="relative group flex-shrink-0">

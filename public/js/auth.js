@@ -118,8 +118,16 @@ export async function login(email, password) {
     try {
       const snap = await getDoc(doc(db, "users", credential.user.uid));
       if (snap.exists()) {
+        const data = snap.data();
+        if (data.displayName) {
+          userObj.displayName = data.displayName;
+          if (!credential.user.photoURL) {
+            userObj.photoURL = `https://ui-avatars.com/api/?name=${encodeURIComponent(data.displayName)}&background=ca5c2e&color=fff`;
+          }
+          localStorage.setItem("recipeplan_user", JSON.stringify(userObj));
+        }
         localStorage.setItem("recipeplan_profile", JSON.stringify({
-          ...snap.data(),
+          ...data,
           photoURL: userObj.photoURL
         }));
       } else {
@@ -178,8 +186,13 @@ export async function loginWithGoogle() {
           onboardingStep: 1
         }));
       } else {
+        const data = snap.data();
+        if (data.displayName) {
+          userObj.displayName = data.displayName;
+          localStorage.setItem("recipeplan_user", JSON.stringify(userObj));
+        }
         localStorage.setItem("recipeplan_profile", JSON.stringify({
-          ...snap.data(),
+          ...data,
           photoURL: userObj.photoURL
         }));
       }

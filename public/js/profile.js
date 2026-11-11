@@ -3,7 +3,7 @@
 
 import { getCurrentUser, onAuthChange, logout, deleteAccount, resetPassword } from "./auth.js";
 import { showToast, escapeHtml } from "./utils.js";
-import { db } from "./firebase-config.js";
+import { auth, db } from "./firebase-config.js";
 import { doc, getDoc, setDoc, updateDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { updateProfile } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
 import { renderNavbar } from "./navbar.js";
@@ -63,6 +63,18 @@ if (document.readyState === "loading") {
   hydrateFromCache();
 }
 
+function isGeneratedAvatarUrl(url) {
+  return !url || String(url).includes("ui-avatars.com/api/");
+}
+
+function buildAvatarUrl(name, existingUrl) {
+  if (existingUrl && !isGeneratedAvatarUrl(existingUrl)) return existingUrl;
+  const fallback = name || "User";
+  return `https://ui-avatars.com/api/?name=${encodeURIComponent(fallback)}&background=ca5c2e&color=fff`;
+}
+
+let hasLocalNameEdit = false;
+
 async function loadProfileForUser(user) {
   if (!user) {
     // If not logged in and no cached user, redirect to login
@@ -74,15 +86,43 @@ async function loadProfileForUser(user) {
   }
 
   activeUser = user;
-  const name = user.displayName || user.email?.split("@")[0] || currentProfile.displayName || "User";
-  const avatar = user.photoURL || currentProfile.photoURL || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=ca5c2e&color=fff`;
+
+  // Prefer cached displayName if it belongs to the same account, preventing a stale
+  // Firebase Auth user.displayName from overwriting a freshly updated name before Firestore resolves.
+  let cachedProfile = null;
+  let cachedUser = null;
+  try {
+    cachedProfile = JSON.parse(localStorage.getItem("recipeplan_profile") || "null");
+    cachedUser = JSON.parse(localStorage.getItem("recipeplan_user") || "null");
+  } catch (e) {}
+
+  const sameAccount =
+    (!cachedProfile?.email && !cachedUser?.email) ||
+    cachedProfile?.email === user.email ||
+    cachedUser?.email === user.email ||
+    cachedUser?.uid === user.uid;
+
+  const preferredCachedName = sameAccount
+    ? cachedProfile?.displayName || cachedUser?.displayName || currentProfile.displayName
+    : "";
+
+  const name =
+    preferredCachedName ||
+    user.displayName ||
+    user.email?.split("@")[0] ||
+    "User";
+
+  const rawPhoto = user.photoURL && !isGeneratedAvatarUrl(user.photoURL)
+    ? user.photoURL
+    : (sameAccount ? cachedProfile?.photoURL || cachedUser?.photoURL : "");
 
   currentProfile.displayName = name;
   currentProfile.email = user.email || currentProfile.email || "";
-  currentProfile.photoURL = avatar;
+  currentProfile.photoURL = buildAvatarUrl(name, rawPhoto);
 
-  // Render immediately with Auth data without waiting for Firestore network roundtrip
+  // Render immediately without waiting for Firestore network roundtrip
   renderProfile();
+  renderNavbar(activeUser);
 
   // Try fetching data from Firestore in the background
   try {
@@ -90,12 +130,20 @@ async function loadProfileForUser(user) {
     const snap = await getDoc(userDocRef);
     if (snap.exists()) {
       const data = snap.data();
-      if (data.displayName) currentProfile.displayName = data.displayName;
+      if (data.displayName && !hasLocalNameEdit) {
+        currentProfile.displayName = data.displayName;
+        currentProfile.photoURL = buildAvatarUrl(data.displayName, currentProfile.photoURL);
+      }
       if (data.diets !== undefined) currentProfile.diets = data.diets;
       if (data.allergies !== undefined) currentProfile.allergies = data.allergies;
       if (data.hideFlagged !== undefined) currentProfile.hideFlagged = data.hideFlagged;
 
-      // Keep local profile cache in sync with cloud
+      // If Firebase Auth still has an outdated displayName, sync it quietly
+      if (auth?.currentUser && currentProfile.displayName && auth.currentUser.displayName !== currentProfile.displayName) {
+        updateProfile(auth.currentUser, { displayName: currentProfile.displayName }).catch(() => {});
+      }
+
+      // Keep both local caches in sync with cloud
       try {
         const cached = JSON.parse(localStorage.getItem("recipeplan_profile") || "{}");
         localStorage.setItem("recipeplan_profile", JSON.stringify({
@@ -107,9 +155,18 @@ async function loadProfileForUser(user) {
           allergies: currentProfile.allergies,
           hideFlagged: currentProfile.hideFlagged,
         }));
+        const userCache = JSON.parse(localStorage.getItem("recipeplan_user") || "{}");
+        localStorage.setItem("recipeplan_user", JSON.stringify({
+          ...userCache,
+          uid: user.uid || userCache.uid,
+          email: currentProfile.email || userCache.email,
+          displayName: currentProfile.displayName,
+          photoURL: currentProfile.photoURL,
+        }));
       } catch (e) {}
 
       renderProfile();
+      renderNavbar(activeUser);
     } else {
       // First time loading, check localStorage
       const cached = localStorage.getItem("recipeplan_profile");
@@ -129,36 +186,62 @@ async function loadProfileForUser(user) {
 }
 
 async function saveProfile(updatedFields) {
+  if (updatedFields.displayName) {
+    hasLocalNameEdit = true;
+    updatedFields.photoURL = buildAvatarUrl(updatedFields.displayName, currentProfile.photoURL);
+  }
+
   currentProfile = { ...currentProfile, ...updatedFields };
 
-  // Update in Firestore
-  if (activeUser && activeUser.uid) {
-    try {
-      const userDocRef = doc(db, "users", activeUser.uid);
-      await setDoc(userDocRef, {
+  // Update localStorage caches immediately so navbar and profile stay in sync without flicker
+  try {
+    const cached = JSON.parse(localStorage.getItem("recipeplan_profile") || "{}");
+    localStorage.setItem("recipeplan_profile", JSON.stringify({
+      ...cached,
+      ...currentProfile,
+    }));
+    const userCache = JSON.parse(localStorage.getItem("recipeplan_user") || "{}");
+    userCache.displayName = currentProfile.displayName;
+    if (currentProfile.email) userCache.email = currentProfile.email;
+    if (currentProfile.photoURL) userCache.photoURL = currentProfile.photoURL;
+    if (activeUser?.uid) userCache.uid = activeUser.uid;
+    localStorage.setItem("recipeplan_user", JSON.stringify(userCache));
+  } catch (e) {}
+
+  // Update UI immediately before network calls
+  renderProfile();
+  renderNavbar(activeUser);
+
+  // Persist to Firebase Auth and Firestore independently
+  const uid = activeUser?.uid || auth?.currentUser?.uid;
+  const tasks = [];
+
+  if (updatedFields.displayName && auth?.currentUser) {
+    tasks.push(
+      updateProfile(auth.currentUser, { displayName: currentProfile.displayName }).catch((err) => {
+        console.warn("Could not update Firebase Auth profile:", err);
+      })
+    );
+  }
+
+  if (uid) {
+    const userDocRef = doc(db, "users", uid);
+    tasks.push(
+      setDoc(userDocRef, {
         displayName: currentProfile.displayName,
         email: currentProfile.email,
         diets: currentProfile.diets,
         allergies: currentProfile.allergies,
         hideFlagged: currentProfile.hideFlagged,
-      }, { merge: true });
-
-      // Update Firebase Auth profile displayName if changed
-      if (updatedFields.displayName && activeUser.updateProfile) {
-        await updateProfile(activeUser, { displayName: currentProfile.displayName });
-      }
-    } catch (err) {
-      console.warn("Could not save to Firestore:", err);
-    }
+      }, { merge: true }).catch((err) => {
+        console.warn("Could not save to Firestore:", err);
+      })
+    );
   }
 
-  // Update localStorage cache
-  try {
-    localStorage.setItem("recipeplan_profile", JSON.stringify(currentProfile));
-    const userCache = JSON.parse(localStorage.getItem("recipeplan_user") || "{}");
-    userCache.displayName = currentProfile.displayName;
-    localStorage.setItem("recipeplan_user", JSON.stringify(userCache));
-  } catch (e) {}
+  if (tasks.length > 0) {
+    await Promise.allSettled(tasks);
+  }
 
   if (updatedFields.diets !== undefined || updatedFields.allergies !== undefined || updatedFields.hideFlagged !== undefined) {
     try {
