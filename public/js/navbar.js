@@ -119,7 +119,7 @@ export function renderNavbar(user) {
         </a>
 
         <!-- Desktop Navigation Links (Centered) -->
-        <nav class="hidden md:flex items-center gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" aria-label="Main">
+        <nav class="hidden lg:flex items-center gap-8 absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2" aria-label="Main">
           ${linksHtml}
         </nav>
 
@@ -129,14 +129,14 @@ export function renderNavbar(user) {
           ${userDisplayHtml}
 
           <!-- Mobile Hamburger Toggle -->
-          <button id="menu-button" type="button" class="md:hidden p-1.5 rounded-xl hover:bg-stone-100 text-stone-700 flex-shrink-0" aria-label="Open Menu">
+          <button id="menu-button" type="button" class="lg:hidden p-1.5 rounded-xl hover:bg-stone-100 text-stone-700 flex-shrink-0" aria-label="Open Menu">
             ${menuSvg}
           </button>
         </div>
       </div>
 
       <!-- Mobile Dropdown Navigation -->
-      <div id="mobile-menu" class="hidden md:hidden border-t border-[#ede4da] bg-[#fcf9f5] px-4 pt-3 pb-5 space-y-3">
+      <div id="mobile-menu" class="hidden lg:hidden border-t border-[#ede4da] bg-[#fcf9f5] px-4 pt-3 pb-5 space-y-3">
         <nav class="flex flex-col space-y-2">
           ${LINKS.map(([href, label]) => {
             const active = page === href || (href === "index.html" && page === "");

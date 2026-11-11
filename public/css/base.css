@@ -37,6 +37,8 @@
 
 html {
   scroll-behavior: smooth;
+  /* Always reserve scrollbar space so pages don't shift sideways between short and long pages */
+  scrollbar-gutter: stable;
 }
 
 @view-transition {
