@@ -993,11 +993,18 @@ async function showRecipe(id) {
           </div>
         </div>
 
-        <!-- Divider -->
-        <hr class="border-[#ede4da]">
+        <!-- Tabs: Recipe | Reviews -->
+        <div class="border-b border-[#ede4da] flex items-center gap-6" role="tablist">
+          <button type="button" role="tab" data-tab="recipe" aria-selected="true" style="margin-bottom:-1px;border-bottom-width:2px;border-bottom-style:solid" class="recipe-tab-btn pb-3 border-[#ca5c2e] text-[#ca5c2e] text-sm sm:text-base font-bold transition focus:outline-none">
+            Ingredients &amp; Instructions
+          </button>
+          <button type="button" role="tab" data-tab="reviews" aria-selected="false" style="margin-bottom:-1px;border-bottom-width:2px;border-bottom-style:solid" class="recipe-tab-btn pb-3 border-transparent text-stone-500 hover:text-stone-800 text-sm sm:text-base font-bold transition focus:outline-none">
+            Reviews <span id="reviews-tab-count" class="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-500">0</span>
+          </button>
+        </div>
 
-        <!-- Bottom Section: Ingredients (Left) and Instructions (Right) -->
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12">
+        <!-- Recipe tab: Ingredients (Left) and Instructions (Right) -->
+        <div id="tab-panel-recipe" role="tabpanel" class="grid grid-cols-1 md:grid-cols-12 gap-8 lg:gap-12">
           
           <!-- Ingredients Column -->
           <div class="md:col-span-5 space-y-4">
@@ -1017,10 +1024,37 @@ async function showRecipe(id) {
           </div>
         </div>
 
-        <!-- Community Ratings & Reviews (Person 3) -->
-        <div id="recipe-ratings-section"></div>
+        <!-- Reviews tab: Community Ratings & Reviews (Person 3) -->
+        <div id="tab-panel-reviews" role="tabpanel" class="hidden">
+          <div id="recipe-ratings-section"></div>
+        </div>
       </div>
     `;
+
+    // Tab switching (also used by the rating link under the title)
+    const tabBtns = detail.querySelectorAll(".recipe-tab-btn");
+    const switchRecipeTab = (tab) => {
+      tabBtns.forEach((b) => {
+        const active = b.dataset.tab === tab;
+        b.setAttribute("aria-selected", String(active));
+        b.classList.toggle("border-[#ca5c2e]", active);
+        b.classList.toggle("text-[#ca5c2e]", active);
+        b.classList.toggle("border-transparent", !active);
+        b.classList.toggle("text-stone-500", !active);
+      });
+      document.getElementById("tab-panel-recipe")?.classList.toggle("hidden", tab !== "recipe");
+      document.getElementById("tab-panel-reviews")?.classList.toggle("hidden", tab !== "reviews");
+    };
+    tabBtns.forEach((b) => b.addEventListener("click", () => switchRecipeTab(b.dataset.tab)));
+    if (window._showReviewsHandler) {
+      window.removeEventListener("recipe:show-reviews", window._showReviewsHandler);
+    }
+    window._showReviewsHandler = () => {
+      switchRecipeTab("reviews");
+      tabBtns[0]?.parentElement?.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
+    window.addEventListener("recipe:show-reviews", window._showReviewsHandler);
+    if (location.hash === "#reviews") switchRecipeTab("reviews");
 
     // Save to favourites handling
     const favBtn = document.getElementById("save-fav-btn");

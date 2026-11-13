@@ -10,7 +10,7 @@ import {
   fetchUserRating,
   deleteRecipeRating,
 } from "./schema.js";
-import { escapeHtml, showToast } from "./utils.js";
+import { escapeHtml, showToast, showAuthPromptModal } from "./utils.js";
 
 /**
  * Calculates rating statistics from a list of ratings
@@ -32,7 +32,7 @@ export function calculateRatingStats(ratings = []) {
  * Returns star display with amber/gray stars
  */
 export function renderStarDisplay(rating, maxStars = 5) {
-  const rounded = Math.round(rating * 2) / 2; // round to nearest half
+  const rounded = Math.round(rating * 2) / 2;
   let starsHtml = "";
   for (let i = 1; i <= maxStars; i++) {
     if (i <= rounded) {
@@ -59,31 +59,28 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
   if (!container || !recipeId) return;
 
-  // Render container layout
+  // Render two-column layout: Summary sidebar (left) + Reviews list (right)
   container.innerHTML = `
-    <div class="mt-12 pt-8 border-t border-[#efe6dc] space-y-8" id="ratings-wrapper">
-      <!-- Section Header -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h2 class="text-2xl font-bold text-stone-900 tracking-tight">Community Reviews</h2>
-          <p class="text-sm text-stone-500 mt-1">See what other home cooks think or leave your own review.</p>
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-10" id="ratings-wrapper">
+      <!-- Summary card -->
+      <aside class="md:col-span-4">
+        <div class="bg-[#fcf9f5] rounded-2xl border border-[#efe6dc] p-5 sm:p-6 space-y-5" style="position:sticky;top:6rem">
+          <div id="ratings-summary-badge">
+            <span class="text-xs text-stone-400">Loading ratings...</span>
+          </div>
+          <div id="ratings-distribution" class="space-y-1.5"></div>
+          <div class="pt-4 border-t border-[#efe6dc] space-y-3">
+            <p class="text-sm text-stone-600 leading-snug">Cooked this? Share your rating and any tweaks with other home cooks.</p>
+            <button type="button" id="btn-open-review" class="open-review-btn w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] rounded-xl transition shadow-xs">
+              <span aria-hidden="true">★</span>
+              <span class="open-review-label">Write a Review</span>
+            </button>
+          </div>
         </div>
-        <div id="ratings-summary-badge" class="flex items-center gap-2 bg-[#fcf9f5] px-4 py-2 rounded-2xl border border-[#efe6dc]">
-          <span class="text-xs text-stone-400">Loading ratings...</span>
-        </div>
-      </div>
+      </aside>
 
-      <!-- User Review Form / Box -->
-      <div id="user-review-panel" class="bg-[#fcf9f5] rounded-2xl border border-[#efe6dc] p-5 sm:p-6 transition-all">
-        <div class="text-center py-4 text-sm text-stone-400 animate-pulse">Checking sign-in status...</div>
-      </div>
-
-      <!-- Ratings List -->
-      <div class="space-y-4">
-        <h3 class="text-lg font-bold text-stone-900 flex items-center justify-between">
-          <span>All Reviews</span>
-          <span id="reviews-count-badge" class="text-xs font-normal text-stone-500"></span>
-        </h3>
+      <!-- Reviews list -->
+      <div class="md:col-span-8 space-y-3">
         <div id="reviews-list-container" class="space-y-3">
           <div class="text-center py-8 text-sm text-stone-400 animate-pulse">Loading reviews...</div>
         </div>
@@ -96,52 +93,102 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
   let userRating = null;
   let currentUser = getCurrentUser();
 
-  // Quick UI updater
+  container.querySelector("#btn-open-review")?.addEventListener("click", () => {
+    openReviewModal();
+  });
+
+  // Keep every "Write a review" button label in sync with the user's state
+  const updateOpenButtons = () => {
+    document.querySelectorAll(".open-review-label").forEach((label) => {
+      const isHeader = Boolean(label.closest("#header-star-rating"));
+      if (userRating) {
+        label.textContent = isHeader ? "Edit your review" : "Edit Your Review";
+      } else {
+        label.textContent = isHeader ? "Write a review" : "Write a Review";
+      }
+    });
+  };
+
+  // Update summary card, distribution bars, tab badge, and header stars
   const updateSummaryUI = (ratings) => {
     const stats = calculateRatingStats(ratings);
     const badge = document.getElementById("ratings-summary-badge");
-    const countBadge = document.getElementById("reviews-count-badge");
+    const dist = document.getElementById("ratings-distribution");
+    const tabCount = document.getElementById("reviews-tab-count");
     const headerRating = document.getElementById("header-star-rating");
 
     if (badge) {
-      if (stats.count === 0) {
-        badge.innerHTML = `
-          <span class="text-sm font-medium text-stone-500">No ratings yet</span>
-        `;
-      } else {
-        badge.innerHTML = `
-          <div class="flex items-center text-amber-500 text-sm tracking-tighter">
-            ${renderStarDisplay(stats.average)}
+      badge.innerHTML = `
+        <p class="text-xs font-bold text-stone-500 uppercase tracking-wide">Community Rating</p>
+        <div class="flex items-end gap-3 mt-1">
+          <span class="font-extrabold text-stone-900 leading-none" style="font-size:3rem">${stats.count ? stats.roundedAvg : "–"}</span>
+          <div class="pb-1">
+            <div class="flex items-center text-lg leading-none">${renderStarDisplay(stats.average)}</div>
+            <p class="text-xs text-stone-500 mt-1">${
+              stats.count
+                ? `Based on ${stats.count} review${stats.count === 1 ? "" : "s"}`
+                : "No reviews yet"
+            }</p>
           </div>
-          <span class="text-sm font-bold text-stone-900">${stats.roundedAvg}</span>
-          <span class="text-xs text-stone-500">(${stats.count} review${stats.count === 1 ? "" : "s"})</span>
-        `;
-      }
+        </div>
+      `;
     }
 
-    if (countBadge) {
-      countBadge.textContent = stats.count > 0 ? `${stats.count} total` : "";
+    if (dist) {
+      dist.innerHTML = [5, 4, 3, 2, 1]
+        .map((starLevel) => {
+          const countForStar = ratings.filter(
+            (r) => Math.round(Number(r.stars)) === starLevel
+          ).length;
+          const pct = stats.count ? Math.round((countForStar / stats.count) * 100) : 0;
+          return `
+            <div class="flex items-center gap-2 text-xs">
+              <span class="inline-flex items-center font-semibold text-stone-600 shrink-0" style="width:2rem;gap:3px;font-variant-numeric:tabular-nums">
+                <span style="display:inline-block;width:0.75rem;text-align:right;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-variant-numeric:tabular-nums">${starLevel}</span>
+                <span style="display:inline-block;width:0.85rem;text-align:center;line-height:1">★</span>
+              </span>
+              <div class="flex-1 rounded-full bg-[#efe6dc] overflow-hidden" style="height:0.5rem">
+                <div class="h-full rounded-full bg-amber-500" style="width:${pct}%"></div>
+              </div>
+              <span class="text-right text-stone-400 shrink-0" style="display:inline-block;width:1.5rem;font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace;font-variant-numeric:tabular-nums">${countForStar}</span>
+            </div>
+          `;
+        })
+        .join("");
     }
 
-    // Sync header ratings if present in recipe.html
+    if (tabCount) {
+      tabCount.textContent = String(stats.count);
+    }
+
     if (headerRating) {
-      if (stats.count === 0) {
-        headerRating.innerHTML = `
-          <div class="flex items-center text-stone-300 text-sm">
-            <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
-          </div>
-          <span class="text-sm text-stone-500">No ratings yet</span>
-        `;
-      } else {
-        headerRating.innerHTML = `
-          <div class="flex items-center text-amber-500 text-sm">
-            ${renderStarDisplay(stats.average)}
-          </div>
-          <span class="text-sm font-semibold text-stone-800">${stats.roundedAvg}</span>
-          <span class="text-sm text-stone-500">(${stats.count} rating${stats.count === 1 ? "" : "s"})</span>
-        `;
-      }
+      const summaryInner =
+        stats.count === 0
+          ? `<span class="flex items-center text-stone-300 text-sm"><span>★</span><span>★</span><span>★</span><span>★</span><span>★</span></span>
+             <span class="text-sm text-stone-500">No reviews yet</span>`
+          : `<span class="flex items-center text-amber-500 text-sm">${renderStarDisplay(stats.average)}</span>
+             <span class="text-sm font-semibold text-stone-800">${stats.roundedAvg}</span>
+             <span class="text-sm text-stone-500">(${stats.count} review${stats.count === 1 ? "" : "s"})</span>`;
+
+      headerRating.innerHTML = `
+        <button type="button" id="header-rating-jump" class="inline-flex items-center gap-2 rounded-lg hover:underline focus:outline-none" title="See reviews">
+          ${summaryInner}
+        </button>
+        <span class="text-stone-300" aria-hidden="true">·</span>
+        <button type="button" class="open-review-btn text-sm font-semibold text-[#ca5c2e] hover:text-[#b04d24] hover:underline transition focus:outline-none">
+          <span class="open-review-label">${userRating ? "Edit your review" : "Write a review"}</span>
+        </button>
+      `;
+
+      headerRating.querySelector("#header-rating-jump")?.addEventListener("click", () => {
+        window.dispatchEvent(new CustomEvent("recipe:show-reviews"));
+      });
+      headerRating.querySelector(".open-review-btn")?.addEventListener("click", () => {
+        openReviewModal();
+      });
     }
+
+    updateOpenButtons();
   };
 
   // Render Reviews List
@@ -164,12 +211,19 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
       return;
     }
 
-    listContainer.innerHTML = ratings
+    const sorted = [...ratings].sort((a, b) => {
+      const mine = (r) => (currentUser && r.uid === currentUser.uid ? 1 : 0);
+      return mine(b) - mine(a);
+    });
+
+    listContainer.innerHTML = sorted
       .map((r) => {
-        const isAuthor = currentUser && currentUser.uid === r.uid;
+        const isAuthor = Boolean(currentUser && currentUser.uid === r.uid);
         const authorBadge = isAuthor
-          ? `<span class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#fbf2ec] text-[#ca5c2e]">You</span>`
+          ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ca5c2e] text-white">You</span>`
           : "";
+        const name = r.displayName || "Anonymous";
+        const initial = escapeHtml(name.trim().charAt(0).toUpperCase() || "?");
         const formattedDate = r.createdAt?.toDate
           ? r.createdAt.toDate().toLocaleDateString(undefined, {
               year: "numeric",
@@ -178,40 +232,52 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
             })
           : "Recently";
 
-        return `
-          <div class="bg-white rounded-2xl border border-[#efe6dc] p-4 sm:p-5 transition hover:border-stone-300">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <div class="flex items-center gap-1.5 flex-wrap">
-                  <span class="font-semibold text-sm text-stone-900">${escapeHtml(r.displayName || "Anonymous")}</span>
-                  ${authorBadge}
-                  <span class="text-xs text-stone-400">&bull;</span>
-                  <span class="text-xs text-stone-400">${formattedDate}</span>
-                </div>
-                <div class="flex items-center text-amber-500 text-sm mt-1">
-                  ${renderStarDisplay(r.stars)}
-                </div>
-              </div>
-              ${
-                isAuthor
-                  ? `
-                <div class="flex items-center gap-1">
-                  <button id="btn-edit-inline" class="text-xs font-semibold text-stone-500 hover:text-[#ca5c2e] p-1.5 rounded-lg hover:bg-[#faf7f2] transition" title="Edit your review">
-                    Edit
-                  </button>
-                  <button id="btn-delete-inline" class="text-xs font-semibold text-red-500 hover:text-red-700 p-1.5 rounded-lg hover:bg-red-50 transition" title="Delete review">
-                    Delete
-                  </button>
-                </div>
-              `
-                  : ""
-              }
+        const cardClasses = isAuthor
+          ? "rounded-2xl border p-4 sm:p-5 transition bg-[#fcf9f5] border-[#ca5c2e]"
+          : "rounded-2xl border p-4 sm:p-5 transition bg-white border-[#efe6dc] hover:border-stone-300";
+
+        const avatarClasses = isAuthor
+          ? "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-[#ca5c2e] text-white"
+          : "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-[#fbf2ec] text-[#ca5c2e]";
+
+        const actionsHtml = isAuthor
+          ? `
+            <div class="flex items-center gap-1 shrink-0">
+              <button type="button" id="btn-edit-inline" class="text-xs font-semibold text-stone-600 hover:text-[#ca5c2e] px-2.5 py-1 rounded-lg bg-white border border-[#efe6dc] hover:border-stone-400 transition" title="Edit your review">
+                Edit
+              </button>
+              <button type="button" id="btn-delete-inline" class="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-50 transition" title="Delete review">
+                Delete
+              </button>
             </div>
-            ${
-              r.comment
-                ? `<p class="text-sm text-stone-700 mt-3 whitespace-pre-line leading-relaxed">${escapeHtml(r.comment)}</p>`
-                : ""
-            }
+          `
+          : "";
+
+        const commentHtml = r.comment
+          ? `<p class="text-sm text-stone-700 mt-2 whitespace-pre-line leading-relaxed">${escapeHtml(r.comment)}</p>`
+          : `<p class="text-xs text-stone-400 mt-2 italic">No written comment</p>`;
+
+        return `
+          <div class="${cardClasses}">
+            <div class="flex items-start gap-3">
+              <div class="${avatarClasses}">${initial}</div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <div class="flex items-center gap-2 flex-wrap">
+                      <span class="font-semibold text-sm text-stone-900">${escapeHtml(name)}</span>
+                      ${authorBadge}
+                    </div>
+                    <div class="flex items-center gap-2 mt-0.5">
+                      <span class="flex items-center text-sm leading-none">${renderStarDisplay(r.stars)}</span>
+                      <span class="text-xs text-stone-400">${formattedDate}</span>
+                    </div>
+                  </div>
+                  ${actionsHtml}
+                </div>
+                ${commentHtml}
+              </div>
+            </div>
           </div>
         `;
       })
@@ -220,10 +286,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     // Wire up inline edit and delete buttons
     const editBtn = document.getElementById("btn-edit-inline");
     if (editBtn) {
-      editBtn.addEventListener("click", () => {
-        renderFormState(true);
-        document.getElementById("user-review-panel")?.scrollIntoView({ behavior: "smooth" });
-      });
+      editBtn.addEventListener("click", () => openReviewModal());
     }
 
     const deleteBtn = document.getElementById("btn-delete-inline");
@@ -232,102 +295,61 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     }
   };
 
-  // Render the User Review Box (Form vs Prompt vs Summary)
-  const renderFormState = (isEditing = false) => {
-    const panel = document.getElementById("user-review-panel");
-    if (!panel) return;
-
-    // Logged Out
-    if (!currentUser) {
-      panel.innerHTML = `
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-white border border-[#efe6dc] flex items-center justify-center text-stone-400 shrink-0">
-              <svg class="w-5 h-5 text-stone-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
-              </svg>
-            </div>
-            <div>
-              <p class="text-sm font-semibold text-stone-800">Want to rate this recipe?</p>
-              <p class="text-xs text-stone-500">Sign in to leave a star rating and share your review.</p>
-            </div>
-          </div>
-          <a href="login.html?redirect=${encodeURIComponent(window.location.pathname + window.location.search)}" 
-             class="inline-flex items-center justify-center px-4 py-2 text-xs font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] rounded-xl transition shadow-xs shrink-0">
-            Log In to Rate
-          </a>
-        </div>
-      `;
-      return;
+  // Close the review popup
+  const closeReviewModal = () => {
+    const modal = document.getElementById("review-modal");
+    if (!modal) return;
+    if (modal._onKey) {
+      document.removeEventListener("keydown", modal._onKey);
     }
+    modal.classList.remove("opacity-100");
+    modal.querySelector(".review-dialog")?.classList.remove("scale-100", "opacity-100");
+    document.body.style.overflow = "";
+    setTimeout(() => modal.remove(), 200);
+  };
 
-    // User already has a review and isn't editing it right now
-    if (userRating && !isEditing) {
-      panel.innerHTML = `
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <div class="flex items-center gap-2">
-              <span class="text-xs font-bold text-stone-500 uppercase tracking-wide">Your Review</span>
-              <div class="flex items-center text-amber-500 text-sm">
-                ${renderStarDisplay(userRating.stars)}
-              </div>
-            </div>
-            ${
-              userRating.comment
-                ? `<p class="text-sm text-stone-700 mt-2 font-medium">"${escapeHtml(userRating.comment)}"</p>`
-                : `<p class="text-xs text-stone-400 mt-1 italic">No written comment</p>`
-            }
-          </div>
-          <div class="flex items-center gap-2 shrink-0">
-            <button id="btn-edit-review" class="px-3 py-1.5 text-xs font-semibold text-stone-700 bg-white border border-[#efe6dc] hover:border-stone-400 rounded-xl transition shadow-2xs">
-              Edit Review
-            </button>
-            <button id="btn-delete-review" class="px-3 py-1.5 text-xs font-semibold text-red-600 bg-white border border-[#efe6dc] hover:bg-red-50 hover:border-red-200 rounded-xl transition shadow-2xs">
-              Delete
-            </button>
-          </div>
-        </div>
-      `;
+  // Form: creating or editing a review (rendered inside the popup)
+  const renderReviewForm = (panel) => {
+    if (!panel || !currentUser) return;
 
-      document.getElementById("btn-edit-review")?.addEventListener("click", () => renderFormState(true));
-      document.getElementById("btn-delete-review")?.addEventListener("click", handleDeleteReview);
-      return;
-    }
-
-    // Form: Creating or editing a review
-    const initialStars = userRating ? userRating.stars : 5;
+    const initialStars = userRating ? Number(userRating.stars) || 5 : 5;
     const initialComment = userRating ? userRating.comment || "" : "";
+    const authorLabel = escapeHtml(
+      currentUser.displayName || currentUser.email?.split("@")[0] || "Home Cook"
+    );
+
+    const starButtonsHtml = [1, 2, 3, 4, 5]
+      .map((star) => {
+        const isSelected = star <= initialStars;
+        const colorClass = isSelected ? "text-amber-500" : "text-stone-300";
+        return `
+          <button
+            type="button"
+            data-star="${star}"
+            role="radio"
+            aria-checked="${star === initialStars}"
+            aria-label="${star} star${star > 1 ? "s" : ""}"
+            class="star-pick-btn w-9 h-9 rounded-xl flex items-center justify-center text-xl transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 ${colorClass}">
+            ★
+          </button>
+        `;
+      })
+      .join("");
 
     panel.innerHTML = `
       <form id="rating-form" class="space-y-4">
-        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-          <h4 class="text-sm font-bold text-stone-900">
+        <div style="padding-right:2.5rem">
+          <h4 class="text-lg font-bold text-stone-900">
             ${userRating ? "Edit Your Review" : "Leave a Review"}
           </h4>
-          <span class="text-xs text-stone-500">Posting as <strong>${escapeHtml(currentUser.displayName || currentUser.email?.split("@")[0] || "Home Cook")}</strong></span>
+          <span class="text-xs text-stone-500">Posting as <strong>${authorLabel}</strong></span>
         </div>
 
         <!-- Star Selection -->
         <div>
           <label class="block text-xs font-semibold text-stone-600 mb-1.5">Rating (1 to 5 stars)</label>
           <div class="flex items-center gap-1" id="star-input-group" role="radiogroup" aria-label="Select star rating">
-            ${[1, 2, 3, 4, 5]
-              .map(
-                (star) => `
-              <button 
-                type="button" 
-                data-star="${star}" 
-                role="radio"
-                aria-checked="${star === initialStars}"
-                aria-label="${star} star${star > 1 ? "s" : ""}"
-                class="star-pick-btn w-9 h-9 rounded-xl flex items-center justify-center text-xl transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 ${
-                  star <= initialStars ? "text-amber-500" : "text-stone-300"
-                }">
-                ★
-              </button>
-            `
-              )
-              .join("")}
+            ${starButtonsHtml}
             <span id="star-rating-hint" class="ml-2 text-xs font-bold text-amber-600">
               ${initialStars} out of 5
             </span>
@@ -343,32 +365,26 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
             </label>
             <span id="comment-char-counter" class="text-[11px] text-stone-400">0/300</span>
           </div>
-          <textarea 
-            id="rating-comment" 
-            maxlength="300" 
-            rows="3" 
-            placeholder="What did you like about this recipe? Any ingredients you modified?" 
+          <textarea
+            id="rating-comment"
+            maxlength="300"
+            rows="3"
+            placeholder="What did you like about this recipe? Any ingredients you modified?"
             class="w-full text-sm rounded-xl border border-[#efe6dc] bg-white p-3 text-stone-800 placeholder-stone-400 focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 outline-none transition resize-none"
           >${escapeHtml(initialComment)}</textarea>
         </div>
 
         <!-- Action Buttons -->
         <div class="flex items-center justify-end gap-2 pt-1">
-          ${
-            userRating
-              ? `
-            <button 
-              type="button" 
-              id="btn-cancel-edit" 
-              class="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800 bg-white border border-[#efe6dc] rounded-xl hover:bg-stone-50 transition">
-              Cancel
-            </button>
-          `
-              : ""
-          }
-          <button 
-            type="submit" 
-            id="btn-submit-review" 
+          <button
+            type="button"
+            id="btn-cancel-edit"
+            class="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800 bg-white border border-[#efe6dc] rounded-xl hover:bg-stone-50 transition">
+            Cancel
+          </button>
+          <button
+            type="submit"
+            id="btn-submit-review"
             class="px-5 py-2 text-xs font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] rounded-xl transition shadow-xs flex items-center gap-2">
             <span>${userRating ? "Update Review" : "Submit Review"}</span>
           </button>
@@ -379,8 +395,8 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     // Interactivity for star selector
     let selectedStars = initialStars;
     const starBtns = panel.querySelectorAll(".star-pick-btn");
-    const starsValueInput = document.getElementById("selected-stars-value");
-    const starsHint = document.getElementById("star-rating-hint");
+    const starsValueInput = panel.querySelector("#selected-stars-value");
+    const starsHint = panel.querySelector("#star-rating-hint");
 
     const updateStarSelectorUI = (stars) => {
       starBtns.forEach((btn) => {
@@ -396,7 +412,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
         }
       });
       if (starsHint) starsHint.textContent = `${stars} out of 5`;
-      if (starsValueInput) starsValueInput.value = stars;
+      if (starsValueInput) starsValueInput.value = String(stars);
     };
 
     starBtns.forEach((btn) => {
@@ -415,8 +431,8 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     });
 
     // Character counter
-    const commentInput = document.getElementById("rating-comment");
-    const counter = document.getElementById("comment-char-counter");
+    const commentInput = panel.querySelector("#rating-comment");
+    const counter = panel.querySelector("#comment-char-counter");
     if (commentInput && counter) {
       counter.textContent = `${commentInput.value.length}/300`;
       commentInput.addEventListener("input", () => {
@@ -424,17 +440,15 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
       });
     }
 
-    // Cancel edit
-    document.getElementById("btn-cancel-edit")?.addEventListener("click", () => {
-      renderFormState(false);
-    });
+    // Cancel
+    panel.querySelector("#btn-cancel-edit")?.addEventListener("click", closeReviewModal);
 
     // Form submit
-    document.getElementById("rating-form")?.addEventListener("submit", async (e) => {
+    panel.querySelector("#rating-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
-      const submitBtn = document.getElementById("btn-submit-review");
-      const stars = Number(document.getElementById("selected-stars-value")?.value || 5);
-      const comment = (document.getElementById("rating-comment")?.value || "").trim();
+      const submitBtn = panel.querySelector("#btn-submit-review");
+      const stars = Number(starsValueInput?.value || 5);
+      const comment = (commentInput?.value || "").trim();
       const displayName =
         currentUser.displayName || currentUser.email?.split("@")[0] || "Home Cook";
 
@@ -451,19 +465,64 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
         });
 
         showToast(userRating ? "Review updated!" : "Thank you for your rating!");
-        
-        // Refresh local cache & UI
+        closeReviewModal();
         await reloadData();
       } catch (err) {
         console.error("Failed to save rating:", err);
         showToast("Error saving review. Please try again.");
         if (submitBtn) {
           submitBtn.disabled = false;
-          submitBtn.innerHTML = `Submit Review`;
+          submitBtn.innerHTML = `<span>${userRating ? "Update Review" : "Submit Review"}</span>`;
         }
       }
     });
   };
+
+  // Open the review form in a popup (or ask the user to log in)
+  function openReviewModal() {
+    if (!currentUser) {
+      showAuthPromptModal({
+        title: "Log in to review",
+        description: "Sign in to leave a star rating and share your tips with other home cooks.",
+      });
+      return;
+    }
+
+    document.getElementById("review-modal")?.remove();
+    const modal = document.createElement("div");
+    modal.id = "review-modal";
+    modal.className =
+      "fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-900/50 backdrop-blur-xs opacity-0 transition-opacity duration-200";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.innerHTML = `
+      <div class="review-dialog relative bg-white w-full max-w-lg rounded-3xl p-5 sm:p-6 shadow-2xl border border-[#efe6dc] scale-95 opacity-0 transition-all duration-200">
+        <button type="button" id="review-modal-close" class="absolute top-4 right-4 p-1.5 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition focus:outline-none" aria-label="Close">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+        <div id="review-modal-body"></div>
+      </div>
+    `;
+    document.body.appendChild(modal);
+    document.body.style.overflow = "hidden";
+
+    modal.addEventListener("click", (e) => {
+      if (e.target === modal) closeReviewModal();
+    });
+    modal.querySelector("#review-modal-close")?.addEventListener("click", closeReviewModal);
+    modal._onKey = (e) => {
+      if (e.key === "Escape") closeReviewModal();
+    };
+    document.addEventListener("keydown", modal._onKey);
+
+    renderReviewForm(modal.querySelector("#review-modal-body"));
+
+    requestAnimationFrame(() => {
+      modal.classList.add("opacity-100");
+      modal.querySelector(".review-dialog")?.classList.add("scale-100", "opacity-100");
+      modal.querySelector("#rating-comment")?.focus({ preventScroll: true });
+    });
+  }
 
   // Delete review handler
   const handleDeleteReview = async () => {
@@ -494,7 +553,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
       updateSummaryUI(currentRatings);
       renderReviewsList(currentRatings);
-      renderFormState(false);
+      updateOpenButtons();
     } catch (err) {
       console.error("Error loading recipe ratings:", err);
       const listContainer = document.getElementById("reviews-list-container");
@@ -508,7 +567,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     }
   };
 
-  // Listen for auth state changes to dynamically update form state
+  // Listen for auth state changes to dynamically update state
   onAuthChange((user) => {
     currentUser = user;
     reloadData();
