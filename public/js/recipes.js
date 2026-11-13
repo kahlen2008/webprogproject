@@ -939,12 +939,11 @@ async function showRecipe(id) {
               </h1>
 
               <!-- Star Rating -->
-              <div class="flex items-center gap-2 mt-2">
-                <div class="flex items-center text-amber-500 text-sm">
-                  <span>★</span><span>★</span><span>★</span><span>★</span><span class="text-amber-400">★</span>
+              <div id="header-star-rating" class="flex items-center gap-2 mt-2">
+                <div class="flex items-center text-stone-300 text-sm">
+                  <span>★</span><span>★</span><span>★</span><span>★</span><span>★</span>
                 </div>
-                <span class="text-sm font-semibold text-stone-800">4.8</span>
-                <span class="text-sm text-stone-500">(120 ratings)</span>
+                <span class="text-sm font-semibold text-stone-400">Loading ratings...</span>
               </div>
             </div>
 
@@ -1017,6 +1016,9 @@ async function showRecipe(id) {
             </ol>
           </div>
         </div>
+
+        <!-- Community Ratings & Reviews (Person 3) -->
+        <div id="recipe-ratings-section"></div>
       </div>
     `;
 
@@ -1125,6 +1127,13 @@ async function showRecipe(id) {
         }
       });
     }
+
+    // Mount Ratings & Reviews system (Person 3)
+    import("./ratings.js")
+      .then(({ initRatings }) => {
+        initRatings(recipe.id, "recipe-ratings-section");
+      })
+      .catch((err) => console.error("Could not load ratings module:", err));
 
   } catch (err) {
     console.error("Recipe display error:", err);
