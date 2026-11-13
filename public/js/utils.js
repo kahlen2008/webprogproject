@@ -185,6 +185,124 @@ export function showAuthPromptModal({ title, description, redirectUrl, icon = "h
   modal.querySelector("#auth-prompt-close")?.addEventListener("click", cleanup);
 }
 
+/**
+ * Shows an elegant confirmation modal matching RecipePlan design tokens.
+ * Returns a Promise that resolves to true (confirmed) or false (cancelled).
+ *
+ * @param {Object} options
+ * @param {string} options.title - e.g. "Delete Review?"
+ * @param {string} options.message - e.g. "Are you sure you want to delete your review?"
+ * @param {string} [options.confirmText="Delete"]
+ * @param {string} [options.cancelText="Cancel"]
+ * @param {"danger"|"primary"} [options.confirmColor="danger"]
+ * @returns {Promise<boolean>}
+ */
+export function showConfirmModal({
+  title = "Are you sure?",
+  message = "This action cannot be undone.",
+  confirmText = "Delete",
+  cancelText = "Cancel",
+  confirmColor = "danger",
+}) {
+  return new Promise((resolve) => {
+    document.getElementById("custom-confirm-modal")?.remove();
+
+    const backdrop = document.createElement("div");
+    backdrop.id = "custom-confirm-modal";
+    backdrop.className =
+      "fixed inset-0 bg-stone-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 transition-opacity duration-200 opacity-0";
+    backdrop.setAttribute("role", "dialog");
+    backdrop.setAttribute("aria-modal", "true");
+
+    const isDanger = confirmColor === "danger";
+    const iconHtml = isDanger
+      ? `<div class="w-14 h-14 rounded-2xl bg-red-100/80 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-200/60 shadow-xs">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+          </svg>
+        </div>`
+      : `<div class="w-14 h-14 rounded-2xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center mx-auto mb-4 border border-[#ca5c2e]/20 shadow-xs">
+          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+        </div>`;
+
+    const confirmBtnClass = isDanger
+      ? "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500/40"
+      : "bg-[#ca5c2e] hover:bg-[#b34d23] text-white focus:ring-[#ca5c2e]/40";
+
+    backdrop.innerHTML = `
+      <div class="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl border border-stone-100 p-6 sm:p-7 text-center transition-all duration-200 transform scale-95 opacity-0">
+        <button type="button" id="confirm-modal-close" class="absolute top-4 right-4 p-2 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition focus:outline-none" aria-label="Close dialog">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
+
+        ${iconHtml}
+
+        <h3 class="text-xl font-bold text-stone-900 tracking-tight">${escapeHtml(title)}</h3>
+        <p class="text-sm text-stone-500 mt-2 leading-relaxed">
+          ${escapeHtml(message)}
+        </p>
+
+        <div class="mt-6 flex items-center gap-3">
+          <button type="button" id="confirm-modal-cancel" class="flex-1 px-4 py-2.5 rounded-xl border border-stone-200 bg-white hover:bg-stone-50 text-stone-700 font-semibold text-sm transition focus:outline-none shadow-xs">
+            ${escapeHtml(cancelText)}
+          </button>
+          <button type="button" id="confirm-modal-ok" class="flex-1 px-4 py-2.5 rounded-xl ${confirmBtnClass} font-semibold text-sm transition shadow-sm hover:shadow focus:outline-none focus:ring-2 inline-flex items-center justify-center gap-1.5">
+            ${escapeHtml(confirmText)}
+          </button>
+        </div>
+      </div>
+    `;
+
+    document.body.appendChild(backdrop);
+    const dialog = backdrop.querySelector(".relative");
+
+    requestAnimationFrame(() => {
+      backdrop.classList.remove("opacity-0");
+      backdrop.classList.add("opacity-100");
+      dialog.classList.remove("scale-95", "opacity-0");
+      dialog.classList.add("scale-100", "opacity-100");
+    });
+
+    let closed = false;
+    function cleanup(confirmed) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKeyDown);
+
+      backdrop.classList.remove("opacity-100");
+      backdrop.classList.add("opacity-0");
+      dialog.classList.remove("scale-100", "opacity-100");
+      dialog.classList.add("scale-95", "opacity-0");
+
+      setTimeout(() => {
+        backdrop.remove();
+        resolve(confirmed);
+      }, 200);
+    }
+
+    function onKeyDown(e) {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        cleanup(false);
+      }
+    }
+
+    document.addEventListener("keydown", onKeyDown);
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) cleanup(false);
+    });
+
+    backdrop.querySelector("#confirm-modal-close")?.addEventListener("click", () => cleanup(false));
+    backdrop.querySelector("#confirm-modal-cancel")?.addEventListener("click", () => cleanup(false));
+    backdrop.querySelector("#confirm-modal-ok")?.addEventListener("click", () => cleanup(true));
+  });
+}
+
 const MINOR_WORDS = new Set([
   "a", "an", "and", "as", "at", "but", "by", "for", "from", "in", "into",
   "near", "nor", "of", "on", "onto", "or", "per", "the", "to", "with", "via"

@@ -10,7 +10,7 @@ import {
   fetchUserRating,
   deleteRecipeRating,
 } from "./schema.js";
-import { escapeHtml, showToast, showAuthPromptModal } from "./utils.js";
+import { escapeHtml, showToast, showAuthPromptModal, showConfirmModal } from "./utils.js";
 
 /**
  * Calculates rating statistics from a list of ratings
@@ -527,13 +527,45 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
   // Delete review handler
   const handleDeleteReview = async () => {
     if (!currentUser || !userRating) return;
-    if (!confirm("Are you sure you want to delete your review?")) return;
+    const confirmed = await showConfirmModal({
+      title: "Delete Review?",
+      message: "Are you sure you want to delete your review?",
+      confirmText: "Delete",
+      cancelText: "Cancel",
+      confirmColor: "danger",
+    });
+    if (!confirmed) return;
+
+    const previousRating = { ...userRating };
 
     try {
       await deleteRecipeRating(recipeId, currentUser.uid);
-      showToast("Review deleted");
       userRating = null;
       await reloadData();
+
+      showToast("Review deleted", {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: async () => {
+            try {
+              await saveRecipeRating(recipeId, currentUser.uid, {
+                stars: previousRating.stars,
+                comment: previousRating.comment || "",
+                displayName:
+                  previousRating.displayName ||
+                  currentUser.displayName ||
+                  "Home Cook",
+              });
+              showToast("Review restored!");
+              await reloadData();
+            } catch (restoreErr) {
+              console.error("Failed to restore review:", restoreErr);
+              showToast("Error restoring review. Please try again.");
+            }
+          },
+        },
+      });
     } catch (err) {
       console.error("Failed to delete review:", err);
       showToast("Error deleting review. Please try again.");
