@@ -1,7 +1,7 @@
 // Weekly Meal planner and shopping list logic matching RecipePlan mockup.
 // Owner: Person 4.
 
-import { showToast, toTitleCase, showAuthPromptModal, escapeHtml } from "./utils.js";
+import { showToast, toTitleCase, showAuthPromptModal, showConfirmModal, escapeHtml } from "./utils.js";
 import { getFavourites } from "./favourites.js";
 import { confirmIfFlagged } from "./preferences.js";
 import { searchRecipes, getRecipeById } from "./api.js";
@@ -140,8 +140,23 @@ export async function savePlan(plan) {
 }
 
 export async function addToPlan(day, meal, recipe, skipConfirm = false) {
-  if (!skipConfirm && !(await confirmIfFlagged(recipe))) return false;
   const plan = await getPlan();
+  const existingMeal = plan[day]?.[meal];
+
+  if (!skipConfirm && existingMeal && existingMeal.name) {
+    const existingName = toTitleCase(existingMeal.name);
+    const newName = toTitleCase(recipe.name || "this recipe");
+    const confirmed = await showConfirmModal({
+      title: "Replace existing meal?",
+      message: `"${existingName}" is already scheduled for ${day} ${meal}. Do you want to replace it with "${newName}"?`,
+      confirmText: "Replace Meal",
+      cancelText: "Keep Current",
+      confirmColor: "primary"
+    });
+    if (!confirmed) return false;
+  }
+
+  if (!skipConfirm && !(await confirmIfFlagged(recipe))) return false;
   if (!plan[day]) plan[day] = {};
   plan[day][meal] = {
     id: recipe.id || "0",

@@ -203,6 +203,7 @@ export function showConfirmModal({
   confirmText = "Delete",
   cancelText = "Cancel",
   confirmColor = "danger",
+  icon = null,
 }) {
   return new Promise((resolve) => {
     document.getElementById("custom-confirm-modal")?.remove();
@@ -215,19 +216,44 @@ export function showConfirmModal({
     backdrop.setAttribute("aria-modal", "true");
 
     const isDanger = confirmColor === "danger";
-    const iconHtml = isDanger
-      ? `<div class="w-14 h-14 rounded-2xl bg-red-100/80 text-red-600 flex items-center justify-center mx-auto mb-4 border border-red-200/60 shadow-xs">
-          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+    const selectedIcon = icon || (isDanger ? "trash" : "swap");
+
+    let iconInner = "";
+    let iconWrapClasses = "";
+
+    if (selectedIcon === "trash") {
+      iconWrapClasses = "bg-red-100/80 text-red-600 border border-red-200/60";
+      iconInner = `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-          </svg>
-        </div>`
-      : `<div class="w-14 h-14 rounded-2xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center mx-auto mb-4 border border-[#ca5c2e]/20 shadow-xs">
-          <svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          </svg>`;
+    } else if (selectedIcon === "swap") {
+      iconWrapClasses = "bg-gradient-to-tr from-[#fbebe3] to-[#fae2d5] text-[#ca5c2e] border border-[#f5cfb8]";
+      iconInner = `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+          </svg>`;
+    } else if (selectedIcon === "calendar") {
+      iconWrapClasses = "bg-[#fbebe3] text-[#ca5c2e] border border-[#f5cfb8]";
+      iconInner = `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="4" width="18" height="18" rx="3" ry="3"></rect>
+            <line x1="16" y1="2" x2="16" y2="6"></line>
+            <line x1="8" y1="2" x2="8" y2="6"></line>
+            <line x1="3" y1="10" x2="21" y2="10"></line>
+          </svg>`;
+    } else {
+      iconWrapClasses = "bg-[#ca5c2e]/10 text-[#ca5c2e] border border-[#ca5c2e]/20";
+      iconInner = `<svg class="w-7 h-7" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <circle cx="12" cy="12" r="10"></circle>
             <line x1="12" y1="8" x2="12" y2="12"></line>
             <line x1="12" y1="16" x2="12.01" y2="16"></line>
-          </svg>
-        </div>`;
+          </svg>`;
+    }
+
+    const iconHtml = `<div class="relative inline-block mx-auto mb-4">
+        <div class="w-16 h-16 rounded-2xl ${iconWrapClasses} flex items-center justify-center shadow-inner ring-4 ring-[#ca5c2e]/5">
+          ${iconInner}
+        </div>
+        ${selectedIcon === "swap" ? '<span class="absolute -top-1.5 -right-1.5 w-6 h-6 bg-white rounded-full border border-[#eee2d5] shadow-xs flex items-center justify-center text-xs select-none">🗓️</span>' : ''}
+      </div>`;
 
     const confirmBtnClass = isDanger
       ? "bg-red-600 hover:bg-red-700 text-white focus:ring-red-500/40"

@@ -4,7 +4,7 @@
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
 import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, playHeartEffect } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect } from "./utils.js";
 import {
   getPreferences,
   savePreferences,
@@ -1219,8 +1219,9 @@ async function showRecipe(id) {
           <button type="button" role="tab" data-tab="recipe" aria-selected="true" style="margin-bottom:-1px;border-bottom-width:2px;border-bottom-style:solid" class="recipe-tab-btn pb-3 border-[#ca5c2e] text-[#ca5c2e] text-sm sm:text-base font-bold transition focus:outline-none">
             Ingredients &amp; Instructions
           </button>
-          <button type="button" role="tab" data-tab="reviews" aria-selected="false" style="margin-bottom:-1px;border-bottom-width:2px;border-bottom-style:solid" class="recipe-tab-btn pb-3 border-transparent text-stone-500 hover:text-stone-800 text-sm sm:text-base font-bold transition focus:outline-none">
-            Reviews <span id="reviews-tab-count" class="ml-1 text-xs font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-500">0</span>
+          <button type="button" role="tab" data-tab="reviews" aria-selected="false" style="margin-bottom:-1px;border-bottom-width:2px;border-bottom-style:solid" class="recipe-tab-btn pb-3 border-transparent text-stone-500 hover:text-stone-800 text-sm sm:text-base font-bold transition focus:outline-none inline-flex items-center">
+            <span>Reviews</span>
+            <span id="reviews-tab-count" class="ml-1.5 text-xs font-semibold px-2 py-0.5 rounded-full bg-stone-100 text-stone-500 inline-flex items-center justify-center leading-none">0</span>
           </button>
         </div>
 
@@ -1372,6 +1373,21 @@ async function showRecipe(id) {
         try {
           const raw = localStorage.getItem("recipeplan_weekly_plan");
           const plan = raw ? JSON.parse(raw) : {};
+          const existingMeal = plan.Mon?.Dinner;
+
+          if (existingMeal && existingMeal.name) {
+            const existingName = toTitleCase(existingMeal.name);
+            const newName = toTitleCase(recipe.name || "this recipe");
+            const confirmed = await showConfirmModal({
+              title: "Replace existing meal?",
+              message: `"${existingName}" is already scheduled for Mon Dinner. Do you want to replace it with "${newName}"?`,
+              confirmText: "Replace Meal",
+              cancelText: "Keep Current",
+              confirmColor: "primary"
+            });
+            if (!confirmed) return;
+          }
+
           if (!plan.Mon) plan.Mon = {};
           plan.Mon.Dinner = {
             id: recipe.id,
