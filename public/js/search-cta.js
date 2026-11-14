@@ -114,8 +114,175 @@ function initRotatingSearchPlaceholder() {
   timerId = setTimeout(tick, 1000);
 }
 
+function initHeroFanCarousel() {
+  const stage = document.getElementById("hero-fan-stage");
+  if (!stage) return;
+
+  const cards = Array.from(stage.querySelectorAll(".hero-fan-card"));
+  const dots = Array.from(document.querySelectorAll(".hero-fan-dot"));
+  if (cards.length !== 3) return;
+
+  let activeIdx = 0;
+  let intervalId = null;
+  let isPaused = false;
+
+  const applyPositions = (centerIdx) => {
+    activeIdx = ((centerIdx % 3) + 3) % 3;
+    const rightIdx = (activeIdx + 1) % 3;
+    const leftIdx = (activeIdx + 2) % 3;
+
+    cards[activeIdx].setAttribute("data-fan-pos", "center");
+    cards[rightIdx].setAttribute("data-fan-pos", "right");
+    cards[leftIdx].setAttribute("data-fan-pos", "left");
+
+    dots.forEach((dot, idx) => {
+      dot.setAttribute("aria-current", idx === activeIdx ? "true" : "false");
+    });
+  };
+
+  const startAutoRotate = () => {
+    if (intervalId) clearInterval(intervalId);
+    intervalId = setInterval(() => {
+      if (!isPaused) {
+        applyPositions(activeIdx + 1);
+      }
+    }, 3000);
+  };
+
+  stage.addEventListener("mouseenter", () => {
+    isPaused = true;
+  });
+  stage.addEventListener("mouseleave", () => {
+    isPaused = false;
+  });
+
+  // Clicking a side card brings it to the front center instead of navigating immediately
+  cards.forEach((card, idx) => {
+    card.addEventListener("click", (e) => {
+      if (e.target.closest(".favourite-btn")) return;
+      if (card.getAttribute("data-fan-pos") !== "center") {
+        e.preventDefault();
+        applyPositions(idx);
+        startAutoRotate();
+      }
+    });
+  });
+
+  dots.forEach((dot) => {
+    dot.addEventListener("click", () => {
+      const idx = Number(dot.getAttribute("data-fan-dot") || 0);
+      applyPositions(idx);
+      startAutoRotate();
+    });
+  });
+
+  startAutoRotate();
+
+  // Wire up live ratings and favourite heart buttons on the hero cards
+  Promise.all([
+    import("./utils.js"),
+    import("./auth.js"),
+    import("./ratings.js"),
+  ])
+    .then(([{ showToast, showAuthPromptModal, playHeartEffect, syncAllCardHearts }, { getCurrentUser }, { attachCardRating }]) => {
+      syncAllCardHearts();
+      cards.forEach((card) => {
+        const recipeId = card.getAttribute("data-recipe-id");
+        if (recipeId) attachCardRating(card, recipeId);
+
+        const favBtn = card.querySelector(".favourite-btn");
+        if (!favBtn) return;
+
+        favBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+
+          const id = favBtn.getAttribute("data-id");
+          const name = favBtn.getAttribute("data-name") || "Recipe";
+          const image = favBtn.getAttribute("data-image") || "";
+          const category = favBtn.getAttribute("data-category") || "Main";
+          const area = favBtn.getAttribute("data-area") || "";
+
+          const user = getCurrentUser();
+          if (!user) {
+            showAuthPromptModal({
+              title: "Log in to save favourites",
+              description: "Your saved recipes will be waiting for you on any device.",
+              redirectUrl: `recipe.html?id=${encodeURIComponent(id)}`,
+              icon: "heart",
+            });
+            return;
+          }
+
+          let storedFavs = [];
+          try {
+            storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+          } catch (err) {}
+
+          const exists = storedFavs.some((f) => String(f.id) === String(id));
+          const icon = favBtn.querySelector(".heart-icon");
+
+          if (exists) {
+            storedFavs = storedFavs.filter((f) => String(f.id) !== String(id));
+            icon?.setAttribute("fill", "none");
+            icon?.classList.remove("text-[#ca5c2e]");
+            favBtn.classList.remove("text-[#ca5c2e]");
+            playHeartEffect(favBtn, false);
+            showToast(`Removed "${name}" from favourites`);
+            if (user.uid) {
+              Promise.all([
+                import("./firebase-config.js"),
+                import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+              ])
+                .then(([{ db }, { doc, deleteDoc }]) =>
+                  deleteDoc(doc(db, "users", user.uid, "favourites", String(id)))
+                )
+                .catch(console.warn);
+            }
+          } else {
+            const favItem = {
+              id: String(id),
+              name,
+              image,
+              category,
+              area,
+              savedAt: new Date().toISOString(),
+            };
+            storedFavs.unshift(favItem);
+            icon?.setAttribute("fill", "#ca5c2e");
+            icon?.classList.add("text-[#ca5c2e]");
+            favBtn.classList.add("text-[#ca5c2e]");
+            playHeartEffect(favBtn, true);
+            showToast(`Saved "${name}" to favourites!`);
+            if (user.uid) {
+              Promise.all([
+                import("./firebase-config.js"),
+                import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
+              ])
+                .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
+                  setDoc(doc(db, "users", user.uid, "favourites", String(id)), {
+                    ...favItem,
+                    savedAt: serverTimestamp(),
+                  })
+                )
+                .catch(console.warn);
+            }
+          }
+
+          localStorage.setItem("recipeplan_favourites", JSON.stringify(storedFavs));
+          window.dispatchEvent(new CustomEvent("favourites-changed"));
+        });
+      });
+    })
+    .catch(() => {});
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", initRotatingSearchPlaceholder);
+  document.addEventListener("DOMContentLoaded", () => {
+    initRotatingSearchPlaceholder();
+    initHeroFanCarousel();
+  });
 } else {
   initRotatingSearchPlaceholder();
+  initHeroFanCarousel();
 }

@@ -12,7 +12,6 @@
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link rel="preload" as="image" href="images/pasta-hero.webp" type="image/webp" fetchpriority="high">
   <link rel="modulepreload" href="js/navbar.js">
   <link rel="modulepreload" href="js/i18n.js">
   <link rel="modulepreload" href="js/search-cta.js">
@@ -21,15 +20,106 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
 
   <link rel="stylesheet" href="css/tailwind.css">
-
+  <style>
+    .hero-fan-stage {
+      position: relative;
+      width: 100%;
+      max-width: 400px;
+      height: 276px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .hero-fan-card {
+      position: absolute;
+      width: 216px;
+      border-radius: 1rem;
+      background: #ffffff;
+      border: 1px solid #efe6dc;
+      overflow: hidden;
+      transition:
+        transform 0.75s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.55s ease,
+        box-shadow 0.55s ease;
+      will-change: transform, opacity;
+      user-select: none;
+    }
+    .hero-fan-card[data-fan-pos="center"] {
+      transform: translate3d(0, -8px, 0) rotate(0deg) scale(1);
+      z-index: 30;
+      opacity: 1;
+      box-shadow: 0 22px 44px -12px rgba(87, 53, 34, 0.22), 0 4px 12px -2px rgba(87, 53, 34, 0.08);
+      border-color: #e5d5c5;
+    }
+    .hero-fan-card[data-fan-pos="left"] {
+      transform: translate3d(-68px, 12px, 0) rotate(-12deg) scale(0.88);
+      z-index: 15;
+      opacity: 0.92;
+      box-shadow: 0 12px 24px -8px rgba(87, 53, 34, 0.14);
+      cursor: pointer;
+    }
+    .hero-fan-card[data-fan-pos="right"] {
+      transform: translate3d(68px, 12px, 0) rotate(12deg) scale(0.88);
+      z-index: 20;
+      opacity: 0.92;
+      box-shadow: 0 12px 24px -8px rgba(87, 53, 34, 0.14);
+      cursor: pointer;
+    }
+    .hero-fan-card[data-fan-pos="left"]:hover {
+      transform: translate3d(-72px, 4px, 0) rotate(-13deg) scale(0.91);
+      opacity: 0.98;
+    }
+    .hero-fan-card[data-fan-pos="right"]:hover {
+      transform: translate3d(72px, 4px, 0) rotate(13deg) scale(0.91);
+      opacity: 0.98;
+    }
+    .hero-fan-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 9999px;
+      background: #dfd3c7;
+      transition: all 0.35s ease;
+      cursor: pointer;
+      border: none;
+      padding: 0;
+    }
+    .hero-fan-dot[aria-current="true"] {
+      width: 22px;
+      background: #ca5c2e;
+    }
+    @media (min-width: 1024px) {
+      #home-main {
+        padding-top: 1.75rem;
+        padding-bottom: 0.75rem;
+        gap: 3.75rem;
+      }
+      #home-main > :not([hidden]) ~ :not([hidden]) {
+        margin-top: 0;
+      }
+    }
+    @media (max-width: 639px) {
+      .hero-fan-stage {
+        height: 290px;
+      }
+      .hero-fan-card {
+        width: 206px;
+      }
+      .hero-fan-card[data-fan-pos="left"] {
+        transform: translate3d(-48px, 12px, 0) rotate(-10deg) scale(0.88);
+      }
+      .hero-fan-card[data-fan-pos="right"] {
+        transform: translate3d(48px, 12px, 0) rotate(10deg) scale(0.88);
+      }
+    }
+  </style>
 </head>
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
   <header id="navbar" class="w-full sticky top-0 z-40 min-h-[64px] bg-[#fcf9f5]/90 border-b border-[#ede4da]"></header>
 
-  <main class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-12 flex flex-col justify-center space-y-10 sm:space-y-12">
+  <main id="home-main" class="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 sm:py-10 flex flex-col justify-center space-y-8 sm:space-y-10">
     <!-- Hero Section -->
-    <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center">
-      <div class="lg:col-span-7 space-y-6">
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-10 items-center">
+      <div class="lg:col-span-7 space-y-5">
         <h1 class="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-stone-900 tracking-tight leading-[1.15]">
           Find recipes. Plan meals.<br>
           <span class="text-[#ca5c2e]">Eat better.</span>
@@ -64,18 +154,108 @@
         </div>
       </div>
 
-      <!-- Hero Featured Dish Image -->
-      <div class="lg:col-span-5 flex justify-center lg:justify-end">
-        <div class="relative w-64 sm:w-72 lg:w-88 aspect-square rounded-full overflow-hidden shadow-xl border-4 border-white ring-6 ring-[#ca5c2e]/10 group">
-          <img 
-            src="images/pasta-hero.webp"
-            width="288"
-            height="288"
-            fetchpriority="high"
-            decoding="async"
-            alt="Delicious artisan Italian pasta with roasted cherry tomatoes and fresh basil"
-            class="w-full h-full object-cover group-hover:scale-105 transition duration-700"
-          >
+      <!-- Hero Rotating Recipe Card Fan -->
+      <div class="lg:col-span-5 flex flex-col items-center justify-center">
+        <div id="hero-fan-stage" class="hero-fan-stage" aria-label="Featured recipes carousel">
+          <!-- Card 0: Big Mac -->
+          <article class="hero-fan-card recipe-card group flex flex-col" data-fan-index="0" data-fan-pos="center" data-recipe-id="53013">
+            <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
+              <a href="recipe.html?id=53013" class="hero-card-link block w-full h-full overflow-hidden">
+                <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="https://www.themealdb.com/images/media/meals/urzj1d1587670726.jpg" alt="Big Mac" fetchpriority="high" decoding="async">
+              </a>
+            </div>
+            <div class="p-3.5 flex flex-col gap-2">
+              <h3 class="font-bold text-stone-900 group-hover:text-[#ca5c2e] text-base leading-snug line-clamp-1 transition">
+                <a href="recipe.html?id=53013" class="hero-card-link text-stone-900 group-hover:text-[#ca5c2e] transition">Big Mac</a>
+              </h3>
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="inline-flex items-center justify-center bg-[#f5ebe4] text-[#a04e28] font-bold rounded-full" style="font-size:13px;line-height:18px;padding:4px 12px">Beef</span>
+                  <span class="recipe-card-rating inline-flex items-center gap-1 text-stone-700" data-recipe-id="53013" style="font-size:13px;line-height:18px">
+                    <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
+                    <span class="rating-avg font-bold">5.0</span>
+                    <span class="rating-count text-stone-400 font-normal">(2)</span>
+                  </span>
+                </div>
+                <div class="card-action-slot flex items-center">
+                  <button type="button" class="favourite-btn inline-flex items-center justify-center p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-[#ca5c2e] transition" data-id="53013" data-name="Big Mac" data-image="https://www.themealdb.com/images/media/meals/urzj1d1587670726.jpg" data-category="Beef" data-area="United States" title="Save to favourites" aria-label="Save to favourites">
+                    <svg class="w-5 h-5 heart-icon" style="transform:translateY(-0.5px)" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Card 1: Pancakes -->
+          <article class="hero-fan-card recipe-card group flex flex-col" data-fan-index="1" data-fan-pos="right" data-recipe-id="52854">
+            <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
+              <a href="recipe.html?id=52854" class="hero-card-link block w-full h-full overflow-hidden">
+                <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg" alt="Pancakes" loading="lazy" decoding="async">
+              </a>
+            </div>
+            <div class="p-3.5 flex flex-col gap-2">
+              <h3 class="font-bold text-stone-900 group-hover:text-[#ca5c2e] text-base leading-snug line-clamp-1 transition">
+                <a href="recipe.html?id=52854" class="hero-card-link text-stone-900 group-hover:text-[#ca5c2e] transition">Pancakes</a>
+              </h3>
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="inline-flex items-center justify-center bg-[#f5ebe4] text-[#a04e28] font-bold rounded-full" style="font-size:13px;line-height:18px;padding:4px 12px">Dessert</span>
+                  <span class="recipe-card-rating inline-flex items-center gap-1 text-stone-700" data-recipe-id="52854" style="font-size:13px;line-height:18px">
+                    <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
+                    <span class="rating-avg font-bold">5.0</span>
+                    <span class="rating-count text-stone-400 font-normal">(2)</span>
+                  </span>
+                </div>
+                <div class="card-action-slot flex items-center">
+                  <button type="button" class="favourite-btn inline-flex items-center justify-center p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-[#ca5c2e] transition" data-id="52854" data-name="Pancakes" data-image="https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg" data-category="Dessert" data-area="United States" title="Save to favourites" aria-label="Save to favourites">
+                    <svg class="w-5 h-5 heart-icon" style="transform:translateY(-0.5px)" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+
+          <!-- Card 2: Grilled Mac and Cheese Sandwich -->
+          <article class="hero-fan-card recipe-card group flex flex-col" data-fan-index="2" data-fan-pos="left" data-recipe-id="52829">
+            <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
+              <a href="recipe.html?id=52829" class="hero-card-link block w-full h-full overflow-hidden">
+                <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="https://www.themealdb.com/images/media/meals/xutquv1505330523.jpg" alt="Grilled Mac and Cheese Sandwich" loading="lazy" decoding="async">
+              </a>
+            </div>
+            <div class="p-3.5 flex flex-col gap-2">
+              <h3 class="font-bold text-stone-900 group-hover:text-[#ca5c2e] text-base leading-snug line-clamp-1 transition">
+                <a href="recipe.html?id=52829" class="hero-card-link text-stone-900 group-hover:text-[#ca5c2e] transition">Grilled Mac And Cheese Sandwich</a>
+              </h3>
+              <div class="flex items-center justify-between gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="inline-flex items-center justify-center bg-[#f5ebe4] text-[#a04e28] font-bold rounded-full" style="font-size:13px;line-height:18px;padding:4px 12px">Pasta</span>
+                  <span class="recipe-card-rating inline-flex items-center gap-1 text-stone-700" data-recipe-id="52829" style="font-size:13px;line-height:18px">
+                    <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
+                    <span class="rating-avg font-bold">4.5</span>
+                    <span class="rating-count text-stone-400 font-normal">(2)</span>
+                  </span>
+                </div>
+                <div class="card-action-slot flex items-center">
+                  <button type="button" class="favourite-btn inline-flex items-center justify-center p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-[#ca5c2e] transition" data-id="52829" data-name="Grilled Mac And Cheese Sandwich" data-image="https://www.themealdb.com/images/media/meals/xutquv1505330523.jpg" data-category="Pasta" data-area="United States" title="Save to favourites" aria-label="Save to favourites">
+                    <svg class="w-5 h-5 heart-icon" style="transform:translateY(-0.5px)" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </article>
+        </div>
+
+        <!-- Fan Carousel Dots -->
+        <div class="flex items-center justify-center gap-2 mt-1" role="tablist" aria-label="Featured recipe cards">
+          <button type="button" class="hero-fan-dot" data-fan-dot="0" aria-current="true" aria-label="Show Big Mac"></button>
+          <button type="button" class="hero-fan-dot" data-fan-dot="1" aria-current="false" aria-label="Show Pancakes"></button>
+          <button type="button" class="hero-fan-dot" data-fan-dot="2" aria-current="false" aria-label="Show Grilled Mac and Cheese Sandwich"></button>
         </div>
       </div>
     </section>
@@ -89,9 +269,9 @@
 
       <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
         <!-- Pillar 1: Explore Recipes -->
-        <a href="recipes.html" class="p-6 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-4">
-          <div class="space-y-3">
-            <div class="w-11 h-11 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
+        <a href="recipes.html" class="p-5 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-3">
+          <div class="space-y-2.5">
+            <div class="w-10 h-10 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
               </svg>
@@ -107,9 +287,9 @@
         </a>
 
         <!-- Pillar 2: Meal Planner -->
-        <a href="planner.html" class="p-6 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-4">
-          <div class="space-y-3">
-            <div class="w-11 h-11 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
+        <a href="planner.html" class="p-5 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-3">
+          <div class="space-y-2.5">
+            <div class="w-10 h-10 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
               </svg>
@@ -125,9 +305,9 @@
         </a>
 
         <!-- Pillar 3: Dietary Safeguards -->
-        <a href="profile.html" class="p-6 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-4">
-          <div class="space-y-3">
-            <div class="w-11 h-11 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
+        <a href="profile.html" class="p-5 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-3">
+          <div class="space-y-2.5">
+            <div class="w-10 h-10 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
               <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
               </svg>
