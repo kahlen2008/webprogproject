@@ -63,9 +63,42 @@ export function normalizeRecipe(meal) {
   };
 }
 
+const CULINARY_SYNONYMS = {
+  porridge: "congee",
+  congee: "porridge",
+  wonton: "dumpling",
+  dumpling: "wonton",
+  dumplings: "wonton",
+  potatoes: "potato",
+  spaghetti: "pasta",
+};
+
 export async function searchRecipes(query) {
   const englishQuery = await translateQueryToEnglish(query);
-  const data = await fetchJson(`search.php?s=${encodeURIComponent(englishQuery)}`);
+  let data = await fetchJson(`search.php?s=${encodeURIComponent(englishQuery)}`);
+
+  // If TheMealDB exact substring search returned 0 results, try culinary synonyms (e.g. "chicken porridge" -> "chicken congee")
+  if ((!data || !data.meals || data.meals.length === 0) && englishQuery) {
+    const words = englishQuery.split(/\s+/);
+    let changed = false;
+    const newWords = words.map((w) => {
+      const lower = w.toLowerCase().replace(/[^a-z]/g, "");
+      if (CULINARY_SYNONYMS[lower]) {
+        changed = true;
+        return CULINARY_SYNONYMS[lower];
+      }
+      return w;
+    });
+
+    if (changed) {
+      const synonymQuery = newWords.join(" ");
+      const fallbackData = await fetchJson(`search.php?s=${encodeURIComponent(synonymQuery)}`);
+      if (fallbackData && fallbackData.meals && fallbackData.meals.length > 0) {
+        data = fallbackData;
+      }
+    }
+  }
+
   return (data.meals || []).map(normalizeRecipe);
 }
 

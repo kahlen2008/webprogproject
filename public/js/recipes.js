@@ -2,6 +2,7 @@
 // Matches the design and interactions shown in RecipePlan mockup.
 
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
+import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal } from "./utils.js";
 import {
@@ -313,7 +314,7 @@ function applyHideFilterAnimated(hide) {
   return true;
 }
 
-async function renderRecipeCards(recipesList) {
+async function renderRecipeCards(recipesList, { isSuggested = false } = {}) {
   if (!results) return;
   if (finishFilterAnimation) finishFilterAnimation();
   results.innerHTML = "";
@@ -335,7 +336,7 @@ async function renderRecipeCards(recipesList) {
     return;
   }
 
-  if (message) {
+  if (message && !isSuggested) {
     message.innerHTML = "";
     message.className = "hidden";
   }
@@ -352,6 +353,123 @@ async function renderRecipeCards(recipesList) {
 // Remembers the last search so toggling "Hide allergen recipes" re-runs the same search.
 let lastSearchQuery = "";
 let lastSearchTitle = "Latest Recipes";
+
+const COMMON_RECIPE_KEYWORDS = [
+  "macaroni", "pancake", "pancakes", "spaghetti", "chicken", "pasta", "pizza",
+  "burger", "salmon", "beef", "pork", "curry", "rice", "soup", "salad",
+  "chocolate", "dessert", "steak", "tacos", "taco", "noodle", "noodles",
+  "sandwich", "bread", "lasagna", "lasagne", "stew", "pie", "tart", "cookie",
+  "cookies", "cake", "muffin", "muffins", "strawberry", "strawberries",
+  "potato", "potatoes", "cheese", "mushroom", "mushrooms", "egg", "eggs",
+  "fish", "tuna", "prawn", "prawns", "shrimp", "duck", "lamb"
+];
+
+function levenshteinDistance(a, b) {
+  const m = a.length;
+  const n = b.length;
+  const dp = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      dp[i][j] = Math.min(dp[i - 1][j] + 1, dp[i][j - 1] + 1, dp[i - 1][j - 1] + cost);
+    }
+  }
+  return dp[m][n];
+}
+
+/**
+ * Netflix-style suggestion finder when a direct search query yields 0 meals.
+ * Handles typos, stems plurals, collapses repeated characters (e.g. "macaronnni" -> "macaroni"),
+ * and queries relevant keywords in parallel to rank dishes by relevance.
+ */
+async function findSimilarRecipes(query) {
+  if (!query || typeof query !== "string") return [];
+  const translated = await translateQueryToEnglish(query);
+  const cleanQ = (translated || query).toLowerCase().trim();
+  const stopWords = new Set([
+    "and", "with", "in", "the", "of", "for", "a", "an", "to", "or",
+    "recipe", "recipes", "dish", "food", "style", "easy", "best"
+  ]);
+
+  const words = cleanQ
+    .split(/[\s,._-]+/)
+    .filter((w) => w.length >= 3 && !stopWords.has(w));
+
+  if (words.length === 0) return [];
+
+  const CULINARY_EXPANSIONS = {
+    porridge: ["congee", "rice"],
+    congee: ["porridge"],
+    wonton: ["dumpling"],
+    dumpling: ["wonton", "dumplings"],
+    noodle: ["noodles", "pasta"],
+    noodles: ["noodle", "pasta"],
+  };
+
+  const searchTerms = new Set();
+  words.forEach((w) => {
+    searchTerms.add(w);
+
+    if (CULINARY_EXPANSIONS[w]) {
+      CULINARY_EXPANSIONS[w].forEach((syn) => searchTerms.add(syn));
+    }
+
+    // 1. Collapse repeated letters from typos (e.g. "macaronnni" -> "macaroni")
+    const collapsed = w.replace(/(.)\1{2,}/g, "$1");
+    if (collapsed !== w) searchTerms.add(collapsed);
+
+    // 2. Common plural/singular stems
+    if (w.endsWith("ies") && w.length > 4) {
+      searchTerms.add(w.slice(0, -3) + "y");
+    } else if (w.endsWith("es") && w.length > 3) {
+      searchTerms.add(w.slice(0, -2));
+    } else if (w.endsWith("s") && w.length > 3) {
+      searchTerms.add(w.slice(0, -1));
+    }
+
+    // 3. Typo-tolerance check against common culinary terms
+    COMMON_RECIPE_KEYWORDS.forEach((kw) => {
+      if (Math.abs(w.length - kw.length) <= 2) {
+        if (levenshteinDistance(w, kw) <= 2) searchTerms.add(kw);
+      }
+      if (collapsed !== w && Math.abs(collapsed.length - kw.length) <= 2) {
+        if (levenshteinDistance(collapsed, kw) <= 2) searchTerms.add(kw);
+      }
+    });
+  });
+
+  const termList = Array.from(searchTerms);
+  const resultsMap = new Map();
+
+  await Promise.all(
+    termList.map(async (term) => {
+      try {
+        const matches = await searchRecipes(term);
+        (matches || []).forEach((recipe) => {
+          const id = String(recipe.id);
+          const nameLower = (recipe.name || "").toLowerCase();
+          if (!resultsMap.has(id)) {
+            resultsMap.set(id, { recipe, score: 0 });
+          }
+          const entry = resultsMap.get(id);
+          if (nameLower.includes(term)) {
+            entry.score += 5;
+          } else {
+            entry.score += 2;
+          }
+        });
+      } catch (e) {}
+    })
+  );
+
+  const sorted = Array.from(resultsMap.values())
+    .sort((a, b) => b.score - a.score || a.recipe.name.localeCompare(b.recipe.name))
+    .map((item) => item.recipe);
+
+  return sorted.slice(0, 12);
+}
 
 function renderRecipesLoading(text = "Loading delicious recipes...") {
   if (!results) return;
@@ -384,19 +502,108 @@ async function runSearch(query, title = "Search Results") {
   renderRecipesLoading("Loading delicious recipes...");
 
   try {
-    const recipes = await searchRecipes(query);
+    let recipes = await searchRecipes(query);
+    let isSuggested = false;
+
+    if (!recipes || recipes.length === 0) {
+      recipes = await findSimilarRecipes(query);
+      if (recipes && recipes.length > 0) {
+        isSuggested = true;
+      }
+    }
+
     if (!recipes || recipes.length === 0) {
       results.innerHTML = "";
       if (message) {
-        message.className = "text-sm text-stone-500 py-12 text-center";
+        message.className = "py-12 sm:py-16 text-center max-w-xl mx-auto";
         const safeQ = /[^\u0000-\u007f]/.test(query)
           ? `<span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`
           : `"${escapeHtml(query)}"`;
-        message.innerHTML = `<span>No recipes found for ${safeQ}. Try another keyword or browse popular categories.</span>`;
+        message.innerHTML = `
+          <div class="w-16 h-16 mx-auto rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/15 shadow-2xs mb-4">
+            <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+            </svg>
+          </div>
+          <h3 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">
+            No recipes found for ${safeQ}
+          </h3>
+          <p class="text-sm sm:text-base text-stone-500 mt-2 max-w-lg mx-auto leading-relaxed">
+            We couldn't find any direct matches. Check for typos or try one of these popular categories:
+          </p>
+          <div class="flex flex-wrap items-center justify-center gap-2.5 sm:gap-3 pt-6">
+            <button type="button" class="empty-cat-btn inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e] hover:bg-[#ca5c2e]/5 text-sm sm:text-base font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs cursor-pointer active:scale-95" data-category="Chicken">
+              <span class="text-base sm:text-lg">🍗</span>
+              <span>Chicken</span>
+            </button>
+            <button type="button" class="empty-cat-btn inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e] hover:bg-[#ca5c2e]/5 text-sm sm:text-base font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs cursor-pointer active:scale-95" data-category="Beef">
+              <span class="text-base sm:text-lg">🥩</span>
+              <span>Beef</span>
+            </button>
+            <button type="button" class="empty-cat-btn inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e] hover:bg-[#ca5c2e]/5 text-sm sm:text-base font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs cursor-pointer active:scale-95" data-category="Pasta">
+              <span class="text-base sm:text-lg">🍝</span>
+              <span>Pasta</span>
+            </button>
+            <button type="button" class="empty-cat-btn inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e] hover:bg-[#ca5c2e]/5 text-sm sm:text-base font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs cursor-pointer active:scale-95" data-category="Vegetarian">
+              <span class="text-base sm:text-lg">🥦</span>
+              <span>Vegetarian</span>
+            </button>
+            <button type="button" class="empty-cat-btn inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e] hover:bg-[#ca5c2e]/5 text-sm sm:text-base font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs cursor-pointer active:scale-95" data-category="Dessert">
+              <span class="text-base sm:text-lg">🍰</span>
+              <span>Dessert</span>
+            </button>
+            <button type="button" class="empty-cat-btn inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e] hover:bg-[#ca5c2e]/5 text-sm sm:text-base font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs cursor-pointer active:scale-95" data-category="Seafood">
+              <span class="text-base sm:text-lg">🐟</span>
+              <span>Seafood</span>
+            </button>
+          </div>
+        `;
+        message.querySelectorAll(".empty-cat-btn").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const cat = btn.dataset.category;
+            if (!cat) return;
+            activeCategory = cat;
+            categoryChips.forEach((c) => {
+              c.classList.toggle("active", c.dataset.category === cat);
+            });
+            window.history.replaceState(null, "", `?category=${encodeURIComponent(cat)}`);
+            runCategoryFilter(cat);
+          });
+        });
       }
       return;
     }
-    await renderRecipeCards(recipes.slice(0, 12));
+
+    if (isSuggested) {
+      if (message) {
+        message.className = "rounded-2xl bg-[#fcf9f5] border border-[#efe6dc] p-4 sm:p-5 flex items-start gap-3.5 mb-6 shadow-2xs";
+        const safeQ = /[^\u0000-\u007f]/.test(query)
+          ? `<span translate="no" class="notranslate">"${escapeHtml(query)}"</span>`
+          : `"${escapeHtml(query)}"`;
+        message.innerHTML = `
+          <div class="w-9 h-9 rounded-xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center shrink-0 border border-[#ca5c2e]/20 mt-0.5">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+            </svg>
+          </div>
+          <div class="space-y-0.5">
+            <p class="text-sm font-semibold text-stone-900">
+              No exact recipes found for ${safeQ}
+            </p>
+            <p class="text-xs sm:text-sm text-stone-500">
+              You may be looking for these related recipes:
+            </p>
+          </div>
+        `;
+      }
+    } else {
+      if (message) {
+        message.innerHTML = "";
+        message.className = "hidden";
+      }
+    }
+
+    await renderRecipeCards(recipes.slice(0, 12), { isSuggested });
   } catch (error) {
     console.warn("Recipe fetch failed, displaying curated recipes:", error);
     await renderRecipeCards(DEFAULT_FALLBACK_RECIPES);
@@ -439,6 +646,15 @@ if (searchForm) {
       categoryChips.forEach((c) => c.classList.remove("active"));
       window.history.replaceState(null, "", `?search=${encodeURIComponent(query)}`);
       runSearch(query, `Recipes matching "${query}"`);
+      const recipesSection = document.getElementById("recipes-section");
+      if (recipesSection) {
+        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    } else {
+      activeCategory = null;
+      categoryChips.forEach((c) => c.classList.remove("active"));
+      window.history.replaceState(null, "", window.location.pathname);
+      runSearch("a", "Latest Recipes");
       const recipesSection = document.getElementById("recipes-section");
       if (recipesSection) {
         recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -869,8 +1085,8 @@ async function showRecipe(id) {
       })
       .join("");
 
-    // Rough nutrition estimate (TheMealDB has no nutrition data).
-    const nutrition = estimateNutrition(recipe.ingredients || []);
+    // Rough nutrition estimate (TheMealDB has no nutrition data; checks author-stated servings first, then estimates from ingredients).
+    const nutrition = estimateNutrition(recipe.ingredients || [], null, recipe.instructions);
     const per = nutrition.perServing;
     const macroBox = (label, value) => `
       <div style="flex:1;min-width:0;text-align:center" class="rounded-xl bg-white border border-[#efe6dc] px-2 py-2.5">
@@ -1049,6 +1265,7 @@ async function showRecipe(id) {
       });
       document.getElementById("tab-panel-recipe")?.classList.toggle("hidden", tab !== "recipe");
       document.getElementById("tab-panel-reviews")?.classList.toggle("hidden", tab !== "reviews");
+      window.dispatchEvent(new CustomEvent("recipe:tab-switched", { detail: { tab } }));
     };
     tabBtns.forEach((b) => b.addEventListener("click", () => switchRecipeTab(b.dataset.tab)));
     if (window._showReviewsHandler) {

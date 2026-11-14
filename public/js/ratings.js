@@ -28,6 +28,86 @@ export function calculateRatingStats(ratings = []) {
   };
 }
 
+// In-memory & sessionStorage cache for recipe rating summaries to keep card grid fast and quota-light
+const ratingStatsCache = new Map();
+const inFlightRequests = new Map();
+
+function getCachedStats(idStr) {
+  if (ratingStatsCache.has(idStr)) return ratingStatsCache.get(idStr);
+  try {
+    const raw = sessionStorage.getItem(`recipeplan_rating_${idStr}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      ratingStatsCache.set(idStr, parsed);
+      return parsed;
+    }
+  } catch (e) {}
+  return null;
+}
+
+function setCachedStats(idStr, stats) {
+  ratingStatsCache.set(idStr, stats);
+  try {
+    sessionStorage.setItem(`recipeplan_rating_${idStr}`, JSON.stringify(stats));
+  } catch (e) {}
+}
+
+export function clearRecipeRatingCache(recipeId) {
+  if (!recipeId) return;
+  const idStr = String(recipeId);
+  ratingStatsCache.delete(idStr);
+  try {
+    sessionStorage.removeItem(`recipeplan_rating_${idStr}`);
+  } catch (e) {}
+}
+
+export async function getRecipeRatingSummary(recipeId) {
+  if (!recipeId) return { count: 0, average: 0, roundedAvg: "0.0" };
+  const idStr = String(recipeId);
+  const cached = getCachedStats(idStr);
+  if (cached) return cached;
+
+  if (inFlightRequests.has(idStr)) {
+    return inFlightRequests.get(idStr);
+  }
+
+  const promise = (async () => {
+    try {
+      const ratings = await fetchRecipeRatings(idStr);
+      const stats = calculateRatingStats(ratings);
+      setCachedStats(idStr, stats);
+      return stats;
+    } catch (e) {
+      return { count: 0, average: 0, roundedAvg: "0.0" };
+    } finally {
+      inFlightRequests.delete(idStr);
+    }
+  })();
+
+  inFlightRequests.set(idStr, promise);
+  return promise;
+}
+
+/**
+ * Attaches the star rating and count to a recipe preview card if ratings exist in Firestore.
+ */
+export async function attachCardRating(card, recipeId) {
+  if (!card || !recipeId) return;
+  const idStr = String(recipeId);
+  const ratingEl = card.querySelector(`.recipe-card-rating[data-recipe-id="${idStr}"]`);
+  if (!ratingEl) return;
+
+  const stats = await getRecipeRatingSummary(idStr);
+  if (stats && stats.count > 0) {
+    const avgEl = ratingEl.querySelector(".rating-avg");
+    const countEl = ratingEl.querySelector(".rating-count");
+    if (avgEl) avgEl.textContent = stats.roundedAvg;
+    if (countEl) countEl.textContent = `(${stats.count})`;
+    ratingEl.classList.remove("hidden");
+    ratingEl.classList.add("inline-flex");
+  }
+}
+
 /**
  * Returns star display with amber/gray stars
  */
@@ -61,10 +141,10 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
   // Render two-column layout: Summary sidebar (left) + Reviews list (right)
   container.innerHTML = `
-    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-10" id="ratings-wrapper">
+    <div class="grid grid-cols-1 md:grid-cols-12 gap-6 lg:gap-10 items-stretch" id="ratings-wrapper">
       <!-- Summary card -->
       <aside class="md:col-span-4">
-        <div class="bg-[#fcf9f5] rounded-2xl border border-[#efe6dc] p-5 sm:p-6 space-y-5" style="position:sticky;top:6rem">
+        <div id="ratings-summary-card" class="bg-[#fcf9f5] rounded-2xl border border-[#efe6dc] p-5 sm:p-6 space-y-5" style="position:sticky;top:6rem">
           <div id="ratings-summary-badge">
             <span class="text-xs text-stone-400">Loading ratings...</span>
           </div>
@@ -80,9 +160,9 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
       </aside>
 
       <!-- Reviews list -->
-      <div class="md:col-span-8 space-y-3">
-        <div id="reviews-list-container" class="space-y-3">
-          <div class="text-center py-8 text-sm text-stone-400 animate-pulse">Loading reviews...</div>
+      <div class="md:col-span-8 flex flex-col">
+        <div id="reviews-list-container" class="flex-1 flex flex-col space-y-3">
+          <div class="flex-1 flex flex-col items-center justify-center text-center py-8 text-sm text-stone-400 animate-pulse">Loading reviews...</div>
         </div>
       </div>
     </div>
@@ -92,6 +172,34 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
   let currentRatings = [];
   let userRating = null;
   let currentUser = getCurrentUser();
+
+  const syncEmptyStateHeight = () => {
+    const summaryCard = document.getElementById("ratings-summary-card");
+    const emptyBox = document.getElementById("reviews-empty-state");
+    if (!emptyBox) return;
+    if (summaryCard && window.innerWidth >= 768) {
+      const cardHeight = summaryCard.offsetHeight;
+      if (cardHeight > 0) {
+        emptyBox.style.minHeight = `${cardHeight}px`;
+      }
+    } else {
+      emptyBox.style.minHeight = "";
+    }
+  };
+
+  const summaryCardEl = container.querySelector("#ratings-summary-card");
+  if (window.ResizeObserver && summaryCardEl) {
+    const ro = new ResizeObserver(() => {
+      syncEmptyStateHeight();
+    });
+    ro.observe(summaryCardEl);
+  }
+  window.addEventListener("resize", syncEmptyStateHeight);
+  window.addEventListener("recipe:tab-switched", (e) => {
+    if (e.detail?.tab === "reviews") {
+      requestAnimationFrame(() => syncEmptyStateHeight());
+    }
+  });
 
   container.querySelector("#btn-open-review")?.addEventListener("click", () => {
     openReviewModal();
@@ -189,6 +297,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     }
 
     updateOpenButtons();
+    syncEmptyStateHeight();
   };
 
   // Render Reviews List
@@ -198,16 +307,17 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
     if (!ratings || ratings.length === 0) {
       listContainer.innerHTML = `
-        <div class="text-center py-10 bg-white rounded-2xl border border-dashed border-[#efe6dc] p-6">
-          <div class="w-12 h-12 mx-auto rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center mb-3">
-            <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+        <div id="reviews-empty-state" class="flex-1 flex flex-col items-center justify-center text-center py-10 sm:py-12 bg-white rounded-2xl border border-dashed border-[#efe6dc] p-6 sm:p-8 transition-all duration-200">
+          <div class="w-14 h-14 sm:w-16 sm:h-16 mx-auto rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center mb-3.5 sm:mb-4 border border-[#ca5c2e]/10 shadow-2xs">
+            <svg class="w-7 h-7 sm:w-8 sm:h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
             </svg>
           </div>
-          <p class="font-semibold text-stone-700">No reviews yet</p>
-          <p class="text-xs text-stone-500 mt-1 max-w-sm mx-auto">Be the first to share your thoughts, cooking tips, or tweaks for this recipe!</p>
+          <h3 class="text-lg sm:text-xl font-bold text-stone-800 tracking-tight">No reviews yet</h3>
+          <p class="text-sm sm:text-base text-stone-500 mt-2 max-w-md mx-auto leading-relaxed">Be the first to share your thoughts, cooking tips, or tweaks for this recipe!</p>
         </div>
       `;
+      syncEmptyStateHeight();
       return;
     }
 
@@ -220,7 +330,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
       .map((r) => {
         const isAuthor = Boolean(currentUser && currentUser.uid === r.uid);
         const authorBadge = isAuthor
-          ? `<span class="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#ca5c2e] text-white">You</span>`
+          ? `<span class="font-bold rounded-full bg-[#ca5c2e] text-white inline-flex items-center justify-center" style="font-size:10px;line-height:1;padding:2.5px 6px">You</span>`
           : "";
         const name = r.displayName || "Anonymous";
         const initial = escapeHtml(name.trim().charAt(0).toUpperCase() || "?");
@@ -233,8 +343,8 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
           : "Recently";
 
         const cardClasses = isAuthor
-          ? "rounded-2xl border p-4 sm:p-5 transition bg-[#fcf9f5] border-[#ca5c2e]"
-          : "rounded-2xl border p-4 sm:p-5 transition bg-white border-[#efe6dc] hover:border-stone-300";
+          ? "rounded-2xl border px-4 sm:px-5 py-3.5 transition bg-[#fcf9f5] border-[#ca5c2e]"
+          : "rounded-2xl border px-4 sm:px-5 py-3.5 transition bg-white border-[#efe6dc] hover:border-stone-300";
 
         const avatarClasses = isAuthor
           ? "w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm shrink-0 bg-[#ca5c2e] text-white"
@@ -242,11 +352,11 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
         const actionsHtml = isAuthor
           ? `
-            <div class="flex items-center gap-1 shrink-0">
-              <button type="button" id="btn-edit-inline" class="text-xs font-semibold text-stone-600 hover:text-[#ca5c2e] px-2.5 py-1 rounded-lg bg-white border border-[#efe6dc] hover:border-stone-400 transition" title="Edit your review">
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" id="btn-edit-inline" class="text-xs font-semibold text-stone-600 hover:text-[#ca5c2e] px-2.5 py-1 rounded-lg bg-white border border-[#efe6dc] hover:border-stone-300 transition shadow-2xs active:scale-95" title="Edit your review">
                 Edit
               </button>
-              <button type="button" id="btn-delete-inline" class="text-xs font-semibold text-red-500 hover:text-red-700 px-2.5 py-1 rounded-lg hover:bg-red-50 transition" title="Delete review">
+              <button type="button" id="btn-delete-inline" class="text-xs font-semibold text-red-600 hover:text-red-700 px-2.5 py-1 rounded-lg bg-white border border-red-200 hover:bg-red-50 hover:border-red-300 transition shadow-2xs active:scale-95" title="Delete review">
                 Delete
               </button>
             </div>
@@ -254,7 +364,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
           : "";
 
         const commentHtml = r.comment
-          ? `<p class="text-sm text-stone-700 mt-2 whitespace-pre-line leading-relaxed">${escapeHtml(r.comment)}</p>`
+          ? `<p class="text-sm text-stone-700 mt-2 whitespace-pre-line leading-relaxed break-words">${escapeHtml(r.comment)}</p>`
           : `<p class="text-xs text-stone-400 mt-2 italic">No written comment</p>`;
 
         return `
@@ -262,15 +372,16 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
             <div class="flex items-start gap-3">
               <div class="${avatarClasses}">${initial}</div>
               <div class="flex-1 min-w-0">
-                <div class="flex items-start justify-between gap-3">
-                  <div>
-                    <div class="flex items-center gap-2 flex-wrap">
-                      <span class="font-semibold text-sm text-stone-900">${escapeHtml(name)}</span>
+                <div class="flex items-start justify-between gap-2">
+                  <div class="min-w-0">
+                    <div class="flex items-center gap-1.5 min-w-0 flex-wrap">
+                      <span class="font-semibold text-sm text-stone-900 truncate max-w-[130px] sm:max-w-none">${escapeHtml(name)}</span>
                       ${authorBadge}
                     </div>
-                    <div class="flex items-center gap-2 mt-0.5">
-                      <span class="flex items-center text-sm leading-none">${renderStarDisplay(r.stars)}</span>
-                      <span class="text-xs text-stone-400">${formattedDate}</span>
+                    <div class="flex items-center gap-2 mt-1">
+                      <span class="flex items-center text-sm leading-none shrink-0">${renderStarDisplay(r.stars)}</span>
+                      <span class="text-stone-300 text-xs select-none" aria-hidden="true">·</span>
+                      <span class="text-xs text-stone-400 whitespace-nowrap">${formattedDate}</span>
                     </div>
                   </div>
                   ${actionsHtml}
@@ -463,6 +574,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
           comment,
           displayName,
         });
+        clearRecipeRatingCache(recipeId);
 
         showToast(userRating ? "Review updated!" : "Thank you for your rating!");
         closeReviewModal();
@@ -540,6 +652,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
     try {
       await deleteRecipeRating(recipeId, currentUser.uid);
+      clearRecipeRatingCache(recipeId);
       userRating = null;
       await reloadData();
 

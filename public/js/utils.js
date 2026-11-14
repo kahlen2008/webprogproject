@@ -384,16 +384,31 @@ export function createRecipeCard(recipe, options = {}) {
       <h3 class="font-bold text-stone-900 group-hover:text-[#ca5c2e] text-base leading-snug line-clamp-1 transition">
         <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="text-stone-900 group-hover:text-[#ca5c2e] transition">${recipeName}</a>
       </h3>
-      <div class="flex items-center justify-between">
-        <span class="inline-block bg-[#f5ebe4] text-[#a04e28] text-xs font-semibold px-2.5 py-0.5 rounded-full">
-          ${recipeCategory}
-        </span>
+      <div class="flex items-center justify-between gap-2">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="inline-block bg-[#f5ebe4] text-[#a04e28] text-xs font-semibold px-2.5 py-0.5 rounded-full">
+            ${recipeCategory}
+          </span>
+          <span class="recipe-card-rating hidden items-center gap-1 text-xs font-semibold text-stone-700" data-recipe-id="${recipeId}">
+            <span class="text-amber-500 text-sm leading-none" aria-hidden="true">★</span>
+            <span class="rating-avg"></span>
+            <span class="rating-count text-stone-400 font-normal"></span>
+          </span>
+        </div>
         <div class="card-action-slot">
           ${actionHtml}
         </div>
       </div>
     </div>
   `;
+
+  if (recipe.id) {
+    import("./ratings.js")
+      .then(({ attachCardRating }) => {
+        attachCardRating(item, recipe.id);
+      })
+      .catch(() => {});
+  }
 
   // Attach quick favorite toggling if on home
   if (!isFavouritePage) {
