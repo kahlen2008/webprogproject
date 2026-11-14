@@ -105,42 +105,87 @@
     <div id="planner-cards" class="sm:hidden space-y-3"></div>
 
     <!-- Integrated Shopping List Section -->
-    <section class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 space-y-4">
-      <div class="flex items-center justify-between">
-  
-        <div>
-          <h2 class="text-lg font-bold text-stone-900 tracking-tight">Shopping List</h2>
-          <p class="text-xs text-stone-500">Auto-generated ingredients for this week's meals</p>
+    <section class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-5 sm:p-7 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-2xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/20 shrink-0 shadow-2xs">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+            </svg>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 flex-wrap">
+              <h2 class="text-base sm:text-lg font-bold text-stone-900 tracking-tight">Shopping List</h2>
+              <span id="shopping-progress-badge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200/60">
+                2 of 6 items checked
+              </span>
+            </div>
+            <p class="text-xs text-stone-500 mt-0.5">Auto-generated ingredients for this week's meals</p>
+          </div>
         </div>
-        <button id="clear-shopping-btn" type="button" class="text-xs font-semibold text-[#ca5c2e] hover:underline">
-          Select All
-        </button>
+
+        <!-- Controls -->
+        <div class="flex items-center gap-2 self-start sm:self-auto">
+          <button id="clear-shopping-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#efe6dc] bg-[#fcf9f5] hover:bg-white text-xs font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs focus:outline-none">
+            <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span id="select-all-label">Select All</span>
+          </button>
+        </div>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-        <label class="flex items-center gap-2.5 p-2 rounded-xl border border-stone-100 hover:bg-stone-50 cursor-pointer text-xs sm:text-sm text-stone-700 select-none">
-          <input type="checkbox" checked class="w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-[#ca5c2e]">
-          <span class="line-through text-stone-400">Spaghetti (200g)</span>
+      <!-- Slim Progress Bar -->
+      <div class="w-full bg-[#efe6dc]/60 rounded-full h-1.5 overflow-hidden">
+        <div id="shopping-progress-bar" class="bg-[#ca5c2e] h-full rounded-full transition-all duration-300" style="width: 33%"></div>
+      </div>
+
+      <!-- Items Grid -->
+      <div id="shopping-list-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
+        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input type="checkbox" checked class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400">Spaghetti</span>
+          </div>
+          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs">200g</span>
         </label>
-        <label class="flex items-center gap-2.5 p-2 rounded-xl border border-stone-100 hover:bg-stone-50 cursor-pointer text-xs sm:text-sm text-stone-700 select-none">
-          <input type="checkbox" checked class="w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-[#ca5c2e]">
-          <span class="line-through text-stone-400">Pancetta (100g)</span>
+
+        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input type="checkbox" checked class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400">Pancetta</span>
+          </div>
+          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs">100g</span>
         </label>
-        <label class="flex items-center gap-2.5 p-2 rounded-xl border border-stone-100 hover:bg-stone-50 cursor-pointer text-xs sm:text-sm text-stone-700 select-none">
-          <input type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-[#ca5c2e]">
-          <span>Eggs (6 large)</span>
+
+        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Eggs</span>
+          </div>
+          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">6 large</span>
         </label>
-        <label class="flex items-center gap-2.5 p-2 rounded-xl border border-stone-100 hover:bg-stone-50 cursor-pointer text-xs sm:text-sm text-stone-700 select-none">
-          <input type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-[#ca5c2e]">
-          <span>Parmesan Cheese (100g)</span>
+
+        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Parmesan Cheese</span>
+          </div>
+          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">100g</span>
         </label>
-        <label class="flex items-center gap-2.5 p-2 rounded-xl border border-stone-100 hover:bg-stone-50 cursor-pointer text-xs sm:text-sm text-stone-700 select-none">
-          <input type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-[#ca5c2e]">
-          <span>Greek Yogurt (500g)</span>
+
+        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Greek Yogurt</span>
+          </div>
+          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">500g</span>
         </label>
-        <label class="flex items-center gap-2.5 p-2 rounded-xl border border-stone-100 hover:bg-stone-50 cursor-pointer text-xs sm:text-sm text-stone-700 select-none">
-          <input type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-[#ca5c2e]">
-          <span>Avocados (2 ripe)</span>
+
+        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
+          <div class="flex items-center gap-2.5 min-w-0">
+            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Avocados</span>
+          </div>
+          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">2 ripe</span>
         </label>
       </div>
     </section>

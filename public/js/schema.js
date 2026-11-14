@@ -256,3 +256,10 @@ export async function fetchUserRating(recipeId, uid) {
   const snap = await getDoc(docRef);
   return snap.exists() ? { uid: snap.id, ...snap.data() } : null;
 }
+
+export async function deleteRecipeRating(recipeId, uid) {
+  if (!recipeId || !uid) throw new Error("recipeId and uid are required to delete rating");
+  const docRef = doc(db, SchemaPaths.rating(recipeId, uid));
+  await deleteDoc(docRef);
+  return true;
+}

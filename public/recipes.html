@@ -25,6 +25,57 @@
   <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet"></noscript>
 
   <link rel="stylesheet" href="css/tailwind.css">
+  <style>
+    .switch-input {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+      pointer-events: none;
+    }
+    .switch-track {
+      width: 32px;
+      height: 18px;
+      background-color: #e7e5e4;
+      border-radius: 9999px;
+      position: relative;
+      transition: background-color 0.2s ease, border-color 0.2s ease;
+      display: flex;
+      align-items: center;
+      border: 1px solid #d6d3d1;
+      flex-shrink: 0;
+    }
+    .switch-thumb {
+      width: 12px;
+      height: 12px;
+      background-color: #ffffff;
+      border-radius: 9999px;
+      position: absolute;
+      top: 2px;
+      left: 2px;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18);
+      transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .switch-input:checked + .switch-track {
+      background-color: #ca5c2e;
+      border-color: #b04d24;
+    }
+    .switch-input:checked + .switch-track .switch-thumb {
+      transform: translateX(14px);
+    }
+    .switch-input:focus-visible + .switch-track {
+      outline: 2px solid #ca5c2e;
+      outline-offset: 2px;
+    }
+    .allergen-pill {
+      height: 36px;
+      padding-left: 8px;
+      padding-right: 14px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+  </style>
 </head>
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
   <header id="navbar" class="w-full sticky top-0 z-40 min-h-[64px] bg-[#fcf9f5]/90 border-b border-[#ede4da]"></header>
@@ -51,7 +102,6 @@
           type="search" 
           placeholder="Search for a recipe, ingredient or cuisine..." 
           class="w-full pl-5 pr-4 py-2.5 bg-transparent border-none text-stone-800 placeholder-stone-400 text-sm sm:text-base focus:outline-none font-medium"
-          required
         >
         <button 
           type="submit" 
@@ -130,18 +180,32 @@
     <section id="recipes-section" class="space-y-5 scroll-mt-20">
       <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#ede4da]">
         <h2 id="recipes-section-title" class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight font-heading">Latest Recipes</h2>
-        <div class="flex items-center gap-4">
-          <label id="hide-flagged-wrap" class="hidden items-center gap-2 text-xs sm:text-sm font-medium text-stone-600 cursor-pointer select-none">
-            <input id="hide-flagged-toggle" type="checkbox" class="w-4 h-4 rounded text-[#ca5c2e] focus:ring-[#ca5c2e] border-stone-300">
-            <span>Hide allergen recipes</span>
-          </label>
-          <button id="view-more-btn" type="button" class="text-sm font-semibold text-[#ca5c2e] hover:text-[#b34d23] hover:underline flex items-center gap-1 cursor-pointer">
-            View more <span>&rarr;</span>
+        <div class="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+          <div id="hide-flagged-wrap" class="hidden items-center">
+            <label class="allergen-pill group rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e]/40 shadow-2xs transition-all duration-200 cursor-pointer select-none">
+              <span class="w-6 h-6 rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center shrink-0">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
+                </svg>
+              </span>
+              <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-stone-900 transition-colors leading-none">Hide allergen recipes</span>
+              <span class="relative inline-flex items-center shrink-0 ml-1.5 sm:ml-2">
+                <input id="hide-flagged-toggle" type="checkbox" class="switch-input">
+                <span class="switch-track" aria-hidden="true">
+                  <span class="switch-thumb"></span>
+                </span>
+              </span>
+            </label>
+          </div>
+
+          <button id="view-more-btn" type="button" class="group inline-flex items-center gap-1.5 h-9 px-3.5 text-xs sm:text-sm font-semibold text-[#ca5c2e] hover:text-white bg-white hover:bg-[#ca5c2e] border border-[#ca5c2e]/30 hover:border-[#ca5c2e] rounded-full transition-all duration-200 shadow-2xs cursor-pointer active:scale-95 leading-none">
+            <span>View more</span>
+            <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">&rarr;</span>
           </button>
         </div>
       </div>
 
-      <p id="results-message" class="hidden text-sm font-medium text-stone-500" aria-live="polite"></p>
+      <div id="results-message" class="hidden text-sm font-medium text-stone-500" aria-live="polite"></div>
       
       <!-- Recipe Cards Grid -->
       <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0 min-h-[680px] content-start"></ul>

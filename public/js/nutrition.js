@@ -148,11 +148,53 @@ const UNIT_GRAMS = {
   can: 400, tin: 400,
 };
 
-// TheMealDB does not say how many people a recipe serves, so we guess from the
-// total calories: about 600 kcal per portion, kept between 1 and 8 servings.
+// TheMealDB does not have a dedicated servings field, so we first check if the author
+// stated servings in the instructions (e.g. "Makes about four servings", "Serves 4"),
+// and if not, we estimate from the total calories: about 600 kcal per portion, between 1 and 8 servings.
 const KCAL_PER_PORTION = 600;
 const MIN_SERVINGS = 1;
 const MAX_SERVINGS = 8;
+
+const NUMBER_WORDS = {
+  one: 1, two: 2, three: 3, four: 4, five: 5,
+  six: 6, seven: 7, eight: 8, nine: 9, ten: 10, twelve: 12,
+};
+
+export function extractStatedServings(text) {
+  if (!text || typeof text !== "string") return null;
+  const wordOrNum = "(?:[0-9]+|one|two|three|four|five|six|seven|eight|nine|ten|twelve)";
+  const pattern1 = new RegExp(
+    `(?:makes|serves|servings?|yields?)\\s*(?::)?\\s*(?:about|approx\\.?|approximately)?\\s*(${wordOrNum})(?:\\s*(?:-|to)\\s*(${wordOrNum}))?\\s*(?:servings?|portions?|people|plates|bowls)?`,
+    "i"
+  );
+  const match1 = text.match(pattern1);
+  if (match1) {
+    const parseNum = (s) => {
+      if (!s) return null;
+      const n = parseInt(s, 10);
+      if (!isNaN(n) && n > 0) return n;
+      return NUMBER_WORDS[s.toLowerCase().trim()] || null;
+    };
+    const min = parseNum(match1[1]);
+    const max = parseNum(match1[2]);
+    if (min && max) return Math.min(MAX_SERVINGS, Math.max(MIN_SERVINGS, Math.round((min + max) / 2)));
+    if (min) return Math.min(MAX_SERVINGS, Math.max(MIN_SERVINGS, min));
+  }
+
+  const pattern2 = new RegExp(`for\\s+(${wordOrNum})\\s+(?:servings?|people|portions?)`, "i");
+  const match2 = text.match(pattern2);
+  if (match2) {
+    const parseNum = (s) => {
+      if (!s) return null;
+      const n = parseInt(s, 10);
+      if (!isNaN(n) && n > 0) return n;
+      return NUMBER_WORDS[s.toLowerCase().trim()] || null;
+    };
+    const val = parseNum(match2[1]);
+    if (val) return Math.min(MAX_SERVINGS, Math.max(MIN_SERVINGS, val));
+  }
+  return null;
+}
 
 export function estimateServings(totalKcal) {
   const guess = Math.round(totalKcal / KCAL_PER_PORTION);
@@ -221,7 +263,7 @@ function toGrams(measure, food) {
 // Returns { total, perServing, servings, counted, skipped }.
 // total and perServing are { kcal, protein, carbs, fat } rounded for display.
 // Leave servings out to have it guessed from the total calories.
-export function estimateNutrition(ingredients = [], servings) {
+export function estimateNutrition(ingredients = [], servings, instructions = "") {
   const sum = { kcal: 0, protein: 0, carbs: 0, fat: 0 };
   const skipped = [];
   let counted = 0;
@@ -252,7 +294,10 @@ export function estimateNutrition(ingredients = [], servings) {
     fat: Math.round(obj.fat / div),
   });
 
-  if (!servings) servings = estimateServings(sum.kcal);
+  if (!servings) {
+    if (instructions) servings = extractStatedServings(instructions);
+    if (!servings) servings = estimateServings(sum.kcal);
+  }
 
   return {
     total: round(sum),

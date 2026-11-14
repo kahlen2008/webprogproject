@@ -866,6 +866,67 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Shopping list interactive preview handlers
+  const shoppingGrid = document.getElementById("shopping-list-grid");
+  const selectAllBtn = document.getElementById("clear-shopping-btn");
+  const selectAllLabel = document.getElementById("select-all-label");
+  const progressBadge = document.getElementById("shopping-progress-badge");
+  const progressBar = document.getElementById("shopping-progress-bar");
+
+  function updateShoppingProgress() {
+    if (!shoppingGrid) return;
+    const cards = shoppingGrid.querySelectorAll(".shopping-item-card");
+    const total = cards.length;
+    let checkedCount = 0;
+
+    cards.forEach((card) => {
+      const checkbox = card.querySelector(".shopping-item-check");
+      const name = card.querySelector(".shopping-item-name");
+      const measure = card.querySelector(".shopping-item-measure");
+
+      if (checkbox && checkbox.checked) {
+        checkedCount++;
+        card.className = "shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs";
+        if (name) name.className = "shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400";
+        if (measure) measure.className = "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs";
+      } else if (checkbox) {
+        card.className = "shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs";
+        if (name) name.className = "shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800";
+        if (measure) measure.className = "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs";
+      }
+    });
+
+    if (progressBadge) {
+      progressBadge.textContent = `${checkedCount} of ${total} items checked`;
+    }
+    if (progressBar && total > 0) {
+      const pct = Math.round((checkedCount / total) * 100);
+      progressBar.style.width = `${pct}%`;
+    }
+    if (selectAllLabel) {
+      selectAllLabel.textContent = checkedCount === total ? "Deselect All" : "Select All";
+    }
+  }
+
+  if (shoppingGrid) {
+    shoppingGrid.addEventListener("change", (e) => {
+      if (e.target.matches(".shopping-item-check")) {
+        updateShoppingProgress();
+      }
+    });
+  }
+
+  if (selectAllBtn && shoppingGrid) {
+    selectAllBtn.addEventListener("click", () => {
+      const checkboxes = shoppingGrid.querySelectorAll(".shopping-item-check");
+      const allChecked = Array.from(checkboxes).every((cb) => cb.checked);
+      checkboxes.forEach((cb) => {
+        cb.checked = !allChecked;
+      });
+      updateShoppingProgress();
+    });
+  }
+
   window.addEventListener("auth-changed", () => {
     renderPlannerTable();
   });
