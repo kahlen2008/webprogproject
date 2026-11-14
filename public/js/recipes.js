@@ -4,7 +4,7 @@
 import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
 import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, playHeartEffect } from "./utils.js";
 import {
   getPreferences,
   savePreferences,
@@ -1330,6 +1330,7 @@ async function showRecipe(id) {
 
       const nextState = !isFaved;
       updateFavDisplay(nextState);
+      playHeartEffect(favBtn, nextState);
 
       if (nextState) {
         showToast(`Saved "${recipe.name}" to favourites!`);
@@ -1341,6 +1342,7 @@ async function showRecipe(id) {
             label: "Undo",
             onClick: () => {
               updateFavDisplay(true);
+              playHeartEffect(favBtn, true);
               import("./favourites.js").then(({ addFavourite }) => addFavourite(recipe)).catch(console.warn);
               showToast(`Restored "${recipe.name}" to favourites!`);
             },

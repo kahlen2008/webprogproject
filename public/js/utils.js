@@ -338,6 +338,105 @@ export function toTitleCase(str) {
 
 // The shared recipe card used on the home page and the favourites page.
 // Matches the RecipePlan mockup card layout.
+/**
+ * Cute heartbeat & floating mini-hearts burst animation when clicking a favourite heart button.
+ */
+export function playHeartEffect(btnEl, isSaved = true) {
+  if (!btnEl || typeof btnEl.animate !== "function") return;
+  const icon = btnEl.querySelector("svg") || btnEl;
+
+  if (!isSaved) {
+    icon.animate(
+      [
+        { transform: "translateY(-0.5px) scale(1) rotate(0deg)" },
+        { transform: "translateY(-0.5px) scale(0.72) rotate(-10deg)" },
+        { transform: "translateY(-0.5px) scale(1.06) rotate(4deg)" },
+        { transform: "translateY(-0.5px) scale(1) rotate(0deg)" }
+      ],
+      { duration: 320, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+    );
+    return;
+  }
+
+  // Elastic double-heartbeat pop on the heart icon
+  icon.animate(
+    [
+      { transform: "translateY(-0.5px) scale(1) rotate(0deg)", offset: 0 },
+      { transform: "translateY(-0.5px) scale(1.48) rotate(-12deg)", offset: 0.25 },
+      { transform: "translateY(-0.5px) scale(0.92) rotate(8deg)", offset: 0.5 },
+      { transform: "translateY(-0.5px) scale(1.26) rotate(-5deg)", offset: 0.75 },
+      { transform: "translateY(-0.5px) scale(1) rotate(0deg)", offset: 1 }
+    ],
+    { duration: 850, easing: "cubic-bezier(0.34, 1.56, 0.64, 1)" }
+  );
+
+  const rect = icon.getBoundingClientRect();
+  const cx = rect.left + rect.width / 2;
+  const cy = rect.top + rect.height / 2;
+
+  // Soft expanding pulse ring
+  const ring = document.createElement("span");
+  ring.className = "pointer-events-none fixed rounded-full";
+  ring.style.zIndex = "9999";
+  ring.style.width = "24px";
+  ring.style.height = "24px";
+  ring.style.left = `${cx - 12}px`;
+  ring.style.top = `${cy - 12}px`;
+  ring.style.border = "2px solid #ca5c2e";
+  document.body.appendChild(ring);
+
+  ring.animate(
+    [
+      { transform: "scale(0.4)", opacity: 0.8 },
+      { transform: "scale(2.2)", opacity: 0 }
+    ],
+    { duration: 750, easing: "cubic-bezier(0.16, 1, 0.3, 1)", fill: "forwards" }
+  ).onfinish = () => ring.remove();
+
+  // Floating mini hearts & sparkles burst
+  const colors = ["#ca5c2e", "#e11d48", "#f43f5e", "#fb7185", "#f59e0b"];
+  const count = 8;
+  for (let i = 0; i < count; i++) {
+    const particle = document.createElement("span");
+    particle.className = "pointer-events-none fixed select-none flex items-center justify-center";
+    particle.style.zIndex = "9999";
+    particle.style.left = `${cx}px`;
+    particle.style.top = `${cy}px`;
+    particle.style.opacity = "0";
+
+    const color = colors[i % colors.length];
+    if (i % 3 === 2) {
+      particle.textContent = "✨";
+      particle.style.fontSize = "12px";
+    } else {
+      particle.innerHTML = `<svg width="12" height="12" viewBox="0 0 24 24" fill="${color}"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>`;
+    }
+
+    const angle = (Math.PI * 2 * i) / count - Math.PI / 2 + (Math.random() - 0.5) * 0.45;
+    const dist = 24 + Math.random() * 20;
+    const tx = Math.cos(angle) * dist;
+    const ty = Math.sin(angle) * dist - 14;
+    const rot = (Math.random() - 0.5) * 55;
+
+    document.body.appendChild(particle);
+
+    particle.animate(
+      [
+        { transform: "translate(-50%, -50%) scale(0.3) rotate(0deg)", opacity: 1, offset: 0 },
+        { transform: `translate(calc(-50% + ${tx * 0.65}px), calc(-50% + ${ty * 0.65}px)) scale(1.2) rotate(${rot * 0.5}deg)`, opacity: 1, offset: 0.45 },
+        { transform: `translate(calc(-50% + ${tx * 0.9}px), calc(-50% + ${ty * 0.9 - 6}px)) scale(1.0) rotate(${rot * 0.85}deg)`, opacity: 0.85, offset: 0.75 },
+        { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty - 14}px)) scale(0.5) rotate(${rot}deg)`, opacity: 0, offset: 1 }
+      ],
+      {
+        duration: 1000 + Math.random() * 350,
+        delay: i * 35,
+        easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+        fill: "forwards"
+      }
+    ).onfinish = () => particle.remove();
+  }
+}
+
 export function createRecipeCard(recipe, options = {}) {
   const item = document.createElement("li");
   item.className = "recipe-card bg-white rounded-2xl border border-[#efe6dc] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group flex flex-col";
@@ -356,15 +455,15 @@ export function createRecipeCard(recipe, options = {}) {
   const isFavouritePage = options.isFavouritePage || false;
   
   const heartButtonHtml = `
-    <button type="button" class="favourite-btn p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-[#ca5c2e] transition" data-id="${recipeId}" title="Save to favourites" aria-label="Save to favourites">
-      <svg class="w-5 h-5 heart-icon" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+    <button type="button" class="favourite-btn inline-flex items-center justify-center p-1.5 rounded-full hover:bg-stone-100 text-stone-400 hover:text-[#ca5c2e] transition" data-id="${recipeId}" title="Save to favourites" aria-label="Save to favourites">
+      <svg class="w-5 h-5 heart-icon" style="transform:translateY(-0.5px)" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path>
       </svg>
     </button>
   `;
 
   const deleteButtonHtml = `
-    <button type="button" class="remove-favourite-btn p-1.5 rounded-full hover:bg-red-50 text-stone-400 hover:text-red-600 transition" data-id="${recipeId}" title="Remove from favourites" aria-label="Remove from favourites">
+    <button type="button" class="remove-favourite-btn inline-flex items-center justify-center p-1.5 rounded-full hover:bg-red-50 text-stone-400 hover:text-red-600 transition" data-id="${recipeId}" title="Remove from favourites" aria-label="Remove from favourites">
       <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
         <path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
       </svg>
@@ -380,22 +479,20 @@ export function createRecipeCard(recipe, options = {}) {
       </a>
       <div class="card-heart-slot absolute top-3 right-3" data-recipe-id="${recipeId}"></div>
     </div>
-    <div class="p-3.5 sm:p-4 flex flex-col gap-2.5">
+    <div class="p-3.5 sm:p-4 flex flex-col gap-2">
       <h3 class="font-bold text-stone-900 group-hover:text-[#ca5c2e] text-base leading-snug line-clamp-1 transition">
         <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="text-stone-900 group-hover:text-[#ca5c2e] transition">${recipeName}</a>
       </h3>
       <div class="flex items-center justify-between gap-2">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="inline-block bg-[#f5ebe4] text-[#a04e28] text-xs font-semibold px-2.5 py-0.5 rounded-full">
-            ${recipeCategory}
-          </span>
-          <span class="recipe-card-rating hidden items-center gap-1 text-xs font-semibold text-stone-700" data-recipe-id="${recipeId}">
-            <span class="text-amber-500 text-sm leading-none" aria-hidden="true">★</span>
-            <span class="rating-avg"></span>
+        <div class="flex items-center gap-2.5 flex-wrap">
+          <span class="inline-flex items-center justify-center bg-[#f5ebe4] text-[#a04e28] font-bold rounded-full" style="font-size:13px;line-height:18px;padding:4px 12px">${recipeCategory}</span>
+          <span class="recipe-card-rating hidden items-center gap-1 text-stone-700" data-recipe-id="${recipeId}" style="font-size:13px;line-height:18px">
+            <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
+            <span class="rating-avg font-bold"></span>
             <span class="rating-count text-stone-400 font-normal"></span>
           </span>
         </div>
-        <div class="card-action-slot">
+        <div class="card-action-slot flex items-center">
           ${actionHtml}
         </div>
       </div>
@@ -442,6 +539,7 @@ export function createRecipeCard(recipe, options = {}) {
           icon.setAttribute("fill", "none");
           icon.classList.remove("text-[#ca5c2e]", "text-red-500");
           favBtn.classList.remove("text-[#ca5c2e]", "text-red-500");
+          playHeartEffect(favBtn, false);
           showToast(`Removed "${recipe.name}" from favourites`, {
             duration: 5000,
             action: {
@@ -467,6 +565,7 @@ export function createRecipeCard(recipe, options = {}) {
                 icon.setAttribute("fill", "#ca5c2e");
                 icon.classList.add("text-[#ca5c2e]");
                 favBtn.classList.add("text-[#ca5c2e]");
+                playHeartEffect(favBtn, true);
 
                 if (user && user.uid) {
                   Promise.all([
@@ -508,6 +607,7 @@ export function createRecipeCard(recipe, options = {}) {
           icon.setAttribute("fill", "#ca5c2e");
           icon.classList.add("text-[#ca5c2e]");
           favBtn.classList.add("text-[#ca5c2e]");
+          playHeartEffect(favBtn, true);
           showToast(`Saved "${recipe.name}" to favourites!`);
           if (user && user.uid) {
             Promise.all([

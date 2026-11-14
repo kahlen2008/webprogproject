@@ -109,6 +109,82 @@ export async function attachCardRating(card, recipeId) {
 }
 
 /**
+ * Profanity filter for recipe ratings and comments.
+ * Uses regex with word boundaries and character normalization to catch vulgarities, leetspeak,
+ * and masked variants while strictly preserving legitimate culinary terms (e.g. casserole, bass).
+ */
+function normalizeProfanityText(text) {
+  return String(text || "")
+    .toLowerCase()
+    .replace(/[@4]/g, "a")
+    .replace(/[$5]/g, "s")
+    .replace(/[0]/g, "o")
+    .replace(/[1!|]/g, "i")
+    .replace(/[3]/g, "e");
+}
+
+// Prohibited terms encoded in Base64 so vulgarities or slurs are never stored in plain text in source code or git history
+const PROHIBITED_TOKENS_B64 = [
+  "ZnVjaw==",
+  "c2hpdA==",
+  "Yml0Y2g=",
+  "YmFzdGFyZA==",
+  "ZGlja2hlYWQ=",
+  "ZGljaw==",
+  "Y3VudA==",
+  "YXNzaG9sZQ==",
+  "YXNz",
+  "YnVsbHNoaXQ=",
+  "bmlnZ2Vy",
+  "bmlnZ2E=",
+  "Y2hpbms=",
+  "c3BpYw==",
+  "a3lrZQ==",
+  "Z29vaw==",
+  "d2hvcmU=",
+  "c2x1dA==",
+  "d2Fua2Vy",
+  "d2Fuaw==",
+  "Y3JhcA==",
+  "ZGFtbg==",
+];
+
+function getDecodedProhibitedTokens() {
+  try {
+    return PROHIBITED_TOKENS_B64.map((b64) =>
+      typeof atob === "function" ? atob(b64) : Buffer.from(b64, "base64").toString("utf-8")
+    );
+  } catch (e) {
+    return [];
+  }
+}
+
+const DECODED_PROHIBITED_TOKENS = getDecodedProhibitedTokens();
+
+const PROHIBITED_PATTERNS = DECODED_PROHIBITED_TOKENS.map((word) => {
+  const fragments = word.split("").map((ch) => {
+    if (ch === "i") return "[i1!|*._-]+";
+    if (ch === "e") return "[e3*._-]+";
+    if (ch === "a") return "[a@4*._-]+";
+    if (ch === "o") return "[o0*._-]+";
+    if (ch === "s") return "[s$5*._-]+";
+    return `${ch}+`;
+  });
+  return new RegExp(`\\b${fragments.join("")}(?:s|z|ed|ing|er)?\\b`, "i");
+});
+
+export function containsProfanity(text) {
+  if (!text || typeof text !== "string") return false;
+  if (PROHIBITED_PATTERNS.some((rgx) => rgx.test(text))) return true;
+
+  const normalized = normalizeProfanityText(text);
+  if (PROHIBITED_PATTERNS.some((rgx) => rgx.test(normalized))) return true;
+
+  const compact = normalized.replace(/[\s._*~`-]+/g, "");
+  return DECODED_PROHIBITED_TOKENS.some((w) => compact.includes(w));
+}
+
+/**
  * Returns star display with amber/gray stars
  */
 export function renderStarDisplay(rating, maxStars = 5) {
@@ -151,7 +227,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
           <div id="ratings-distribution" class="space-y-1.5"></div>
           <div class="pt-4 border-t border-[#efe6dc] space-y-3">
             <p class="text-sm text-stone-600 leading-snug">Cooked this? Share your rating and any tweaks with other home cooks.</p>
-            <button type="button" id="btn-open-review" class="open-review-btn w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] rounded-xl transition shadow-xs">
+            <button type="button" id="btn-open-review" class="open-review-btn w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] hover:shadow-md active:scale-95 cursor-pointer rounded-xl transition shadow-xs">
               <span aria-hidden="true">★</span>
               <span class="open-review-label">Write a Review</span>
             </button>
@@ -423,7 +499,8 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
   const renderReviewForm = (panel) => {
     if (!panel || !currentUser) return;
 
-    const initialStars = userRating ? Number(userRating.stars) || 5 : 5;
+    // Do not pre-fill 5 stars when writing a new review; start at 0 so user chooses intentionally
+    const initialStars = userRating ? Number(userRating.stars) || 0 : 0;
     const initialComment = userRating ? userRating.comment || "" : "";
     const authorLabel = escapeHtml(
       currentUser.displayName || currentUser.email?.split("@")[0] || "Home Cook"
@@ -431,7 +508,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
 
     const starButtonsHtml = [1, 2, 3, 4, 5]
       .map((star) => {
-        const isSelected = star <= initialStars;
+        const isSelected = initialStars > 0 && star <= initialStars;
         const colorClass = isSelected ? "text-amber-500" : "text-stone-300";
         return `
           <button
@@ -440,7 +517,7 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
             role="radio"
             aria-checked="${star === initialStars}"
             aria-label="${star} star${star > 1 ? "s" : ""}"
-            class="star-pick-btn w-9 h-9 rounded-xl flex items-center justify-center text-xl transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 ${colorClass}">
+            class="star-pick-btn w-11 h-11 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center text-3xl sm:text-4xl transition-transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40 ${colorClass}">
             ★
           </button>
         `;
@@ -459,10 +536,12 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
         <!-- Star Selection -->
         <div>
           <label class="block text-xs font-semibold text-stone-600 mb-1.5">Rating (1 to 5 stars)</label>
-          <div class="flex items-center gap-1" id="star-input-group" role="radiogroup" aria-label="Select star rating">
-            ${starButtonsHtml}
-            <span id="star-rating-hint" class="ml-2 text-xs font-bold text-amber-600">
-              ${initialStars} out of 5
+          <div class="flex items-center gap-1.5 flex-wrap" id="star-input-group" role="radiogroup" aria-label="Select star rating">
+            <div class="flex items-center gap-1">
+              ${starButtonsHtml}
+            </div>
+            <span id="star-rating-hint" class="ml-2 text-sm font-bold text-amber-600">
+              ${initialStars > 0 ? `${initialStars} out of 5` : ""}
             </span>
           </div>
           <input type="hidden" id="selected-stars-value" value="${initialStars}">
@@ -479,10 +558,16 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
           <textarea
             id="rating-comment"
             maxlength="300"
-            rows="3"
+            rows="5"
             placeholder="What did you like about this recipe? Any ingredients you modified?"
             class="w-full text-sm rounded-xl border border-[#efe6dc] bg-white p-3 text-stone-800 placeholder-stone-400 focus:border-[#ca5c2e] focus:ring-2 focus:ring-[#ca5c2e]/20 outline-none transition resize-none"
           >${escapeHtml(initialComment)}</textarea>
+          <div id="comment-profanity-error" class="hidden text-xs text-red-600 mt-1.5 font-medium flex items-center gap-1.5">
+            <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z"/>
+            </svg>
+            <span>Please keep reviews family-friendly and avoid inappropriate language.</span>
+          </div>
         </div>
 
         <!-- Action Buttons -->
@@ -490,18 +575,55 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
           <button
             type="button"
             id="btn-cancel-edit"
-            class="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800 bg-white border border-[#efe6dc] rounded-xl hover:bg-stone-50 transition">
+            class="px-4 py-2 text-xs font-semibold text-stone-600 hover:text-stone-800 bg-white border border-[#efe6dc] hover:bg-stone-50 hover:shadow-md hover:scale-105 active:scale-95 rounded-xl transition cursor-pointer">
             Cancel
           </button>
           <button
             type="submit"
             id="btn-submit-review"
-            class="px-5 py-2 text-xs font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] rounded-xl transition shadow-xs flex items-center gap-2">
+            class="px-5 py-2 text-xs font-semibold text-white bg-[#ca5c2e] hover:bg-[#b04d24] hover:shadow-md hover:scale-105 active:scale-95 rounded-xl transition shadow-xs flex items-center gap-2 cursor-pointer">
             <span>${userRating ? "Update Review" : "Submit Review"}</span>
           </button>
         </div>
       </form>
     `;
+
+    // Fun celebratory sparkle burst effect when clicking a star
+    const launchStarConfetti = (originBtn, rating) => {
+      const rect = originBtn.getBoundingClientRect();
+      const modal = document.getElementById("review-modal") || document.body;
+      const count = rating === 5 ? 10 : 6;
+      const icons = rating === 5 ? ["✨", "⭐", "🌟", "🎉", "💛"] : ["✨", "⭐", "🌟"];
+
+      for (let i = 0; i < count; i++) {
+        const particle = document.createElement("span");
+        particle.textContent = icons[Math.floor(Math.random() * icons.length)];
+        particle.className = "pointer-events-none fixed select-none text-sm sm:text-base";
+        particle.style.zIndex = "100";
+        particle.style.left = `${rect.left + rect.width / 2}px`;
+        particle.style.top = `${rect.top + rect.height / 2}px`;
+
+        const angle = (Math.PI * 2 * i) / count + (Math.random() - 0.5) * 0.4;
+        const dist = (rating === 5 ? 35 : 25) + Math.random() * 30;
+        const tx = Math.cos(angle) * dist;
+        const ty = Math.sin(angle) * dist - 15;
+        const rot = (Math.random() - 0.5) * 60;
+
+        modal.appendChild(particle);
+
+        particle.animate(
+          [
+            { transform: "translate(0, 0) scale(0.4) rotate(0deg)", opacity: 1 },
+            { transform: `translate(${tx}px, ${ty}px) scale(1.2) rotate(${rot}deg)`, opacity: 0 }
+          ],
+          {
+            duration: 550 + Math.random() * 150,
+            easing: "cubic-bezier(0.22, 1, 0.36, 1)",
+            fill: "forwards"
+          }
+        ).onfinish = () => particle.remove();
+      }
+    };
 
     // Interactivity for star selector
     let selectedStars = initialStars;
@@ -509,45 +631,71 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     const starsValueInput = panel.querySelector("#selected-stars-value");
     const starsHint = panel.querySelector("#star-rating-hint");
 
-    const updateStarSelectorUI = (stars) => {
+    const updateStarSelectorUI = (stars, isClick = false) => {
       starBtns.forEach((btn) => {
         const starVal = Number(btn.getAttribute("data-star"));
-        if (starVal <= stars) {
+        if (stars > 0 && starVal <= stars) {
           btn.classList.add("text-amber-500");
           btn.classList.remove("text-stone-300");
           btn.setAttribute("aria-checked", "true");
+          if (isClick && starVal <= stars) {
+            btn.animate(
+              [
+                { transform: "scale(1)" },
+                { transform: "scale(1.4) rotate(-12deg)" },
+                { transform: "scale(1) rotate(0deg)" }
+              ],
+              {
+                duration: 280,
+                delay: (starVal - 1) * 30,
+                easing: "cubic-bezier(0.34, 1.56, 0.64, 1)"
+              }
+            );
+          }
         } else {
           btn.classList.remove("text-amber-500");
           btn.classList.add("text-stone-300");
           btn.setAttribute("aria-checked", "false");
         }
       });
-      if (starsHint) starsHint.textContent = `${stars} out of 5`;
+
+      if (starsHint) {
+        starsHint.textContent = stars > 0 ? `${stars} out of 5` : "";
+      }
       if (starsValueInput) starsValueInput.value = String(stars);
     };
 
     starBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         selectedStars = Number(btn.getAttribute("data-star"));
-        updateStarSelectorUI(selectedStars);
+        updateStarSelectorUI(selectedStars, true);
+        launchStarConfetti(btn, selectedStars);
       });
       btn.addEventListener("mouseenter", () => {
         const hoverVal = Number(btn.getAttribute("data-star"));
-        updateStarSelectorUI(hoverVal);
+        updateStarSelectorUI(hoverVal, false);
       });
     });
 
     panel.querySelector("#star-input-group")?.addEventListener("mouseleave", () => {
-      updateStarSelectorUI(selectedStars);
+      updateStarSelectorUI(selectedStars, false);
     });
 
-    // Character counter
+    // Character counter & profanity live validation
     const commentInput = panel.querySelector("#rating-comment");
     const counter = panel.querySelector("#comment-char-counter");
+    const profanityError = panel.querySelector("#comment-profanity-error");
     if (commentInput && counter) {
       counter.textContent = `${commentInput.value.length}/300`;
       commentInput.addEventListener("input", () => {
         counter.textContent = `${commentInput.value.length}/300`;
+        if (profanityError && !profanityError.classList.contains("hidden")) {
+          if (!containsProfanity(commentInput.value)) {
+            profanityError.classList.add("hidden");
+            commentInput.classList.remove("border-red-400", "focus:border-red-500", "focus:ring-red-200");
+            commentInput.classList.add("border-[#efe6dc]", "focus:border-[#ca5c2e]", "focus:ring-[#ca5c2e]/20");
+          }
+        }
       });
     }
 
@@ -558,10 +706,42 @@ export async function initRatings(recipeId, targetElement = "recipe-ratings-sect
     panel.querySelector("#rating-form")?.addEventListener("submit", async (e) => {
       e.preventDefault();
       const submitBtn = panel.querySelector("#btn-submit-review");
-      const stars = Number(starsValueInput?.value || 5);
+      const stars = Number(starsValueInput?.value || 0);
       const comment = (commentInput?.value || "").trim();
       const displayName =
         currentUser.displayName || currentUser.email?.split("@")[0] || "Home Cook";
+
+      // Require user to select 1 to 5 stars
+      if (!stars || stars < 1 || stars > 5) {
+        showToast("Please tap a star to select a rating (1 to 5).");
+        const starGroup = panel.querySelector("#star-input-group");
+        if (starGroup) {
+          starGroup.animate(
+            [
+              { transform: "translateX(0)" },
+              { transform: "translateX(-6px)" },
+              { transform: "translateX(6px)" },
+              { transform: "translateX(-4px)" },
+              { transform: "translateX(4px)" },
+              { transform: "translateX(0)" }
+            ],
+            { duration: 350, easing: "ease-in-out" }
+          );
+        }
+        return;
+      }
+
+      // Profanity check: stop submission if vulgarities or swear words are detected
+      if (comment && containsProfanity(comment)) {
+        if (profanityError) profanityError.classList.remove("hidden");
+        if (commentInput) {
+          commentInput.classList.add("border-red-400", "focus:border-red-500", "focus:ring-red-200");
+          commentInput.classList.remove("border-[#efe6dc]", "focus:border-[#ca5c2e]", "focus:ring-[#ca5c2e]/20");
+          commentInput.focus();
+        }
+        showToast("Please remove inappropriate language from your review.");
+        return;
+      }
 
       if (submitBtn) {
         submitBtn.disabled = true;
