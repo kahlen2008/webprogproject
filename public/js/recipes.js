@@ -180,6 +180,13 @@ const DEFAULT_FALLBACK_RECIPES = Object.values(FALLBACK_RECIPES_BY_ID);
 
 function syncHideToggle() {
   const prefs = getPreferences();
+  // Logged-out visitors see every recipe unfiltered, with a note that logging in personalises them.
+  const note = document.getElementById("personalise-note");
+  if (note) {
+    const loggedOut = !getCurrentUser();
+    note.classList.toggle("hidden", !loggedOut);
+    note.classList.toggle("inline-flex", loggedOut);
+  }
   if (hideToggleWrap) {
     if (prefs.allergies && prefs.allergies.length > 0) {
       hideToggleWrap.classList.remove("hidden");

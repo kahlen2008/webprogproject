@@ -181,6 +181,11 @@
       <div class="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-[#ede4da]">
         <h2 id="recipes-section-title" class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight font-heading">Latest Recipes</h2>
         <div class="flex items-center gap-2.5 sm:gap-3 flex-wrap">
+          <!-- Shown to logged-out visitors: preferences only apply after logging in -->
+          <a id="personalise-note" href="login.html?redirect=recipes.html" class="hidden items-center gap-1.5 h-9 px-3.5 rounded-full bg-[#fbf2ec] text-xs sm:text-sm font-semibold text-[#a04e28] hover:bg-[#f7e4d8] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+            Log in to personalise recipes
+          </a>
           <div id="hide-flagged-wrap" class="hidden items-center">
             <label class="allergen-pill group rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e]/40 shadow-2xs transition-all duration-200 cursor-pointer select-none">
               <span class="w-6 h-6 rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center shrink-0">
