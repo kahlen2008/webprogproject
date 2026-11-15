@@ -537,124 +537,10 @@ export function createRecipeCard(recipe, options = {}) {
   if (!isFavouritePage) {
     const favBtn = item.querySelector(".favourite-btn");
     if (favBtn) {
-      favBtn.addEventListener("click", async (e) => {
+      favBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-
-        const user = getCurrentUser();
-        if (!user) {
-          showAuthPromptModal({
-            title: "Log in to save favourites",
-            description: "Your saved recipes will be waiting for you on any device.",
-            redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
-            icon: "heart"
-          });
-          return;
-        }
-
-        let storedFavs = [];
-        try {
-          storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-        } catch (err) {}
-
-        const exists = storedFavs.some((f) => String(f.id) === String(recipe.id));
-        const icon = favBtn.querySelector(".heart-icon");
-
-        if (exists) {
-          storedFavs = storedFavs.filter((f) => String(f.id) !== String(recipe.id));
-          icon.setAttribute("fill", "none");
-          icon.classList.remove("text-[#ca5c2e]", "text-red-500");
-          favBtn.classList.remove("text-[#ca5c2e]", "text-red-500");
-          playHeartEffect(favBtn, false);
-          showToast(`Removed "${recipe.name}" from favourites`, {
-            duration: 5000,
-            action: {
-              label: "Undo",
-              onClick: () => {
-                let currentFavs = [];
-                try {
-                  currentFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-                } catch (err) {}
-                const favItem = {
-                  id: String(recipe.id),
-                  name: recipe.name || "",
-                  image: recipe.image || "",
-                  category: recipe.category || "Main",
-                  area: recipe.area || "",
-                  savedAt: new Date().toISOString(),
-                };
-                currentFavs = currentFavs.filter((f) => String(f.id) !== String(recipe.id));
-                currentFavs.unshift(favItem);
-                localStorage.setItem("recipeplan_favourites", JSON.stringify(currentFavs));
-                window.dispatchEvent(new CustomEvent("favourites-changed"));
-
-                icon.setAttribute("fill", "#ca5c2e");
-                icon.classList.add("text-[#ca5c2e]");
-                favBtn.classList.add("text-[#ca5c2e]");
-                playHeartEffect(favBtn, true);
-
-                if (user && user.uid) {
-                  Promise.all([
-                    import("./firebase-config.js"),
-                    import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-                  ])
-                    .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
-                      setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
-                        ...favItem,
-                        savedAt: serverTimestamp(),
-                      })
-                    )
-                    .catch(console.warn);
-                }
-                showToast(`Restored "${recipe.name}" to favourites!`);
-              },
-            },
-          });
-          if (user && user.uid) {
-            Promise.all([
-              import("./firebase-config.js"),
-              import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-            ])
-              .then(([{ db }, { doc, deleteDoc }]) =>
-                deleteDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)))
-              )
-              .catch(console.warn);
-          }
-        } else {
-          const favItem = {
-            id: String(recipe.id),
-            name: recipe.name || "",
-            image: recipe.image || "",
-            category: recipe.category || "Main",
-            area: recipe.area || "",
-            savedAt: new Date().toISOString(),
-          };
-          storedFavs.unshift(favItem);
-          icon.setAttribute("fill", "#ca5c2e");
-          icon.classList.add("text-[#ca5c2e]");
-          favBtn.classList.add("text-[#ca5c2e]");
-          playHeartEffect(favBtn, true);
-          showToast(`Saved "${recipe.name}" to favourites!`);
-          if (user && user.uid) {
-            Promise.all([
-              import("./firebase-config.js"),
-              import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-            ])
-              .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
-                setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
-                  id: String(recipe.id),
-                  name: recipe.name || "",
-                  image: recipe.image || "",
-                  category: recipe.category || "Main",
-                  area: recipe.area || "",
-                  savedAt: serverTimestamp(),
-                })
-              )
-              .catch(console.warn);
-          }
-        }
-        localStorage.setItem("recipeplan_favourites", JSON.stringify(storedFavs));
-        window.dispatchEvent(new CustomEvent("favourites-changed"));
+        toggleCardFavourite(favBtn, recipe);
       });
 
       // Check initial favourite state (only if user is logged in)
@@ -674,6 +560,74 @@ export function createRecipeCard(recipe, options = {}) {
   }
 
   return item;
+}
+
+function isSavedLocally(recipeId) {
+  try {
+    const favs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+    return favs.some((f) => String(f.id) === String(recipeId));
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Heart button click on any recipe card (cards grid, hero fan).
+ * Saves through favourites.js so every save has the same fields (including
+ * ingredientNames). favourites.js updates the local cache and fires
+ * "favourites-changed", which refreshes every heart on the page; if the
+ * Firestore write fails it rolls the cache back and the heart flips back.
+ */
+export async function toggleCardFavourite(favBtn, recipe) {
+  if (!recipe || !recipe.id) return;
+  const name = recipe.name || "Recipe";
+
+  if (!getCurrentUser()) {
+    showAuthPromptModal({
+      title: "Log in to save favourites",
+      description: "Your saved recipes will be waiting for you on any device.",
+      redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
+      icon: "heart",
+    });
+    return;
+  }
+
+  if (favBtn.dataset.busy === "true") return;
+  favBtn.dataset.busy = "true";
+
+  const wasSaved = isSavedLocally(recipe.id);
+  playHeartEffect(favBtn, !wasSaved);
+
+  try {
+    const { addFavourite, removeFavourite } = await import("./favourites.js");
+    if (wasSaved) {
+      const removing = removeFavourite(recipe.id, { throwOnError: true });
+      showToast(`Removed "${name}" from favourites`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            addFavourite(recipe, { throwOnError: true })
+              .then(() => showToast(`Restored "${name}" to favourites!`))
+              .catch(() => showToast(`Couldn't restore "${name}". Please try again.`));
+          },
+        },
+      });
+      await removing;
+    } else {
+      const adding = addFavourite(recipe, { throwOnError: true });
+      showToast(`Saved "${name}" to favourites!`);
+      await adding;
+    }
+  } catch (err) {
+    console.warn("Favourite update failed:", err);
+    showToast(
+      wasSaved ? `Couldn't remove "${name}". Please try again.` : `Couldn't save "${name}". Please try again.`,
+
+    );
+  } finally {
+    delete favBtn.dataset.busy;
+  }
 }
 
 /**

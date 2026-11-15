@@ -11,6 +11,23 @@ const LINKS = [
   ["planner.html", "Planner"],
 ];
 
+// The favourites cache is only filled on the favourites and planner pages, so
+// load it once per session for a signed-in user (one Firestore read). Without
+// this, the card hearts on other pages show as empty on a new device.
+async function loadFavouritesOnce(user) {
+  if (!user || !user.uid) return;
+  const key = `recipeplan_favs_loaded_${user.uid}`;
+  try {
+    if (sessionStorage.getItem(key)) return;
+    sessionStorage.setItem(key, "1");
+  } catch (e) {}
+  try {
+    const { getFavourites } = await import("./favourites.js");
+    await getFavourites();
+    window.dispatchEvent(new CustomEvent("favourites-changed"));
+  } catch (e) {}
+}
+
 function currentPage() {
   const path = window.location.pathname.split("/").pop();
   return path || "index.html";
@@ -170,6 +187,7 @@ export function renderNavbar(user) {
 
   // Setup event listeners
   bindLanguageSwitcher("nav");
+  if (user) loadFavouritesOnce(user);
   const menuBtn = document.getElementById("menu-button");
   const mobileMenu = document.getElementById("mobile-menu");
   if (menuBtn && mobileMenu) {

@@ -133,7 +133,8 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 - Favourites sync to Firestore live (`onSnapshot`) and store `ingredientNames`. The favourites page has category and sort menus.
 - The weekly plan is saved per week to `users/{uid}/mealPlan/{weekId}` through `schema.js`, with a localStorage copy per user. The week arrows now show each week's own plan. The recipe page's "Add to meal plan" goes through `addToPlan` (still always Mon Dinner).
 - Planner: drag and drop between slots (tablet and desktop; dropping on a filled slot swaps them), day tabs on phones, Clear week with Undo, and a week switcher with a "Back to today" button.
-- The card heart buttons in `utils.js` and `search-cta.js` still write favourites to Firestore themselves instead of calling `favourites.js`. The favourites page adds the missing `ingredientNames` in the background, but these should switch to `addFavourite` / `removeFavourite`.
+- The card heart buttons in `utils.js` and `search-cta.js` go through `toggleCardFavourite` (in `utils.js`), which calls `addFavourite` / `removeFavourite`. If the save fails, the heart flips back and an error toast shows.
+- The navbar loads the favourites list once per session after login, so card hearts are right on a new device. Favourite cards show a "You ★4" badge when the user has rated that recipe.
 - The shopping list on `planner.html` is still sample markup. It needs to be built from the plan using `combineIngredients` (Person 4).
 - Ratings and comments are built (`ratings.js`).
 - The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).

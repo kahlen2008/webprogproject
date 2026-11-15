@@ -181,10 +181,9 @@ function initHeroFanCarousel() {
   // Wire up live ratings and favourite heart buttons on the hero cards
   Promise.all([
     import("./utils.js"),
-    import("./auth.js"),
     import("./ratings.js"),
   ])
-    .then(([{ showToast, showAuthPromptModal, playHeartEffect, syncAllCardHearts }, { getCurrentUser }, { attachCardRating }]) => {
+    .then(([{ toggleCardFavourite, syncAllCardHearts }, { attachCardRating }]) => {
       syncAllCardHearts();
       cards.forEach((card) => {
         const recipeId = card.getAttribute("data-recipe-id");
@@ -196,81 +195,13 @@ function initHeroFanCarousel() {
         favBtn.addEventListener("click", (e) => {
           e.preventDefault();
           e.stopPropagation();
-
-          const id = favBtn.getAttribute("data-id");
-          const name = favBtn.getAttribute("data-name") || "Recipe";
-          const image = favBtn.getAttribute("data-image") || "";
-          const category = favBtn.getAttribute("data-category") || "Main";
-          const area = favBtn.getAttribute("data-area") || "";
-
-          const user = getCurrentUser();
-          if (!user) {
-            showAuthPromptModal({
-              title: "Log in to save favourites",
-              description: "Your saved recipes will be waiting for you on any device.",
-              redirectUrl: `recipe.html?id=${encodeURIComponent(id)}`,
-              icon: "heart",
-            });
-            return;
-          }
-
-          let storedFavs = [];
-          try {
-            storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-          } catch (err) {}
-
-          const exists = storedFavs.some((f) => String(f.id) === String(id));
-          const icon = favBtn.querySelector(".heart-icon");
-
-          if (exists) {
-            storedFavs = storedFavs.filter((f) => String(f.id) !== String(id));
-            icon?.setAttribute("fill", "none");
-            icon?.classList.remove("text-[#ca5c2e]");
-            favBtn.classList.remove("text-[#ca5c2e]");
-            playHeartEffect(favBtn, false);
-            showToast(`Removed "${name}" from favourites`);
-            if (user.uid) {
-              Promise.all([
-                import("./firebase-config.js"),
-                import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-              ])
-                .then(([{ db }, { doc, deleteDoc }]) =>
-                  deleteDoc(doc(db, "users", user.uid, "favourites", String(id)))
-                )
-                .catch(console.warn);
-            }
-          } else {
-            const favItem = {
-              id: String(id),
-              name,
-              image,
-              category,
-              area,
-              savedAt: new Date().toISOString(),
-            };
-            storedFavs.unshift(favItem);
-            icon?.setAttribute("fill", "#ca5c2e");
-            icon?.classList.add("text-[#ca5c2e]");
-            favBtn.classList.add("text-[#ca5c2e]");
-            playHeartEffect(favBtn, true);
-            showToast(`Saved "${name}" to favourites!`);
-            if (user.uid) {
-              Promise.all([
-                import("./firebase-config.js"),
-                import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-              ])
-                .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
-                  setDoc(doc(db, "users", user.uid, "favourites", String(id)), {
-                    ...favItem,
-                    savedAt: serverTimestamp(),
-                  })
-                )
-                .catch(console.warn);
-            }
-          }
-
-          localStorage.setItem("recipeplan_favourites", JSON.stringify(storedFavs));
-          window.dispatchEvent(new CustomEvent("favourites-changed"));
+          toggleCardFavourite(favBtn, {
+            id: favBtn.getAttribute("data-id"),
+            name: favBtn.getAttribute("data-name") || "Recipe",
+            image: favBtn.getAttribute("data-image") || "",
+            category: favBtn.getAttribute("data-category") || "Main",
+            area: favBtn.getAttribute("data-area") || "",
+          });
         });
       });
     })
