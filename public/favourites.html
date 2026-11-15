@@ -49,8 +49,81 @@
   <header id="navbar" class="w-full sticky top-0 z-40"></header>
 
   <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10 space-y-6">
-    <div class="flex items-center justify-between">
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">My Favourites</h1>
+    <div class="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+      <div>
+        <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">My Favourites</h1>
+        <p id="favourites-count" class="text-sm text-stone-500 mt-1" aria-live="polite"></p>
+      </div>
+
+    </div>
+
+    <!-- Sort and filter (shown by js/favourites.js once there are favourites) -->
+    <div id="favourites-toolbar" class="hidden">
+      <div class="flex items-center justify-between gap-3">
+        <!-- Category menu (options built by js/favourites.js) -->
+        <div class="relative min-w-0">
+          <button
+            id="favourites-category-btn"
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="favourites-category-menu"
+            class="max-w-full inline-flex items-center gap-2 h-10 pl-3.5 pr-2.5 rounded-full border text-sm font-semibold shadow-2xs bg-white border-[#ede4da] text-stone-700 hover:border-[#ca5c2e]/50 hover:text-[#ca5c2e] data-[active=true]:bg-[#fdf8f4] data-[active=true]:border-[#ca5c2e]/60 data-[active=true]:text-[#ca5c2e] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition"
+          >
+            <svg class="w-4 h-4 shrink-0 text-[#ca5c2e]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 5h18l-7 8.5V19l-4 2v-7.5L3 5z"></path>
+            </svg>
+            <span class="sr-only">Category:</span>
+            <span id="favourites-category-label" class="truncate">All categories</span>
+            <span id="favourites-category-count" class="shrink-0 min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-bold leading-4 text-center bg-[#f5ebe4] text-[#a04e28]">0</span>
+            <svg id="favourites-category-chevron" class="w-4 h-4 shrink-0 text-stone-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+          <ul
+            id="favourites-category-menu"
+            role="listbox"
+            aria-labelledby="favourites-category-btn"
+            tabindex="-1"
+            class="hidden absolute left-0 top-full mt-2 w-64 max-h-80 overflow-y-auto bg-white rounded-2xl shadow-lg border border-[#efe6dc] p-1.5 z-30 origin-top-left opacity-0 scale-95 transition duration-150 ease-out focus:outline-none"
+          ></ul>
+        </div>
+
+        <!-- Sort menu -->
+        <div class="relative shrink-0">
+          <button
+            id="favourites-sort-btn"
+            type="button"
+            aria-haspopup="listbox"
+            aria-expanded="false"
+            aria-controls="favourites-sort-menu"
+            class="inline-flex items-center gap-2 h-10 pl-3.5 pr-2.5 rounded-full bg-white border border-[#ede4da] text-sm font-semibold text-stone-700 shadow-2xs hover:border-[#ca5c2e]/50 hover:text-[#ca5c2e] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition"
+          >
+            <svg class="w-4 h-4 text-[#ca5c2e]" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M3 7h13M3 12h9M3 17h5M17 10v10m0 0l-3-3m3 3l3-3"></path>
+            </svg>
+            <span class="sr-only">Sort by:</span>
+            <span id="favourites-sort-label" class="whitespace-nowrap">Newest first</span>
+            <svg id="favourites-sort-chevron" class="w-4 h-4 text-stone-400 transition-transform duration-200" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"></path>
+            </svg>
+          </button>
+
+          <ul
+            id="favourites-sort-menu"
+            role="listbox"
+            aria-labelledby="favourites-sort-btn"
+            tabindex="-1"
+            class="hidden absolute right-0 top-full mt-2 w-56 bg-white rounded-2xl shadow-lg border border-[#efe6dc] p-1.5 z-30 origin-top-right opacity-0 scale-95 transition duration-150 ease-out focus:outline-none"
+          >
+            <li class="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-400" role="presentation">Sort by</li>
+            <li role="option" tabindex="-1" data-value="newest" class="sort-option">Newest first</li>
+            <li role="option" tabindex="-1" data-value="oldest" class="sort-option">Oldest first</li>
+            <li role="option" tabindex="-1" data-value="name-asc" class="sort-option">Name, A to Z</li>
+            <li role="option" tabindex="-1" data-value="name-desc" class="sort-option">Name, Z to A</li>
+          </ul>
+        </div>
+      </div>
     </div>
 
     <div id="favourites-message" aria-live="polite"></div>

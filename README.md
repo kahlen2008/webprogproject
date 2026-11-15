@@ -7,7 +7,6 @@
 [![Tailwind CSS](<https://img.shields.io/badge/TailwindCSS-v3%20CDN-38B2AC?logo=tailwind-css&logoColor=white>)](https://tailwindcss.com/)
 [![JavaScript](<https://img.shields.io/badge/JavaScript-ES%20Modules-F7DF1E?logo=javascript&logoColor=black>)](https://developer.mozilla.org/en-US/docs/Web/JavaScript)
 [![TheMealDB](https://img.shields.io/badge/API-TheMealDB-orange)](https://www.themealdb.com/api.php)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
 
@@ -121,9 +120,9 @@ Deciding what to cook every day is time-consuming and often fragmented across bo
 | 🔍 **Recipe Search & Filtering**      | Instant keyword search, categorized exploration (Chicken, Seafood, Vegetarian, Pasta, etc.), and international cuisine filters.      |
 | 📖 **Dynamic Recipe Details**         | Full instructions, ingredient quantities, YouTube video tutorials, and interactive serving-size scaling.                             |
 | 🛡️ **Dietary & Allergen Detection** | Real-time keyword scanning on recipe cards and detail views alerting users of matching allergen risks.                               |
-| 📅 **Weekly Meal Planner**            | Interactive 7-day schedule (Breakfast, Lunch, Dinner) with slot-based meal scheduling.                                               |
-| 🛒 **Smart Shopping List**            | Aggregates all ingredients across planned recipes, merging common items with interactive check-off and print view.                   |
-| ❤️ **Personal Favourites**          | One-click cloud saving, persistent collection management, and offline local fallback.                                                |
+| 📅 **Weekly Meal Planner**            | 7-day schedule (Breakfast, Lunch, Dinner) saved per week to your account. Drag meals between slots, switch weeks, clear a week with Undo, and use day tabs on phones. |
+| 🛒 **Smart Shopping List**            | *In progress.* Will combine the ingredients from every planned recipe into one list, with check-off, a print view and Copy list. The section on the planner page is still sample data. |
+| ❤️ **Personal Favourites**          | One-click saving to your account, live sync across devices, filter by category and sort by date or name, with an offline fallback. |
 | 👤 **User Accounts & Onboarding**     | Secure Firebase email/password & Google OAuth, 2-step onboarding wizard, password safety validation, and account profile management. |
 | 📜 **Legal & Compliance**             | Transparent British English Terms of Service and Privacy Policy pages.                                                               |
 
@@ -138,7 +137,7 @@ RecipePlan was developed collaboratively by a 4-person team. Each member holds e
 | **Kahlen Ong - 202699471** | **Accounts, Profile & Security**     | User authentication (Email/Password, Google OAuth), 2-step onboarding questionnaire, profile editing, password security rules, and Firestore user document schema. | `login.htmlsignup.html``onboarding.htmlprofile.html``js/auth.jsjs/navbar.js``js/firebase-config.jsfirestore.rules` |
 | **Shrestha Puja - 202537250** | **Recipe Discovery & Design System** | Homepage search, category/cuisine filtering, recipe detail views, serving-size scaler, TheMealDB API integration, and core Tailwind/CSS design system.             | `index.htmlrecipe.html``css/base.csscss/components.css``css/recipes.cssjs/api.js``js/recipes.js`                   |
 | **Sunar Roshani - 202537197** | **Favourites & Quality Assurance**   | Favourites collection view, heart toggles, star ratings/feedback, cross-device Firestore data sync, and responsive layout testing.                                 | `favourites.htmlcss/favourites.css``js/favourites.jsjs/ratings.js`                                                 |
-| **Aale Aaditi - 202537195** | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, Firebase Hosting deployment, and documentation.            | `planner.htmlcss/planner.css``js/planner.jsfirebase.json``README.md`                                               |
+| **Aale Aaditi - 202537195** | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, deployment (GitHub Pages and Firebase Hosting), and documentation.            | `planner.htmlcss/planner.css``js/planner.jsfirebase.json``README.md`                                               |
 
 ---
 
@@ -161,42 +160,57 @@ All production web assets reside within the `public/` directory for direct hosti
 ```text
 webprogproject/
 ├── .github/workflows/
-│   └── deploy.yml              # GitHub Actions automated deployment workflow
-├── firestore.rules             # Firestore security and privacy access rules
-├── firebase.json               # Firebase Hosting configuration
-├── PROJECT_NOTES.md            # Team guidelines and shared conventions
-├── README.md                   # Project overview and technical documentation
-└── public/
-    ├── index.html              # Homepage with recipe search and discovery
-    ├── recipe.html             # Detailed recipe viewer with ingredient scaler
-    ├── login.html              # Split-screen responsive login page
-    ├── signup.html             # Split-screen sign up page with password validation
-    ├── onboarding.html         # 2-step dietary and allergy configuration wizard
-    ├── profile.html            # Profile management, preferences, and security
-    ├── favourites.html         # User saved recipes collection
-    ├── planner.html            # 7-day meal planner and smart grocery list
-    ├── terms.html              # Terms of Service (British English)
-    ├── privacy.html            # Privacy Policy (British English)
+│   ├── deploy.yml                          # Deploys public/ to GitHub Pages on push to main
+│   ├── firebase-hosting-merge.yml          # Deploys to Firebase Hosting (live) on push to main
+│   └── firebase-hosting-pull-request.yml   # Firebase Hosting preview for each pull request
+├── .firebaserc                 # Firebase project id (recipe-plan-app)
+├── firebase.json               # Firebase Hosting and Firestore rules configuration
+├── firestore.rules             # Firestore security rules
+├── PROJECT_NOTES.md            # Team rules, file owners, shared contracts and status
+├── Recipe Finder & Meal Planner Team Use Cases.md   # Use cases, flows and timeline
+├── README.md                   # This file
+└── public/                     # Everything the site serves
+    ├── index.html              # Home page with hero search and featured recipes
+    ├── recipes.html            # Browse and search recipes with category filters
+    ├── recipe.html             # Recipe detail: ingredients, steps, ratings and reviews
+    ├── login.html              # Log in (email/password or Google)
+    ├── signup.html             # Sign up with live password rules
+    ├── onboarding.html         # 2-step diet and allergy setup
+    ├── profile.html            # Profile, diet and allergy preferences, account settings
+    ├── favourites.html         # Saved recipes with category filter and sort
+    ├── planner.html            # Weekly meal planner (shopping list in progress)
+    ├── terms.html              # Terms of Service
+    ├── privacy.html            # Privacy Policy
+    ├── 404.html                # Page not found
+    ├── favicon.svg, favicon.ico, apple-touch-icon.png
     ├── css/
-    │   ├── base.css            # Global CSS variables, reset, and typography tokens
-    │   ├── components.css      # Reusable buttons, cards, and modal components
-    │   ├── auth.css            # Authentication form styling
-    │   ├── recipes.css         # Recipe card grids and category chips
-    │   ├── favourites.css      # Favourites grid styles
-    │   └── planner.css         # Weekly calendar grid and shopping list printable styles
+    │   ├── tailwind.css        # Prebuilt Tailwind CSS used by the home and recipe pages
+    │   ├── base.css            # Global variables, reset and typography
+    │   ├── components.css      # Shared buttons, cards and modals
+    │   ├── auth.css            # Login and sign-up pages
+    │   ├── onboarding.css      # Onboarding steps and chips
+    │   ├── recipes.css         # Recipe grids and category chips
+    │   ├── favourites.css      # Favourites page menus
+    │   └── planner.css         # Planner page
     ├── js/
-    │   ├── firebase-config.js  # Firebase project credentials and initialisation
-    │   ├── auth.js             # Authentication, session observer, and password rules
-    │   ├── navbar.js           # Dynamic navigation header reflecting user auth state
-    │   ├── api.js              # TheMealDB API client methods
-    │   ├── recipes.js          # Search, category filtering, and recipe page rendering
-    │   ├── preferences.js      # Diet and allergy keyword matching engine
-    │   ├── onboarding.js       # Step wizard state and preference storage
-    │   ├── favourites.js       # Favourites Firestore and LocalStorage synchroniser
-    │   ├── planner.js          # Meal calendar state and consolidated grocery list builder
-    │   └── utils.js            # Shared helpers (toasts, formatters, debounce)
-    └── images/
-        └── pasta-hero.jpg      # Showcase culinary photography
+    │   ├── firebase-config.js  # Firebase initialisation (exports app, auth, db)
+    │   ├── auth.js             # Sign up, log in, Google sign-in, password rules, session
+    │   ├── navbar.js           # Navbar and footer that react to login state
+    │   ├── onboarding.js       # 2-step preferences flow
+    │   ├── profile.js          # Profile page
+    │   ├── preferences.js      # Diet and allergy checker, warning badges and prompts
+    │   ├── schema.js           # Firestore paths, document builders and read/write helpers
+    │   ├── i18n.js             # Language switcher (130+ languages) and search translation
+    │   ├── api.js              # TheMealDB client with sessionStorage caching
+    │   ├── recipes.js          # Search, filters and the recipe detail page
+    │   ├── search-cta.js       # Home page: rotating search placeholder and featured recipe cards
+    │   ├── nutrition.js        # Rough calorie and servings estimates from ingredients
+    │   ├── ratings.js          # Star ratings and reviews
+    │   ├── favourites.js       # Favourites: live Firestore sync, sort and filter
+    │   ├── planner.js          # Weekly planner: per-week Firestore plans, drag and drop, day tabs
+    │   └── utils.js            # Shared helpers (toasts, modals, recipe cards, ingredient merging)
+    ├── images/                 # Hero photo and category images (.webp, .jpg)
+    └── proposal/               # Proposal page, slides (PDF) and proposal README
 ```
 
 ---
@@ -271,11 +285,18 @@ You may notice that API keys and configurations are committed directly in the re
 
 ### Automated Deployment (CI/CD)
 
-The project includes a GitHub Actions workflow in [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). Any push or merged pull request to the `main` branch automatically deploys the latest build to Firebase Hosting.
+Every push to `main` (including a merged pull request) runs two GitHub Actions workflows:
+
+- [`deploy.yml`](.github/workflows/deploy.yml) publishes the `public/` folder to **GitHub Pages**: <https://kahlen2008.github.io/webprogproject/>. This is the link used in the proposal and for submission.
+- [`firebase-hosting-merge.yml`](.github/workflows/firebase-hosting-merge.yml) deploys the same folder to **Firebase Hosting** (project `recipe-plan-app`).
+
+[`firebase-hosting-pull-request.yml`](.github/workflows/firebase-hosting-pull-request.yml) also builds a Firebase preview link for each pull request.
+
+The GitHub Pages domain must be listed under **Authentication > Settings > Authorised domains** in Firebase, or Google sign-in will not work on the live site.
 
 ### Manual CLI Deployment
 
-To deploy manually using the Firebase CLI:
+To deploy to Firebase Hosting manually with the Firebase CLI:
 
 ```bash
 # Install Firebase Tools globally
@@ -318,4 +339,4 @@ To maintain clean code quality and prevent merge conflicts across team members:
 
 ## 📄 Licence
 
-This project was built for educational purposes under the **MIT Licence**. See the [LICENSE](LICENSE) file for details.
+This project was built for the K0126002 Web Programming course at Gachon University. No open-source licence has been chosen yet, so there is no `LICENSE` file. If the team decides on one (for example MIT), add a `LICENSE` file at the root and link it here.

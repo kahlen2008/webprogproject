@@ -1,19 +1,22 @@
 // Favourites page logic and Firestore/localStorage sync.
 // Owner: Person 3.
 // Firestore Schema: users/{uid}/favourites/{recipeId}
-// Document fields: { id, name, image, category, area, savedAt }
+// Document fields: { id, name, image, category, area, ingredientNames, savedAt }
+// ingredientNames lets the favourites page check allergens without calling TheMealDB again.
 
 import { createRecipeCard, showToast } from "./utils.js";
-import { getCurrentUser } from "./auth.js";
-import { db } from "./firebase-config.js";
-import { getPreferences, checkRecipes, decorateCard } from "./preferences.js";
+import { getCurrentUser, onAuthChange } from "./auth.js";
+import { db, auth } from "./firebase-config.js";
+import { getPreferences, checkRecipes, decorateCard, getIngredientNames } from "./preferences.js";
 import {
   doc,
   getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
   collection,
   getDocs,
+  onSnapshot,
   serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 
@@ -81,7 +84,7 @@ export async function getFavourites() {
       const colRef = collection(db, "users", user.uid, "favourites");
       const snap = await getDocs(colRef);
       const rawFavs = [];
-      snap.forEach((d) => rawFavs.push(d.data()));
+      snap.forEach((d) => rawFavs.push(d.data({ serverTimestamps: "estimate" })));
 
       // Stably sort newest first in JavaScript (guarantees identical order across Firestore & localCache)
       const favs = sortBySavedAtDesc(rawFavs);
@@ -123,13 +126,72 @@ export async function addFavourite(recipe) {
   const user = getCurrentUser();
   if (user && user.uid) {
     try {
+      // Cards from search and category results have no ingredients, so this may
+      // look them up once (getIngredientNames caches the answer).
+      const ingredientNames = await resolveIngredientNames(recipe);
       const docRef = doc(db, "users", user.uid, "favourites", String(recipe.id));
       await setDoc(docRef, {
         ...data,
+        ingredientNames,
         savedAt: serverTimestamp(),
       });
     } catch (err) {
       console.warn("Could not save favourite to Firestore:", err);
+    }
+  }
+}
+
+// ---------- Ingredient names (for allergen checks without extra API calls) ----------
+
+function cleanIngredientNames(names) {
+  const seen = new Set();
+  const out = [];
+  (names || []).forEach((n) => {
+    const name = String(typeof n === "string" ? n : n?.name || "").trim();
+    const key = name.toLowerCase();
+    if (name && !seen.has(key)) {
+      seen.add(key);
+      out.push(name);
+    }
+  });
+  return out;
+}
+
+async function resolveIngredientNames(recipe) {
+  if (Array.isArray(recipe.ingredientNames) && recipe.ingredientNames.length) {
+    return cleanIngredientNames(recipe.ingredientNames);
+  }
+  try {
+    return cleanIngredientNames(await getIngredientNames(recipe));
+  } catch (e) {
+    return [];
+  }
+}
+
+// Gives the shared allergen checker the stored names, so it does not fetch the recipe.
+function withStoredIngredients(fav) {
+  if (Array.isArray(fav.ingredientNames) && fav.ingredientNames.length) {
+    return { ...fav, ingredients: fav.ingredientNames };
+  }
+  return fav;
+}
+
+// Favourites saved before ingredientNames existed (or saved by the card heart
+// buttons, which write to Firestore directly) get the field added once.
+// updateDoc fails on a deleted document, so a favourite removed meanwhile is not recreated.
+const backfillAttempted = new Set();
+async function backfillIngredientNames(uid, favs) {
+  const missing = favs.filter(
+    (f) => f && f.id && !Array.isArray(f.ingredientNames) && !backfillAttempted.has(`${uid}/${f.id}`)
+  );
+  for (const fav of missing) {
+    backfillAttempted.add(`${uid}/${fav.id}`);
+    const ingredientNames = await resolveIngredientNames(fav);
+    if (!ingredientNames.length) continue;
+    try {
+      await updateDoc(doc(db, "users", uid, "favourites", String(fav.id)), { ingredientNames });
+    } catch (err) {
+      // Removed in the meantime, or offline: nothing to do.
     }
   }
 }
@@ -182,14 +244,86 @@ export async function isFavourite(recipeId) {
   return false;
 }
 
+/**
+ * Calls callback(favs) now and whenever the user's favourites change, on this
+ * device or any other. Uses a Firestore onSnapshot listener while signed in,
+ * and the localStorage cache when signed out or offline.
+ * Returns a function that stops watching.
+ */
 export function watchFavourites(callback) {
-  window.addEventListener("storage", async () => {
-    callback(await getFavourites());
+  let unsubscribeCloud = null;
+  let watchedUid = null;
+  let stopped = false;
+  let authResolved = false;
+
+  // pending: a signed-in user is cached but Firebase has not restored the session yet,
+  // so the cloud list is still on its way.
+  const emitLocal = () => {
+    if (stopped) return;
+    const user = getCurrentUser();
+    callback(user ? getLocalFavourites() : [], { pending: Boolean(user) && !authResolved });
+  };
+
+  const subscribe = () => {
+    if (stopped) return;
+    // Only listen once Firebase has restored the session; the cached user in
+    // localStorage is not enough for the security rules.
+    const uid = auth?.currentUser?.uid || null;
+    if (uid && uid === watchedUid && unsubscribeCloud) return;
+
+    if (unsubscribeCloud) unsubscribeCloud();
+    unsubscribeCloud = null;
+    watchedUid = uid;
+
+    if (!uid) {
+      emitLocal();
+      return;
+    }
+
+    const colRef = collection(db, "users", uid, "favourites");
+    unsubscribeCloud = onSnapshot(
+      colRef,
+      (snap) => {
+        const raw = [];
+        snap.forEach((d) => raw.push(d.data({ serverTimestamps: "estimate" })));
+        const favs = sortBySavedAtDesc(raw);
+        try {
+          localStorage.setItem(STORAGE_KEY, JSON.stringify(favs));
+        } catch (e) {}
+        if (!stopped) callback(favs, { pending: false });
+        backfillIngredientNames(uid, favs);
+      },
+      (err) => {
+        console.warn("Live favourites unavailable, using local cache:", err);
+        unsubscribeCloud = null;
+        watchedUid = null;
+        emitLocal();
+      }
+    );
+  };
+
+  // Local changes still matter when there is no live listener (signed out, offline).
+  const onLocalChange = () => {
+    if (!unsubscribeCloud) emitLocal();
+  };
+
+  const stopAuth = onAuthChange(() => {
+    authResolved = true;
+    subscribe();
   });
-  window.addEventListener("favourites-changed", async () => {
-    callback(await getFavourites());
-  });
-  return () => {};
+  window.addEventListener("auth-changed", subscribe);
+  window.addEventListener("favourites-changed", onLocalChange);
+  window.addEventListener("storage", onLocalChange);
+  subscribe();
+
+  return () => {
+    stopped = true;
+    if (unsubscribeCloud) unsubscribeCloud();
+    if (typeof stopAuth === "function") stopAuth();
+    window.removeEventListener("auth-changed", subscribe);
+    window.removeEventListener("favourites-changed", onLocalChange);
+    window.removeEventListener("storage", onLocalChange);
+  };
 }
 
 // ---------- Render Favourites Page ----------
@@ -300,12 +434,15 @@ function renderLoggedOutEmptyState() {
 
 function renderEmptyState() {
   const user = getCurrentUser();
+  setToolbarVisible(false);
   if (!user) {
+    currentView = "logged-out";
     renderLoggedOutEmptyState();
     return;
   }
 
   if (!messageEl) return;
+  currentView = "empty";
   messageEl.innerHTML = `
     <div class="space-y-10 sm:space-y-12">
       <!-- Warm Culinary Hero Card -->
@@ -440,7 +577,8 @@ function renderCardsFast(favs) {
           });
         };
 
-        // If this was the last card, animate it out and show empty state
+        // If this was the last card shown, animate it out, then show what is left
+        // (the empty state, or the other categories when a filter was active)
         if (siblingCards.length === 0) {
           card.style.transition = "opacity 0.22s ease-out, transform 0.22s ease-out";
           card.style.opacity = "0";
@@ -448,7 +586,7 @@ function renderCardsFast(favs) {
           setTimeout(async () => {
             await removeFavourite(recipe.id);
             card.remove();
-            renderEmptyState();
+            renderPage(allFavourites.filter((f) => String(f.id) !== String(recipe.id)));
             triggerRemovalToast();
           }, 200);
           return;
@@ -456,6 +594,7 @@ function renderCardsFast(favs) {
 
         // 2. Clone card as an absolute ghost overlay to fade out at its exact spot
         const ghost = card.cloneNode(true);
+        ghost.removeAttribute("data-card-id"); // so live updates don't count it as a shown card
         ghost.style.position = "absolute";
         ghost.style.left = `${cardRect.left - listRect.left}px`;
         ghost.style.top = `${cardRect.top - listRect.top}px`;
@@ -533,49 +672,356 @@ function renderLoadingSpinner() {
   if (messageEl) messageEl.innerHTML = "";
 }
 
-let isInitialLoad = true;
+// ---------- Sort and filter ----------
+const toolbarEl = document.getElementById("favourites-toolbar");
+const sortBtn = document.getElementById("favourites-sort-btn");
+const sortMenu = document.getElementById("favourites-sort-menu");
+const sortLabel = document.getElementById("favourites-sort-label");
+const sortChevron = document.getElementById("favourites-sort-chevron");
+const countEl = document.getElementById("favourites-count");
 
-async function renderFavourites() {
-  if (!listEl) return;
+const SORTERS = {
+  newest: (items) => sortBySavedAtDesc(items),
+  oldest: (items) => sortBySavedAtDesc(items).reverse(),
+  "name-asc": (items) => [...items].sort((a, b) => String(a.name).localeCompare(String(b.name))),
+  "name-desc": (items) => [...items].sort((a, b) => String(b.name).localeCompare(String(a.name))),
+};
+const SORT_KEY = "recipeplan_favourites_sort";
 
-  const user = getCurrentUser();
-  if (!user) {
-    isInitialLoad = false;
-    listEl.innerHTML = "";
-    renderEmptyState();
-    return;
-  }
+const CATEGORY_EMOJI = {
+  Beef: "🥩", Breakfast: "🍳", Chicken: "🍗", Dessert: "🍰", Goat: "🐐", Lamb: "🍖",
+  Miscellaneous: "🍽️", Pasta: "🍝", Pork: "🥓", Seafood: "🍤", Side: "🥔",
+  Starter: "🥟", Vegan: "🌱", Vegetarian: "🥗",
+};
 
-  // 1. Show animated brand spinner on initial page load
-  if (isInitialLoad) {
-    renderLoadingSpinner();
-  }
+let allFavourites = [];
+let currentView = null; // "loading" | "logged-out" | "empty" | "cards"
+let selectedCategory = "all";
+let selectedSort = "newest";
+let chipSignature = "";
 
-  // 2. Fetch from Firestore (stably sorted newest first)
-  const favs = await getFavourites();
-  isInitialLoad = false;
+try {
+  const saved = localStorage.getItem(SORT_KEY);
+  if (saved && SORTERS[saved]) selectedSort = saved;
+} catch (e) {}
 
-  // 3. If empty, show empty state
-  if (!favs || favs.length === 0) {
-    listEl.innerHTML = "";
-    renderEmptyState();
-    return;
-  }
+function setToolbarVisible(visible) {
+  if (toolbarEl) toolbarEl.classList.toggle("hidden", !visible);
+  if (countEl && !visible) countEl.textContent = "";
+  if (!visible) closeAllMenus();
+}
 
-  if (messageEl) messageEl.innerHTML = "";
+function categoryOf(fav) {
+  return String(fav.category || "Main");
+}
 
-  // 4. Render cards
-  renderCardsFast(favs);
+// ----- Popover menus (sort menu and "More" categories) -----
+// A button that opens a listbox. Arrow keys, Home and End move, Enter or Space picks,
+// Escape or Tab closes, and a click outside closes it.
+const openMenus = new Set();
 
-  // 5. Asynchronously decorate warning badges without rearranging or jumping
+function createMenu({ button, menu, chevron, onChoose }) {
+  if (!button || !menu) return { open() {}, close() {}, isOpen: () => false };
+
+  const options = () => Array.from(menu.querySelectorAll('[role="option"]'));
+
+  const api = {
+    isOpen: () => button.getAttribute("aria-expanded") === "true",
+    open() {
+      openMenus.forEach((m) => m !== api && m.close(false));
+      openMenus.add(api);
+      menu.classList.remove("hidden");
+      button.setAttribute("aria-expanded", "true");
+      chevron?.classList.add("rotate-180");
+      requestAnimationFrame(() => {
+        menu.classList.remove("opacity-0", "scale-95");
+        menu.classList.add("opacity-100", "scale-100");
+      });
+      const opts = options();
+      (opts.find((o) => o.getAttribute("aria-selected") === "true") || opts[0])?.focus();
+    },
+    close(returnFocus = true) {
+      openMenus.delete(api);
+      if (!api.isOpen()) return;
+      button.setAttribute("aria-expanded", "false");
+      chevron?.classList.remove("rotate-180");
+      menu.classList.add("opacity-0", "scale-95");
+      menu.classList.remove("opacity-100", "scale-100");
+      setTimeout(() => {
+        if (!api.isOpen()) menu.classList.add("hidden");
+      }, 150);
+      if (returnFocus) button.focus();
+    },
+  };
+
+  button.addEventListener("click", () => (api.isOpen() ? api.close() : api.open()));
+  button.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      e.preventDefault();
+      api.open();
+    }
+  });
+
+  menu.addEventListener("click", (e) => {
+    const opt = e.target.closest('[role="option"]');
+    if (!opt) return;
+    api.close();
+    onChoose(opt.dataset.value);
+  });
+
+  menu.addEventListener("keydown", (e) => {
+    const opts = options();
+    const index = opts.indexOf(document.activeElement);
+    const focusAt = (i) => opts[(i + opts.length) % opts.length]?.focus();
+    switch (e.key) {
+      case "ArrowDown": e.preventDefault(); focusAt(index + 1); break;
+      case "ArrowUp": e.preventDefault(); focusAt(index - 1); break;
+      case "Home": e.preventDefault(); focusAt(0); break;
+      case "End": e.preventDefault(); focusAt(opts.length - 1); break;
+      case "Enter":
+      case " ":
+        e.preventDefault();
+        if (index >= 0) {
+          api.close();
+          onChoose(opts[index].dataset.value);
+        }
+        break;
+      case "Escape": e.preventDefault(); api.close(); break;
+      case "Tab": api.close(false); break;
+    }
+  });
+
+  document.addEventListener("click", (e) => {
+    if (api.isOpen() && !menu.contains(e.target) && !button.contains(e.target)) api.close(false);
+  });
+
+  return api;
+}
+
+function closeAllMenus() {
+  openMenus.forEach((m) => m.close(false));
+}
+
+// ----- Category menu -----
+// One dropdown listing "All categories" and every category the user has saved,
+// most-used first, each with its count. The chosen one gets a tick.
+const categoryBtn = document.getElementById("favourites-category-btn");
+const categoryMenu = document.getElementById("favourites-category-menu");
+const categoryLabel = document.getElementById("favourites-category-label");
+const categoryCount = document.getElementById("favourites-category-count");
+const COUNT_BADGE = "shrink-0 min-w-[1.25rem] px-1.5 py-px rounded-full text-[11px] font-bold leading-4 text-center bg-[#f5ebe4] text-[#a04e28]";
+
+function escapeAttr(text) {
+  return String(text).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
+function categoryOptionHtml({ value, label, count, emoji }) {
+  const on = value === selectedCategory;
+  return `
+    <li role="option" tabindex="-1" aria-selected="${on}" data-value="${escapeAttr(value)}" class="sort-option">
+      <span class="flex items-center gap-2 min-w-0 flex-1">
+        <span class="w-5 text-center shrink-0" aria-hidden="true">${emoji}</span>
+        <span class="truncate">${escapeAttr(label)}</span>
+      </span>
+      <span class="${COUNT_BADGE}">${count}</span>
+    </li>`;
+}
+
+// Rebuilds the menu from the current favourites, keeping the selection if that category still exists.
+function updateCategoryMenu(favs) {
+  const counts = new Map();
+  favs.forEach((f) => counts.set(categoryOf(f), (counts.get(categoryOf(f)) || 0) + 1));
+  if (selectedCategory !== "all" && !counts.has(selectedCategory)) selectedCategory = "all";
+
+  const categories = [...counts.keys()].sort((a, b) => counts.get(b) - counts.get(a) || a.localeCompare(b));
+  const options = [
+    { value: "all", label: "All categories", count: favs.length, emoji: "❤️" },
+    ...categories.map((c) => ({ value: c, label: c, count: counts.get(c), emoji: CATEGORY_EMOJI[c] || "🍽️" })),
+  ];
+
+  // Button shows the current choice.
+  const current = options.find((o) => o.value === selectedCategory) || options[0];
+  if (categoryLabel) categoryLabel.textContent = current.label;
+  if (categoryCount) categoryCount.textContent = String(current.count);
+  categoryBtn?.setAttribute("data-active", String(selectedCategory !== "all"));
+
+  // Only redraw the list when something changed, so keyboard focus inside an open menu is kept.
+  const signature = `${selectedCategory}|${options.map((o) => `${o.value}:${o.count}`).join(",")}`;
+  if (signature === chipSignature || !categoryMenu) return;
+  chipSignature = signature;
+
+  categoryMenu.innerHTML =
+    `<li class="px-3 pt-1.5 pb-1 text-[11px] font-semibold uppercase tracking-wider text-stone-400" role="presentation">Category</li>` +
+    categoryOptionHtml(options[0]) +
+    (options.length > 1 ? `<li class="my-1 border-t border-[#f1e8de]" role="presentation"></li>` : "") +
+    options.slice(1).map(categoryOptionHtml).join("");
+}
+
+createMenu({
+  button: categoryBtn,
+  menu: categoryMenu,
+  chevron: document.getElementById("favourites-category-chevron"),
+  onChoose: (value) => {
+    if (value == null || value === selectedCategory) return;
+    selectedCategory = value;
+    renderPage(allFavourites);
+  },
+});
+
+// ----- Sort menu -----
+function syncSortUi() {
+  sortMenu?.querySelectorAll(".sort-option").forEach((opt) => {
+    const on = opt.dataset.value === selectedSort;
+    opt.setAttribute("aria-selected", String(on));
+    if (on && sortLabel) sortLabel.textContent = opt.textContent.trim();
+  });
+}
+
+createMenu({
+  button: sortBtn,
+  menu: sortMenu,
+  chevron: sortChevron,
+  onChoose: (value) => {
+    if (!SORTERS[value] || value === selectedSort) return;
+    selectedSort = value;
+    try {
+      localStorage.setItem(SORT_KEY, value);
+    } catch (e) {}
+    syncSortUi();
+    renderPage(allFavourites);
+  },
+});
+
+syncSortUi();
+
+// ----- FLIP animation for sorting, filtering and live updates -----
+// First: remember where each card is. Last: render. Invert: move each card back
+// to its old spot. Play: let it glide to the new one. New cards fade in, and
+// cards that left fade out where they were.
+const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+
+function captureCardPositions() {
+  const map = new Map();
+  if (!listEl) return map;
+  listEl.querySelectorAll(".recipe-card[data-card-id]").forEach((el) => {
+    map.set(el.getAttribute("data-card-id"), { el, rect: el.getBoundingClientRect() });
+  });
+  return map;
+}
+
+function playCardFlip(before) {
+  if (!listEl || !before.size || reduceMotion?.matches) return;
+
+  const listRect = listEl.getBoundingClientRect();
+  const moved = [];
+  const entering = [];
+  const ghosts = [];
+  const present = new Set();
+
+  listEl.querySelectorAll(".recipe-card[data-card-id]").forEach((el) => {
+    const id = el.getAttribute("data-card-id");
+    present.add(id);
+    const old = before.get(id);
+    el.style.transition = "none";
+    if (old) {
+      const now = el.getBoundingClientRect();
+      const dx = old.rect.left - now.left;
+      const dy = old.rect.top - now.top;
+      if (dx || dy) {
+        el.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
+        moved.push(el);
+      }
+    } else {
+      el.style.opacity = "0";
+      el.style.transform = "scale(0.94)";
+      entering.push(el);
+    }
+  });
+
+  // Cards that are no longer shown fade out from where they were.
+  before.forEach(({ el, rect }, id) => {
+    if (present.has(id)) return;
+    const ghost = el;
+    ghost.removeAttribute("data-card-id");
+    Object.assign(ghost.style, {
+      position: "absolute",
+      left: `${rect.left - listRect.left}px`,
+      top: `${rect.top - listRect.top}px`,
+      width: `${rect.width}px`,
+      height: `${rect.height}px`,
+      margin: "0",
+      zIndex: "0",
+      pointerEvents: "none",
+      transition: "none",
+      transform: "",
+      opacity: "1",
+    });
+    ghost.setAttribute("aria-hidden", "true");
+    listEl.appendChild(ghost);
+    ghosts.push(ghost);
+  });
+
+  void listEl.offsetHeight; // apply the inverted positions before animating
+
+  requestAnimationFrame(() => {
+    const ease = "cubic-bezier(0.2, 0.8, 0.2, 1)";
+    moved.forEach((el) => {
+      el.style.transition = `transform 0.4s ${ease}`;
+      el.style.transform = "";
+    });
+    entering.forEach((el, i) => {
+      const delay = Math.min(i, 8) * 30;
+      el.style.transition = `opacity 0.3s ease-out ${delay}ms, transform 0.4s ${ease} ${delay}ms`;
+      el.style.opacity = "";
+      el.style.transform = "";
+    });
+    ghosts.forEach((g) => {
+      g.style.transition = "opacity 0.2s ease-out, transform 0.25s ease-out";
+      g.style.opacity = "0";
+      g.style.transform = "scale(0.9)";
+    });
+
+    setTimeout(() => {
+      ghosts.forEach((g) => g.remove());
+      [...moved, ...entering].forEach((el) => {
+        el.style.transition = "";
+        el.style.transform = "";
+        el.style.opacity = "";
+      });
+    }, 680);
+  });
+}
+function getVisibleFavourites(favs) {
+  const sorter = SORTERS[selectedSort] || SORTERS.newest;
+  const filtered = selectedCategory === "all" ? favs : favs.filter((f) => categoryOf(f) === selectedCategory);
+  return sorter(filtered);
+}
+
+function updateCount(visibleCount, totalCount) {
+  if (!countEl) return;
+  const noun = (n) => (n === 1 ? "recipe" : "recipes");
+  countEl.textContent =
+    visibleCount === totalCount
+      ? `${totalCount} saved ${noun(totalCount)}`
+      : `Showing ${visibleCount} of ${totalCount} saved ${noun(totalCount)}`;
+}
+
+// Ids of the cards currently on screen, in order (ghost cards from the remove animation have no id).
+function shownCardKey() {
+  if (!listEl) return "";
+  return Array.from(listEl.querySelectorAll(".recipe-card[data-card-id]"))
+    .map((c) => c.getAttribute("data-card-id"))
+    .join(",");
+}
+
+// Adds allergen / diet badges using the stored ingredientNames, so no extra API calls.
+function decorateBadges(favs) {
   const prefs = getPreferences();
-  checkRecipes(favs, prefs)
+  checkRecipes(favs.map(withStoredIngredients), prefs)
     .then((checked) => {
       checked.forEach(({ recipe, result }) => {
         const card = listEl.querySelector(`[data-card-id="${recipe.id}"]`);
-        if (card) {
-          decorateCard(card, result);
-        }
+        if (card) decorateCard(card, result);
       });
     })
     .catch((err) => {
@@ -583,21 +1029,67 @@ async function renderFavourites() {
     });
 }
 
-if (listEl) {
-  renderFavourites();
-  window.addEventListener("auth-changed", () => {
-    renderFavourites();
-  });
-  window.addEventListener("storage", (e) => {
-    if (e.key === "recipeplan_user") renderFavourites();
-  });
-  window.addEventListener("preferences-changed", () => {
-    renderFavourites();
-  });
-  window.addEventListener("favourites-changed", () => {
-    // If currently displaying the empty state, re-render to transition into the favourites cards
-    if (messageEl && messageEl.innerHTML.trim() !== "") {
-      renderFavourites();
+function renderPage(favs, { pending = false } = {}) {
+  if (!listEl) return;
+  allFavourites = Array.isArray(favs) ? favs : [];
+
+  if (!getCurrentUser()) {
+    listEl.innerHTML = "";
+    renderEmptyState();
+    return;
+  }
+
+  if (!allFavourites.length) {
+    if (pending) {
+      // Signed in, waiting for the cloud list: show the spinner, not "no favourites yet".
+      if (currentView !== "loading") {
+        setToolbarVisible(false);
+        renderLoadingSpinner();
+        currentView = "loading";
+      }
+      return;
     }
+    if (currentView === "empty" && !listEl.querySelector(".recipe-card")) return;
+    listEl.innerHTML = "";
+    renderEmptyState();
+    return;
+  }
+
+  setToolbarVisible(true);
+  updateCategoryMenu(allFavourites);
+  const visible = getVisibleFavourites(allFavourites);
+  updateCount(visible.length, allFavourites.length);
+
+  // Skip the redraw when the same cards are already shown in the same order
+  // (for example right after a remove animation), but refresh the badges.
+  const key = visible.map((f) => String(f.id)).join(",");
+  if (currentView === "cards" && key === shownCardKey()) {
+    decorateBadges(visible);
+    return;
+  }
+
+  if (messageEl) messageEl.innerHTML = "";
+  const before = currentView === "cards" ? captureCardPositions() : new Map();
+  renderCardsFast(visible);
+  playCardFlip(before);
+  currentView = "cards";
+  decorateBadges(visible);
+}
+
+// Used by Undo: re-reads favourites once (the live listener also catches the change).
+async function renderFavourites() {
+  renderPage(await getFavourites());
+}
+
+if (listEl) {
+  if (getCurrentUser()) {
+    renderLoadingSpinner();
+    currentView = "loading";
+  }
+
+  watchFavourites((favs, info) => renderPage(favs, info));
+
+  window.addEventListener("preferences-changed", () => {
+    if (currentView === "cards") decorateBadges(getVisibleFavourites(allFavourites));
   });
 }
