@@ -41,7 +41,7 @@ All site files live in `public/`. The repo currently has:
 - GitHub Pages: `.github/workflows/deploy.yml` uploads `./public`
 - Firebase Hosting: `firebase.json`, `.firebaserc` (project `recipe-plan-app`) and the two `firebase-hosting-*.yml` workflows
 
-See "Open decisions" for which one is the official submission link.
+Both deploy on every push to `main`. The GitHub Pages link (<https://kahlen2008.github.io/webprogproject/>) is the one used in the proposal and README, so treat it as the submission link.
 
 ## Rules
 
@@ -59,7 +59,7 @@ See "Open decisions" for which one is the official submission link.
 | -------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1 (Lead) | Accounts, onboarding, profile, diet and allergy checker, languages (i18n), Firestore schema helpers, security rules | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/i18n.js`, `js/schema.js`, `js/firebase-config.js`, `css/auth.css`, `css/onboarding.css`, `firestore.rules` |
 | 2        | Recipe discovery, API, shared look                                      | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css`                                                                                           |
-| 3        | Favourites, ratings and comments, QA                                    | `favourites.html`, `js/favourites.js`, `css/favourites.css`, ratings code (planned `js/ratings.js`)                                                                                                                                                        |
+| 3        | Favourites, ratings and comments, QA                                    | `favourites.html`, `js/favourites.js`, `css/favourites.css`, `js/ratings.js`                                                                                                                                                        |
 | 4        | Meal planner, shopping list, deployment, README                         | `planner.html`, `js/planner.js`, `css/planner.css`, `firebase.json`, `.github/workflows/`, `README.md`                                                                                                                                                 |
 | Anyone   | Small shared helpers                                                    | `js/utils.js` (add, do not change existing functions)                                                                                                                                                                                                            |
 
@@ -94,10 +94,12 @@ Recipe object used everywhere:
 ```
 
 **`js/favourites.js` (Person 3)**
-`getFavourites()`, `addFavourite(recipe)`, `removeFavourite(recipeId)`, `isFavourite(recipeId)`, `watchFavourites(cb)`.
+`getFavourites()`, `addFavourite(recipe)` (also saves `ingredientNames`), `removeFavourite(recipeId)`, `isFavourite(recipeId)`, `watchFavourites(cb)`.
+`watchFavourites` listens live with Firestore `onSnapshot` while signed in (localStorage when signed out or offline), calls `cb(favs, { pending })`, and returns a function that stops watching. `pending` is true while a signed-in session is still being restored.
 
 **`js/planner.js` (Person 4)**
-`DAYS`, `MEALS`, `getPlan()`, `savePlan(plan)`, `addToPlan(day, meal, recipe, skipConfirm)`, `removeFromPlan(day, meal)`, `generateFromFavourites()`, `renderPlannerTable()`.
+`DAYS`, `MEALS`, `emptyPlan()`, `shownWeekId()`, `getPlan(weekId?)`, `savePlan(plan, weekId?)`, `addToPlan(day, meal, recipe, options)`, `removeFromPlan(day, meal)`, `moveInPlan(fromDay, fromMeal, toDay, toMeal)`, `clearWeek()`, `generateFromFavourites()`, `renderPlannerTable()`.
+`weekId` defaults to the week shown on the planner (this week on other pages). `addToPlan` options: `{ skipConfirm }` skips the replace and allergen prompts, `{ skipAllergenCheck }` skips only the allergen prompt (use it when the caller already ran `confirmIfFlagged`). Other pages should call `addToPlan` instead of writing the plan themselves.
 
 **`js/utils.js` (shared)**
 `escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText`, `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items).
@@ -114,7 +116,7 @@ users/{uid}
   hideFlagged: boolean
   onboardingComplete: boolean
   onboardingStep: 1 | 2
-  favourites/{recipeId}     { id, name, image, category, area, savedAt }
+  favourites/{recipeId}     { id, name, image, category, area, ingredientNames, savedAt }
   mealPlan/{weekId}         { Mon: { Breakfast, Lunch, Dinner }, ... }
   shoppingList/{weekId}     { items: [{ name, measure, checked }] }
 
@@ -128,11 +130,15 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 ## Current status vs plan (check before you build)
 
-- `schema.js` has the Firestore helpers, but no page imports them yet. Favourites and the weekly plan are still stored in `localStorage` only. Firestore sync (`users/{uid}/favourites`, `mealPlan`) is still to do (Persons 3 and 4). Preferences already sync to Firestore.
+- Favourites sync to Firestore live (`onSnapshot`) and store `ingredientNames`. The favourites page has category and sort menus.
+- The weekly plan is saved per week to `users/{uid}/mealPlan/{weekId}` through `schema.js`, with a localStorage copy per user. The week arrows now show each week's own plan. The recipe page's "Add to meal plan" goes through `addToPlan` (still always Mon Dinner).
+- Planner: drag and drop between slots (tablet and desktop; dropping on a filled slot swaps them), day tabs on phones, Clear week with Undo, and a week switcher with a "Back to today" button.
+- The card heart buttons in `utils.js` and `search-cta.js` still write favourites to Firestore themselves instead of calling `favourites.js`. The favourites page adds the missing `ingredientNames` in the background, but these should switch to `addFavourite` / `removeFavourite`.
 - The shopping list on `planner.html` is still sample markup. It needs to be built from the plan using `combineIngredients` (Person 4).
-- Ratings and comments are not built yet (no `ratings.js`; the rule is in place).
-- `planner.js` still seeds a demo plan on first load. Remove before final.
-- "Generate from Favourites" in the planner is an extra we added.
+- Ratings and comments are built (`ratings.js`).
+- The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).
+- Still to do (Person 4), in this order: build the shopping list from the plan, save checkbox state to `shoppingList/{weekId}`, then the print view and Copy list.
+- "Fill from favourites" (in the planner's ⋯ menu, next to Clear week) is an extra we added.
 - Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
 
 ## Shared UI/UX rules

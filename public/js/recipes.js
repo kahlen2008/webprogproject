@@ -1369,35 +1369,15 @@ async function showRecipe(id) {
         }
 
         if (!(await confirmIfFlagged(recipe))) return;
-        // Save to meal plan in localStorage
+        // Save through the planner so it goes to this week's plan on the account (Firestore).
+        // addToPlan asks before replacing a meal that is already there.
         try {
-          const raw = localStorage.getItem("recipeplan_weekly_plan");
-          const plan = raw ? JSON.parse(raw) : {};
-          const existingMeal = plan.Mon?.Dinner;
-
-          if (existingMeal && existingMeal.name) {
-            const existingName = toTitleCase(existingMeal.name);
-            const newName = toTitleCase(recipe.name || "this recipe");
-            const confirmed = await showConfirmModal({
-              title: "Replace existing meal?",
-              message: `"${existingName}" is already scheduled for Mon Dinner. Do you want to replace it with "${newName}"?`,
-              confirmText: "Replace Meal",
-              cancelText: "Keep Current",
-              confirmColor: "primary"
-            });
-            if (!confirmed) return;
-          }
-
-          if (!plan.Mon) plan.Mon = {};
-          plan.Mon.Dinner = {
-            id: recipe.id,
-            name: recipe.name,
-            image: recipe.image
-          };
-          localStorage.setItem("recipeplan_weekly_plan", JSON.stringify(plan));
-          showToast(`Added "${toTitleCase(recipe.name)}" to Mon Dinner!`);
+          const { addToPlan } = await import("./planner.js");
+          const added = await addToPlan("Mon", "Dinner", recipe, { skipAllergenCheck: true });
+          if (added) showToast(`Added "${toTitleCase(recipe.name)}" to Mon Dinner!`);
         } catch (e) {
-          showToast(`Added to your weekly meal plan!`);
+          console.warn("Could not add to meal plan:", e);
+          showToast("Couldn't add this recipe to your plan. Please try again.");
         }
       });
     }

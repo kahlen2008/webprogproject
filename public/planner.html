@@ -54,32 +54,60 @@
 
     <div id="planner-main-content" class="space-y-6">
       <!-- Planner Header & Toolbar -->
-      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-      <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">Weekly Meal Plan</h1>
+      <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+        <div class="min-w-0">
+          <h1 class="text-2xl sm:text-3xl font-extrabold text-stone-900 tracking-tight">Weekly Meal Plan</h1>
 
-      <!-- Date Range Navigator -->
-      <div class="inline-flex items-center gap-3 bg-white px-3 py-1.5 rounded-2xl border border-[#efe6dc] shadow-xs">
-        <button id="prev-week-btn" type="button" class="p-1 rounded-lg text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition focus:outline-none" aria-label="Previous week">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
-        </button>
-        <span id="week-label" class="text-xs sm:text-sm font-semibold text-stone-700 select-none">23 Nov – 29 Nov 2026</span>
-        <button id="next-week-btn" type="button" class="p-1 rounded-lg text-stone-400 hover:text-stone-800 hover:bg-stone-100 transition focus:outline-none" aria-label="Next week">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
-        </button>
+          <!-- Week switcher -->
+          <div class="mt-1.5 flex items-center gap-1 -ml-1.5">
+            <button id="prev-week-btn" type="button" class="p-1.5 rounded-full text-stone-400 hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40" aria-label="Previous week">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+            <span class="select-none tabular-nums" aria-live="polite">
+              <span id="week-label" class="text-sm font-semibold text-stone-700">9 – 15 Nov 2026</span>
+              <span id="week-relative" class="text-sm text-stone-400">· This week</span>
+            </span>
+            <button id="next-week-btn" type="button" class="p-1.5 rounded-full text-stone-400 hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40" aria-label="Next week">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>
+            </button>
+            <button id="this-week-btn" type="button" title="Go back to the current week" class="hidden ml-2 items-center gap-1 px-2.5 py-1 rounded-full border border-[#ede4da] bg-white text-xs font-semibold text-stone-600 hover:text-[#ca5c2e] hover:border-[#ca5c2e]/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">
+              <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.4" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M9 14L4 9l5-5M4 9h10.5a5.5 5.5 0 010 11H11"></path></svg>
+              Back to today
+            </button>
+          </div>
+        </div>
+
+        <!-- Actions: one main button, the rest in a menu -->
+        <div class="flex items-center gap-2">
+          <button id="open-add-drawer-btn" type="button" class="inline-flex items-center gap-1.5 bg-[#ca5c2e] hover:bg-[#b34d23] text-white pl-3.5 pr-4 h-10 rounded-full text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ca5c2e]/50 shadow-sm">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            Add meal
+          </button>
+
+          <div class="relative">
+            <button id="plan-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="plan-menu" aria-label="More plan actions" class="w-10 h-10 inline-flex items-center justify-center rounded-full bg-white border border-[#ede4da] text-stone-500 hover:text-[#ca5c2e] hover:border-[#ca5c2e]/50 aria-expanded:text-[#ca5c2e] aria-expanded:border-[#ca5c2e]/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 shadow-2xs">
+              <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
+            </button>
+            <div id="plan-menu" role="menu" aria-labelledby="plan-menu-btn" tabindex="-1" class="focus:outline-none hidden absolute right-0 top-full mt-2 w-60 bg-white rounded-2xl shadow-lg border border-[#efe6dc] p-1.5 z-30 origin-top-right opacity-0 scale-95 transition duration-150 ease-out">
+              <button id="generate-plan-btn" type="button" role="menuitem" tabindex="-1" class="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-[#fbf2ec] focus-visible:bg-[#fbf2ec] focus:outline-none transition group">
+                <svg class="w-4 h-4 mt-0.5 shrink-0 text-[#ca5c2e]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
+                <span>
+                  <span class="block text-sm font-semibold text-stone-800 group-hover:text-[#ca5c2e] group-focus-visible:text-[#ca5c2e]">Fill from favourites</span>
+                  <span class="block text-xs text-stone-500">Puts saved recipes in the empty slots</span>
+                </span>
+              </button>
+              <div class="my-1 border-t border-[#f1e8de]" role="separator"></div>
+              <button id="clear-week-btn" type="button" role="menuitem" tabindex="-1" class="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-red-50 focus-visible:bg-red-50 focus:outline-none disabled:opacity-45 disabled:pointer-events-none transition group">
+                <svg class="w-4 h-4 mt-0.5 shrink-0 text-red-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M4 7h16M10 11v6M14 11v6M5 7l1 12a2 2 0 002 2h8a2 2 0 002-2l1-12M9 7V4h6v3"></path></svg>
+                <span>
+                  <span class="block text-sm font-semibold text-stone-800 group-hover:text-red-600 group-focus-visible:text-red-600">Clear week</span>
+                  <span class="block text-xs text-stone-500">Removes every meal this week</span>
+                </span>
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
-
-      <!-- Action Buttons -->
-      <div class="flex flex-wrap items-center gap-2">
-
-        <button id="open-add-drawer-btn" type="button" class="inline-flex items-center gap-1.5 bg-[#ca5c2e] hover:bg-[#b34d23] text-white px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition focus:outline-none shadow-xs">
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-          Add to Calendar
-        </button>
-        <button id="generate-plan-btn" type="button" class="inline-flex items-center gap-2 border border-[#ca5c2e] text-[#ca5c2e] hover:bg-[#ca5c2e]/10 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold transition focus:outline-none shadow-xs">
-          Generate from Favourites
-        </button>
-      </div>
-    </div>
 
     <!-- Weekly Planner Table Card (tablet and desktop) -->
     <div class="hidden sm:block bg-white rounded-3xl border border-[#efe6dc] shadow-sm overflow-hidden">

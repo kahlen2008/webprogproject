@@ -1,42 +1,19 @@
-// Weekly Meal planner and shopping list logic matching RecipePlan mockup.
-// Owner: Person 4.
+// Weekly meal planner logic. Owner: Person 4.
+// Each week has its own plan, saved to Firestore at users/{uid}/mealPlan/{weekId}
+// (weekId like "2026-W46", see schema.js). A copy is kept in localStorage per user
+// so the page paints instantly and still works offline.
 
 import { showToast, toTitleCase, showAuthPromptModal, showConfirmModal, escapeHtml } from "./utils.js";
 import { getFavourites } from "./favourites.js";
 import { confirmIfFlagged } from "./preferences.js";
 import { searchRecipes, getRecipeById } from "./api.js";
 import { estimateNutrition } from "./nutrition.js";
-import { getCurrentUser } from "./auth.js";
+import { getCurrentUser, onAuthChange } from "./auth.js";
+import { auth } from "./firebase-config.js";
+import { getCurrentWeekId, saveUserMealPlan, fetchUserMealPlan, createMealPlanDoc } from "./schema.js";
 
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const MEALS = ["Breakfast", "Lunch", "Dinner"];
-
-// Default weekly plan using authentic TheMealDB recipes
-const DEMO_PLAN = {
-  Mon: {
-    Breakfast: { id: "52855", name: "Banana Pancakes", image: "https://www.themealdb.com/images/media/meals/sywswr1511383814.jpg" },
-    Lunch: { id: "53011", name: "Chicken Quinoa Greek Salad", image: "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg" },
-    Dinner: { id: "52982", name: "Spaghetti alla Carbonara", image: "https://www.themealdb.com/images/media/meals/llcbn01574260722.jpg" }
-  },
-  Tue: {
-    Breakfast: { id: "52957", name: "Fruit and Cream Cheese Breakfast Pastries", image: "https://www.themealdb.com/images/media/meals/1543774956.jpg" },
-    Lunch: { id: "52830", name: "Crock Pot Chicken Baked Tacos", image: "https://www.themealdb.com/images/media/meals/ypxvwv1505333929.jpg" },
-    Dinner: { id: "53194", name: "Tom Yum Soup with Prawns", image: "https://www.themealdb.com/images/media/meals/l50vz41763422681.jpg" }
-  },
-  Wed: {
-    Breakfast: { id: "52854", name: "Pancakes", image: "https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg" },
-    Lunch: { id: "52772", name: "Teriyaki Chicken Casserole", image: "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg" },
-    Dinner: { id: "52844", name: "Lasagne", image: "https://www.themealdb.com/images/media/meals/wtsvxx1511296896.jpg" }
-  },
-  Thu: {
-    Breakfast: null,
-    Lunch: { id: "52874", name: "Beef and Mustard Pie", image: "https://www.themealdb.com/images/media/meals/sytuqu1511553755.jpg" },
-    Dinner: null
-  },
-  Fri: { Breakfast: null, Lunch: null, Dinner: null },
-  Sat: { Breakfast: null, Lunch: null, Dinner: null },
-  Sun: { Breakfast: null, Lunch: null, Dinner: null }
-};
 
 // Side drawer / modal state
 let currentDrawerDay = "Mon";
@@ -58,92 +35,176 @@ const POPULAR_SEARCH_TAGS = [
   "Breakfast"
 ];
 
-export async function getPlan() {
+// ---------- Plan storage ----------
+
+// Which week is shown: 0 = this week, -1 = last week, 1 = next week.
+let weekOffset = 0;
+
+// The old single-week plan from before plans were saved per week and per account.
+const LEGACY_PLAN_KEY = "recipeplan_weekly_plan";
+// The demo plan older versions seeded on first visit. If the legacy plan still
+// matches it exactly, the user never edited it, so it is dropped instead of migrated.
+const LEGACY_DEMO_SIGNATURE =
+  "Mon.Breakfast:52855|Mon.Lunch:53011|Mon.Dinner:52982|Tue.Breakfast:52957|Tue.Lunch:52830|Tue.Dinner:53194|" +
+  "Wed.Breakfast:52854|Wed.Lunch:52772|Wed.Dinner:52844|Thu.Lunch:52874";
+
+const memoryPlans = new Map(); // `${uid}/${weekId}` -> plan, loaded this session
+
+export function emptyPlan() {
+  const plan = {};
+  DAYS.forEach((day) => {
+    plan[day] = {};
+    MEALS.forEach((meal) => (plan[day][meal] = null));
+  });
+  return plan;
+}
+
+function clonePlan(plan) {
+  return JSON.parse(JSON.stringify(plan || emptyPlan()));
+}
+
+// Always returns every day and meal, with entries reduced to { id, name, image }.
+function normalisePlan(plan) {
+  return createMealPlanDoc(plan || {});
+}
+
+function planSignature(plan) {
+  const parts = [];
+  DAYS.forEach((day) =>
+    MEALS.forEach((meal) => {
+      const item = plan?.[day]?.[meal];
+      if (item) parts.push(`${day}.${meal}:${item.id}`);
+    })
+  );
+  return parts.join("|");
+}
+
+function isPlanEmpty(plan) {
+  return planSignature(plan) === "";
+}
+
+// Monday of the week being shown (or another offset).
+function weekStart(offset = weekOffset) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const monday = new Date(today);
+  monday.setDate(today.getDate() - ((today.getDay() + 6) % 7) + offset * 7);
+  return monday;
+}
+
+export function shownWeekId() {
+  return getCurrentWeekId(weekStart());
+}
+
+function cacheKey(uid) {
+  return `recipeplan_meal_plans_${uid}`;
+}
+
+function readLocalPlans(uid) {
   try {
-    const raw = localStorage.getItem("recipeplan_weekly_plan");
-    if (!raw) {
-      localStorage.setItem("recipeplan_weekly_plan", JSON.stringify(DEMO_PLAN));
-      return JSON.parse(JSON.stringify(DEMO_PLAN));
-    }
-    const plan = JSON.parse(raw);
-    let changed = false;
-
-    // Migrate any legacy mock recipes or un-ID'd entries from previous demo data
-    DAYS.forEach((day) => {
-      if (!plan[day]) return;
-      MEALS.forEach((meal) => {
-        const item = plan[day][meal];
-        if (!item) return;
-
-        if (item.id === "greek-salad" || item.name === "Greek Salad") {
-          item.id = "53011";
-          item.name = "Chicken Quinoa Greek Salad";
-          item.image = "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg";
-          changed = true;
-        } else if (item.name === "Banana Pancakes") {
-          if (item.id !== "52855") {
-            item.id = "52855";
-            item.image = "https://www.themealdb.com/images/media/meals/sywswr1511383814.jpg";
-            changed = true;
-          }
-        } else if (item.name === "Chicken Salad" && (!item.id || item.id === "0")) {
-          item.id = "53011";
-          item.name = "Chicken Quinoa Greek Salad";
-          item.image = "https://www.themealdb.com/images/media/meals/k29viq1585565980.jpg";
-          changed = true;
-        } else if (item.name === "Spaghetti Carbonara" && (!item.id || item.id === "0")) {
-          item.id = "52982";
-          item.name = "Spaghetti alla Carbonara";
-          item.image = "https://www.themealdb.com/images/media/meals/llcbn01574260722.jpg";
-          changed = true;
-        } else if (item.name === "Tom Yum Soup" && (!item.id || item.id === "0")) {
-          item.id = "53194";
-          item.name = "Tom Yum Soup with Prawns";
-          item.image = "https://www.themealdb.com/images/media/meals/l50vz41763422681.jpg";
-          changed = true;
-        } else if (item.name === "Beef Tacos" && (!item.id || item.id === "0")) {
-          item.id = "52830";
-          item.name = "Crock Pot Chicken Baked Tacos";
-          item.image = "https://www.themealdb.com/images/media/meals/ypxvwv1505333929.jpg";
-          changed = true;
-        } else if (item.name === "Greek Yogurt Parfait" && (!item.id || item.id === "0")) {
-          item.id = "52957";
-          item.name = "Fruit and Cream Cheese Breakfast Pastries";
-          item.image = "https://www.themealdb.com/images/media/meals/1543774956.jpg";
-          changed = true;
-        } else if (item.name === "Avocado Toast" && (!item.id || item.id === "0")) {
-          item.id = "52854";
-          item.name = "Pancakes";
-          item.image = "https://www.themealdb.com/images/media/meals/rwuyqx1511383174.jpg";
-          changed = true;
-        } else if (item.name === "Teriyaki Chicken Casserole" && (!item.id || item.id === "0")) {
-          item.id = "52772";
-          item.image = "https://www.themealdb.com/images/media/meals/wvpsxx1468256321.jpg";
-          changed = true;
-        }
-      });
-    });
-
-    if (changed) {
-      localStorage.setItem("recipeplan_weekly_plan", JSON.stringify(plan));
-    }
-    return plan;
+    return JSON.parse(localStorage.getItem(cacheKey(uid)) || "{}") || {};
   } catch (e) {
-    return JSON.parse(JSON.stringify(DEMO_PLAN));
+    return {};
   }
 }
 
-export async function savePlan(plan) {
+function writeLocalPlan(uid, weekId, plan) {
   try {
-    localStorage.setItem("recipeplan_weekly_plan", JSON.stringify(plan));
+    const all = readLocalPlans(uid);
+    if (isPlanEmpty(plan)) delete all[weekId];
+    else all[weekId] = plan;
+    localStorage.setItem(cacheKey(uid), JSON.stringify(all));
   } catch (e) {}
 }
 
-export async function addToPlan(day, meal, recipe, skipConfirm = false) {
+// Firebase has restored the session, so Firestore reads and writes will pass the rules.
+function cloudUid() {
+  return auth?.currentUser?.uid || null;
+}
+
+// Moves a plan saved by an older version (browser only, one repeating week) into
+// this week's plan on the account, once. The unedited demo plan is just dropped.
+async function migrateLegacyPlan(uid, weekId, cloudPlan) {
+  let legacy = null;
+  try {
+    legacy = JSON.parse(localStorage.getItem(LEGACY_PLAN_KEY) || "null");
+  } catch (e) {}
+  if (!legacy) return cloudPlan;
+  try {
+    localStorage.removeItem(LEGACY_PLAN_KEY);
+  } catch (e) {}
+
+  const legacyPlan = normalisePlan(legacy);
+  const sig = planSignature(legacyPlan);
+  if (!sig || sig === LEGACY_DEMO_SIGNATURE) return cloudPlan;
+  if (cloudPlan && !isPlanEmpty(cloudPlan)) return cloudPlan; // never overwrite a saved week
+
+  await saveUserMealPlan(uid, weekId, legacyPlan);
+  return legacyPlan;
+}
+
+/**
+ * Returns the plan for a week (the shown week by default).
+ * Signed in: Firestore, cached in memory for the session. Before Firebase has
+ * restored the session, or offline: the localStorage copy.
+ */
+export async function getPlan(weekId = shownWeekId()) {
+  const user = getCurrentUser();
+  if (!user) return emptyPlan();
+
+  const uid = cloudUid();
+  const localUid = uid || user.uid;
+  const key = `${localUid}/${weekId}`;
+  if (memoryPlans.has(key)) return clonePlan(memoryPlans.get(key));
+
+  if (uid) {
+    try {
+      let plan = await fetchUserMealPlan(uid, weekId);
+      if (weekId === getCurrentWeekId()) plan = await migrateLegacyPlan(uid, weekId, plan);
+      const clean = normalisePlan(plan);
+      memoryPlans.set(key, clean);
+      writeLocalPlan(uid, weekId, clean);
+      return clonePlan(clean);
+    } catch (err) {
+      console.warn("Could not load meal plan from Firestore, using local copy:", err);
+    }
+  }
+
+  return normalisePlan(localUid ? readLocalPlans(localUid)[weekId] : null);
+}
+
+/** Saves a week's plan (the shown week by default) locally at once, then to Firestore. */
+export async function savePlan(plan, weekId = shownWeekId()) {
+  const user = getCurrentUser();
+  if (!user) return;
+  const clean = normalisePlan(plan);
+  const uid = cloudUid() || user.uid;
+
+  writeLocalPlan(uid, weekId, clean);
+
+  if (cloudUid()) {
+    memoryPlans.set(`${uid}/${weekId}`, clean);
+    try {
+      await saveUserMealPlan(cloudUid(), weekId, clean);
+    } catch (err) {
+      console.warn("Could not save meal plan to Firestore:", err);
+      showToast("Couldn't save your plan to your account. It's kept on this device for now.");
+    }
+  }
+}
+
+/**
+ * Puts a recipe in a slot of the shown week.
+ * options.skipConfirm: skip the replace and allergen prompts (used by Undo and moves).
+ * options.skipAllergenCheck: skip only the allergen prompt (the caller already asked).
+ * A boolean is still accepted in place of options, meaning skipConfirm.
+ */
+export async function addToPlan(day, meal, recipe, options = {}) {
+  const opts = typeof options === "boolean" ? { skipConfirm: options } : options || {};
   const plan = await getPlan();
   const existingMeal = plan[day]?.[meal];
 
-  if (!skipConfirm && existingMeal && existingMeal.name) {
+  if (!opts.skipConfirm && existingMeal && existingMeal.name) {
     const existingName = toTitleCase(existingMeal.name);
     const newName = toTitleCase(recipe.name || "this recipe");
     const confirmed = await showConfirmModal({
@@ -156,8 +217,7 @@ export async function addToPlan(day, meal, recipe, skipConfirm = false) {
     if (!confirmed) return false;
   }
 
-  if (!skipConfirm && !(await confirmIfFlagged(recipe))) return false;
-  if (!plan[day]) plan[day] = {};
+  if (!opts.skipConfirm && !opts.skipAllergenCheck && !(await confirmIfFlagged(recipe))) return false;
   plan[day][meal] = {
     id: recipe.id || "0",
     name: recipe.name,
@@ -172,8 +232,9 @@ export async function removeFromPlan(day, meal, options = {}) {
   const plan = await getPlan();
   if (plan[day] && plan[day][meal]) {
     const previousItem = { ...plan[day][meal] };
+    const weekId = shownWeekId();
     plan[day][meal] = null;
-    await savePlan(plan);
+    await savePlan(plan, weekId);
     renderPlannerTable();
 
     if (!options.silent) {
@@ -183,13 +244,68 @@ export async function removeFromPlan(day, meal, options = {}) {
         action: {
           label: "Undo",
           onClick: async () => {
-            await addToPlan(day, meal, previousItem, true);
+            const current = await getPlan(weekId);
+            current[day][meal] = previousItem;
+            await savePlan(current, weekId);
+            renderPlannerTable();
             showToast(`Restored "${recipeName}" to ${day} ${meal}!`);
           }
         }
       });
     }
   }
+}
+
+// Moves a meal to another slot in the shown week. If that slot is filled, the two swap.
+export async function moveInPlan(fromDay, fromMeal, toDay, toMeal) {
+  if (fromDay === toDay && fromMeal === toMeal) return;
+  const plan = await getPlan();
+  const moving = plan[fromDay]?.[fromMeal];
+  if (!moving) return;
+  const target = plan[toDay]?.[toMeal] || null;
+
+  plan[toDay][toMeal] = moving;
+  plan[fromDay][fromMeal] = target;
+  await savePlan(plan);
+  renderPlannerTable();
+
+  const name = toTitleCase(moving.name || "Recipe");
+  showToast(target ? `Swapped "${name}" with "${toTitleCase(target.name || "Recipe")}"` : `Moved "${name}" to ${toDay} ${toMeal}`);
+}
+
+// Empties every slot in the shown week, after asking. Undo puts it back.
+export async function clearWeek() {
+  const weekId = shownWeekId();
+  const plan = await getPlan(weekId);
+  if (isPlanEmpty(plan)) {
+    showToast("This week is already empty.");
+    return;
+  }
+
+  const count = planSignature(plan).split("|").length;
+  const confirmed = await showConfirmModal({
+    title: "Clear this week?",
+    message: `This removes all ${count} planned meal${count === 1 ? "" : "s"} for ${document.getElementById("week-label")?.textContent || "this week"}.`,
+    confirmText: "Clear Week",
+    cancelText: "Keep Meals",
+    confirmColor: "danger"
+  });
+  if (!confirmed) return;
+
+  const previous = clonePlan(plan);
+  await savePlan(emptyPlan(), weekId);
+  renderPlannerTable();
+  showToast("Week cleared", {
+    duration: 6000,
+    action: {
+      label: "Undo",
+      onClick: async () => {
+        await savePlan(previous, weekId);
+        renderPlannerTable();
+        showToast("Meals restored!");
+      }
+    }
+  });
 }
 
 export async function generateFromFavourites() {
@@ -203,7 +319,6 @@ export async function generateFromFavourites() {
   let favIndex = 0;
 
   DAYS.forEach((day) => {
-    if (!plan[day]) plan[day] = {};
     MEALS.forEach((meal) => {
       if (!plan[day][meal]) {
         const picked = favs[favIndex % favs.length];
@@ -330,10 +445,6 @@ async function fillDayCalorieTotals(plan) {
   );
 }
 
-// Which week is shown: 0 = this week, -1 = last week, 1 = next week.
-// The saved plan is a single repeating week, so this only changes the dates shown.
-let weekOffset = 0;
-
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const FALLBACK_MEAL_IMG = "https://images.unsplash.com/photo-1498837167922-ddd27525d352?auto=format&fit=crop&w=160&q=80";
 
@@ -358,8 +469,32 @@ function updateWeekLabel() {
   const label = document.getElementById("week-label");
   if (!label) return;
   const dates = getWeekDates();
+  const first = dates[0];
   const last = dates[6];
-  label.textContent = `${formatShortDate(dates[0])} – ${formatShortDate(last)} ${last.getFullYear()}`;
+  // "9 – 15 Nov 2026", or "30 Nov – 6 Dec 2026" when the week crosses a month
+  // (and "29 Dec 2026 – 4 Jan 2027" across a year).
+  if (first.getFullYear() !== last.getFullYear()) {
+    label.textContent = `${formatShortDate(first)} ${first.getFullYear()} – ${formatShortDate(last)} ${last.getFullYear()}`;
+  } else if (first.getMonth() !== last.getMonth()) {
+    label.textContent = `${formatShortDate(first)} – ${formatShortDate(last)} ${last.getFullYear()}`;
+  } else {
+    label.textContent = `${first.getDate()} – ${formatShortDate(last)} ${last.getFullYear()}`;
+  }
+  const backBtn = document.getElementById("this-week-btn");
+  backBtn?.classList.toggle("hidden", weekOffset === 0);
+  backBtn?.classList.toggle("inline-flex", weekOffset !== 0);
+
+  // Says which week this is compared to today.
+  const relative = document.getElementById("week-relative");
+  if (relative) {
+    const n = Math.abs(weekOffset);
+    let text = "This week";
+    if (weekOffset === 1) text = "Next week";
+    else if (weekOffset === -1) text = "Last week";
+    else if (weekOffset > 1) text = `In ${n} weeks`;
+    else if (weekOffset < -1) text = `${n} weeks ago`;
+    relative.textContent = `· ${text}`;
+  }
 }
 
 function isToday(d) {
@@ -368,16 +503,20 @@ function isToday(d) {
 }
 
 // One filled meal: photo, name on up to two lines, remove button in the corner.
+// On larger screens the tile can be dragged to another slot.
 function mealTileHtml(item, day, meal, compact = false) {
   const hasLink = item.id && item.id !== "0";
   const link = hasLink ? `recipe.html?id=${encodeURIComponent(item.id)}` : "#";
   const name = escapeHtml(toTitleCase(item.name || ""));
   const img = escapeHtml(item.image || FALLBACK_MEAL_IMG);
   const size = compact ? "w-12 h-12" : "w-16 h-16";
+  const dragAttrs = compact
+    ? ""
+    : `draggable="true" data-drag-day="${day}" data-drag-meal="${meal}" title="Drag to move, or click to view the recipe"`;
   return `
-    <div class="relative group h-full">
-      <a href="${link}" class="flex items-center gap-3 h-full bg-white border border-[#efe6dc] rounded-2xl p-2 pr-7 shadow-xs hover:border-[#ca5c2e]/50 hover:shadow-sm transition" title="View recipe">
-        <img src="${img}" alt="${name}" loading="lazy" class="${size} rounded-xl object-cover flex-shrink-0 bg-stone-100">
+    <div class="plan-tile relative group h-full ${compact ? "" : "cursor-grab active:cursor-grabbing"}" ${dragAttrs}>
+      <a href="${link}" draggable="false" class="flex items-center gap-3 h-full bg-white border border-[#efe6dc] rounded-2xl p-2 pr-7 shadow-xs hover:border-[#ca5c2e]/50 hover:shadow-sm transition">
+        <img src="${img}" alt="${name}" loading="lazy" draggable="false" class="${size} rounded-xl object-cover flex-shrink-0 bg-stone-100">
         <span class="text-sm font-semibold text-stone-800 group-hover:text-[#ca5c2e] leading-snug line-clamp-2">${name}</span>
       </a>
       <button type="button" class="remove-plan-item absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 border border-stone-200 text-stone-400 hover:text-red-500 hover:border-red-200 flex items-center justify-center text-sm leading-none shadow-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" data-day="${day}" data-meal="${meal}" title="Remove meal" aria-label="Remove ${name} from ${day} ${meal}">&times;</button>
@@ -395,15 +534,86 @@ function emptySlotHtml(day, meal, compact = false) {
   `;
 }
 
+// Phones show one day at a time. Defaults to today when the shown week is this week.
+let mobileDay = null;
+
+function defaultMobileDay(dates) {
+  const todayIndex = dates.findIndex(isToday);
+  return DAYS[todayIndex >= 0 ? todayIndex : 0];
+}
+
+function dayTabsHtml(plan, dates) {
+  return `
+    <div role="tablist" aria-label="Day of the week" class="grid grid-cols-7 gap-1 bg-white rounded-2xl border border-[#efe6dc] p-1 shadow-2xs">
+      ${DAYS.map((day, i) => {
+        const selected = day === mobileDay;
+        const today = isToday(dates[i]);
+        const planned = MEALS.filter((meal) => plan[day]?.[meal]).length;
+        const dots = MEALS.map((_, m) =>
+          `<span class="w-1 h-1 rounded-full ${m < planned ? (selected ? "bg-white" : "bg-[#ca5c2e]") : selected ? "bg-white/35" : "bg-stone-200"}"></span>`
+        ).join("");
+        const stateClass = selected
+          ? "bg-[#ca5c2e] text-white shadow-sm"
+          : today
+            ? "text-[#ca5c2e] bg-[#fbf2ec]"
+            : "text-stone-600 hover:bg-stone-50";
+        return `
+          <button type="button" role="tab" id="day-tab-${day}" data-day="${day}"
+            aria-selected="${selected}" aria-controls="day-panel" tabindex="${selected ? "0" : "-1"}"
+            aria-label="${day}${today ? ", today" : ""}, ${planned} of 3 meals planned"
+            class="day-tab flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 ${stateClass}">
+            <span class="text-[11px] font-semibold uppercase tracking-wide">${day}</span>
+            <span class="text-base font-bold leading-none">${dates[i].getDate()}</span>
+            <span class="flex gap-0.5 mt-0.5" aria-hidden="true">${dots}</span>
+          </button>`;
+      }).join("")}
+    </div>
+  `;
+}
+
+function dayPanelHtml(plan, dates) {
+  const i = DAYS.indexOf(mobileDay);
+  const today = isToday(dates[i]);
+  const mealsHtml = MEALS.map((meal) => {
+    const item = plan[mobileDay]?.[meal];
+    return `
+      <div>
+        <div class="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1">${meal}</div>
+        ${item ? mealTileHtml(item, mobileDay, meal, true) : emptySlotHtml(mobileDay, meal, true)}
+      </div>
+    `;
+  }).join("");
+  return `
+    <section id="day-panel" role="tabpanel" aria-labelledby="day-tab-${mobileDay}" class="bg-white rounded-2xl border ${today ? "border-[#ca5c2e] ring-2 ring-[#ca5c2e]/15" : "border-[#efe6dc]"} shadow-xs p-4 space-y-3">
+      <div class="flex items-baseline justify-between gap-2">
+        <h3 class="font-bold ${today ? "text-[#ca5c2e]" : "text-stone-900"}">
+          ${mobileDay} <span class="text-sm font-medium ${today ? "text-[#ca5c2e]/80" : "text-stone-400"}">· ${today ? "Today" : formatShortDate(dates[i])}</span>
+        </h3>
+        <span class="day-kcal-total text-xs font-semibold text-stone-400" data-day="${mobileDay}">–</span>
+      </div>
+      ${mealsHtml}
+    </section>
+  `;
+}
+
+let renderToken = 0;
+
 export async function renderPlannerTable() {
   updatePlannerAuthUI();
   updateWeekLabel();
   const host = document.getElementById("planner-table-body");
   const cardsHost = document.getElementById("planner-cards");
   if (!host && !cardsHost) return;
+  if (!getCurrentUser()) return;
 
+  // Ignore results from an older render (for example after clicking through weeks quickly).
+  const token = ++renderToken;
   const plan = await getPlan();
+  if (token !== renderToken) return;
   const dates = getWeekDates();
+
+  const clearBtn = document.getElementById("clear-week-btn");
+  if (clearBtn) clearBtn.disabled = isPlanEmpty(plan);
 
   // Desktop / tablet: table
   if (host) {
@@ -422,7 +632,7 @@ export async function renderPlannerTable() {
 
       MEALS.forEach((meal) => {
         const item = plan[day]?.[meal];
-        cellsHtml += `<td class="py-2.5 px-2 align-middle">${item ? mealTileHtml(item, day, meal) : emptySlotHtml(day, meal)}</td>`;
+        cellsHtml += `<td class="plan-slot py-2.5 px-2 align-middle" data-day="${day}" data-meal="${meal}"><div class="plan-slot-inner rounded-2xl transition">${item ? mealTileHtml(item, day, meal) : emptySlotHtml(day, meal)}</div></td>`;
       });
 
       cellsHtml += `
@@ -436,31 +646,10 @@ export async function renderPlannerTable() {
     });
   }
 
-  // Phones: one card per day, meals stacked
+  // Phones: day tabs, one day at a time
   if (cardsHost) {
-    cardsHost.innerHTML = DAYS.map((day, i) => {
-      const today = isToday(dates[i]);
-      const mealsHtml = MEALS.map((meal) => {
-        const item = plan[day]?.[meal];
-        return `
-          <div>
-            <div class="text-[11px] font-bold uppercase tracking-wider text-stone-400 mb-1">${meal}</div>
-            ${item ? mealTileHtml(item, day, meal, true) : emptySlotHtml(day, meal, true)}
-          </div>
-        `;
-      }).join("");
-      return `
-        <section class="bg-white rounded-2xl border ${today ? "border-[#ca5c2e] ring-2 ring-[#ca5c2e]/15" : "border-[#efe6dc]"} shadow-xs p-4 space-y-3">
-          <div class="flex items-baseline justify-between gap-2">
-            <h3 class="font-bold ${today ? "text-[#ca5c2e]" : "text-stone-900"}">
-              ${day} <span class="text-sm font-medium ${today ? "text-[#ca5c2e]/80" : "text-stone-400"}">· ${today ? "Today" : formatShortDate(dates[i])}</span>
-            </h3>
-            <span class="day-kcal-total text-xs font-semibold text-stone-400" data-day="${day}">–</span>
-          </div>
-          ${mealsHtml}
-        </section>
-      `;
-    }).join("");
+    if (!mobileDay || !DAYS.includes(mobileDay)) mobileDay = defaultMobileDay(dates);
+    cardsHost.innerHTML = dayTabsHtml(plan, dates) + dayPanelHtml(plan, dates);
   }
 
   fillDayCalorieTotals(plan);
@@ -479,6 +668,100 @@ export async function renderPlannerTable() {
         openMealDrawer(day, meal);
       });
     });
+  });
+}
+
+// ---------- Phone day tabs ----------
+function selectMobileDay(day, focus = false) {
+  if (!DAYS.includes(day)) return;
+  mobileDay = day;
+  renderPlannerTable().then(() => {
+    if (focus) document.getElementById(`day-tab-${day}`)?.focus();
+  });
+}
+
+function initDayTabs() {
+  const cardsHost = document.getElementById("planner-cards");
+  if (!cardsHost) return;
+  cardsHost.addEventListener("click", (e) => {
+    const tab = e.target.closest(".day-tab");
+    if (tab) selectMobileDay(tab.dataset.day);
+  });
+  // Arrow keys move between tabs, as in a standard tab list.
+  cardsHost.addEventListener("keydown", (e) => {
+    const tab = e.target.closest(".day-tab");
+    if (!tab) return;
+    const i = DAYS.indexOf(tab.dataset.day);
+    let next = null;
+    if (e.key === "ArrowRight") next = DAYS[(i + 1) % DAYS.length];
+    else if (e.key === "ArrowLeft") next = DAYS[(i - 1 + DAYS.length) % DAYS.length];
+    else if (e.key === "Home") next = DAYS[0];
+    else if (e.key === "End") next = DAYS[DAYS.length - 1];
+    if (next) {
+      e.preventDefault();
+      selectMobileDay(next, true);
+    }
+  });
+}
+
+// ---------- Drag and drop (table on tablet and desktop) ----------
+// Drag a meal onto another slot to move it there; dropping on a filled slot swaps them.
+const DROP_HIGHLIGHT = ["ring-2", "ring-[#ca5c2e]/50", "bg-[#fbf2ec]"];
+let dragSource = null; // { day, meal }
+
+function clearDropHighlights(root) {
+  root.querySelectorAll(".plan-slot-inner").forEach((el) => el.classList.remove(...DROP_HIGHLIGHT));
+}
+
+function initDragAndDrop() {
+  const host = document.getElementById("planner-table-body");
+  if (!host) return;
+
+  host.addEventListener("dragstart", (e) => {
+    const tile = e.target.closest?.(".plan-tile[draggable='true']");
+    if (!tile) return;
+    dragSource = { day: tile.dataset.dragDay, meal: tile.dataset.dragMeal };
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", `${dragSource.day}|${dragSource.meal}`);
+    requestAnimationFrame(() => tile.classList.add("opacity-40"));
+  });
+
+  host.addEventListener("dragend", (e) => {
+    e.target.closest?.(".plan-tile")?.classList.remove("opacity-40");
+    clearDropHighlights(host);
+    dragSource = null;
+  });
+
+  host.addEventListener("dragover", (e) => {
+    if (!dragSource) return;
+    const slot = e.target.closest(".plan-slot");
+    if (!slot) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+    const inner = slot.querySelector(".plan-slot-inner");
+    if (inner && !inner.classList.contains(DROP_HIGHLIGHT[0])) {
+      clearDropHighlights(host);
+      const isSource = slot.dataset.day === dragSource.day && slot.dataset.meal === dragSource.meal;
+      if (!isSource) inner.classList.add(...DROP_HIGHLIGHT);
+    }
+  });
+
+  host.addEventListener("dragleave", (e) => {
+    const slot = e.target.closest(".plan-slot");
+    if (slot && !slot.contains(e.relatedTarget)) {
+      slot.querySelector(".plan-slot-inner")?.classList.remove(...DROP_HIGHLIGHT);
+    }
+  });
+
+  host.addEventListener("drop", (e) => {
+    if (!dragSource) return;
+    const slot = e.target.closest(".plan-slot");
+    if (!slot) return;
+    e.preventDefault();
+    clearDropHighlights(host);
+    const from = dragSource;
+    dragSource = null;
+    moveInPlan(from.day, from.meal, slot.dataset.day, slot.dataset.meal);
   });
 }
 
@@ -757,8 +1040,90 @@ function createDrawerRecipeRow(recipe) {
 // Page Initialization
 // -------------------------------------------------------------
 
+// ---------- Actions menu ("⋯" next to Add meal) ----------
+function planMenuItems() {
+  return Array.from(document.querySelectorAll("#plan-menu [role=\"menuitem\"]:not([disabled])"));
+}
+
+function openPlanMenu(focusLast = false, fromKeyboard = true) {
+  const btn = document.getElementById("plan-menu-btn");
+  const menu = document.getElementById("plan-menu");
+  if (!btn || !menu) return;
+  menu.classList.remove("hidden");
+  btn.setAttribute("aria-expanded", "true");
+  requestAnimationFrame(() => {
+    menu.classList.remove("opacity-0", "scale-95");
+    menu.classList.add("opacity-100", "scale-100");
+  });
+  if (!fromKeyboard) {
+    menu.focus(); // arrow keys still work from here
+    return;
+  }
+  const items = planMenuItems();
+  (focusLast ? items[items.length - 1] : items[0])?.focus();
+}
+
+function closePlanMenu(returnFocus = true) {
+  const btn = document.getElementById("plan-menu-btn");
+  const menu = document.getElementById("plan-menu");
+  if (!btn || !menu || btn.getAttribute("aria-expanded") !== "true") return;
+  btn.setAttribute("aria-expanded", "false");
+  menu.classList.add("opacity-0", "scale-95");
+  menu.classList.remove("opacity-100", "scale-100");
+  setTimeout(() => {
+    if (btn.getAttribute("aria-expanded") === "false") menu.classList.add("hidden");
+  }, 150);
+  if (returnFocus) btn.focus();
+}
+
+function initPlanMenu() {
+  const btn = document.getElementById("plan-menu-btn");
+  const menu = document.getElementById("plan-menu");
+  if (!btn || !menu) return;
+
+  btn.addEventListener("click", (e) => {
+    if (btn.getAttribute("aria-expanded") === "true") closePlanMenu();
+    else openPlanMenu(false, e.detail === 0); // detail is 0 for Enter/Space, so only then focus an item
+  });
+  btn.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowDown") { e.preventDefault(); openPlanMenu(); }
+    if (e.key === "ArrowUp") { e.preventDefault(); openPlanMenu(true); }
+  });
+  menu.addEventListener("keydown", (e) => {
+    const items = planMenuItems();
+    const i = items.indexOf(document.activeElement);
+    const focusAt = (n) => items[(n + items.length) % items.length]?.focus();
+    if (e.key === "ArrowDown") { e.preventDefault(); focusAt(i + 1); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); focusAt(i < 0 ? items.length - 1 : i - 1); }
+    else if (e.key === "Home") { e.preventDefault(); focusAt(0); }
+    else if (e.key === "End") { e.preventDefault(); focusAt(items.length - 1); }
+    else if (e.key === "Escape") { e.preventDefault(); closePlanMenu(); }
+    else if (e.key === "Tab") closePlanMenu(false);
+  });
+  document.addEventListener("click", (e) => {
+    if (!menu.contains(e.target) && !btn.contains(e.target)) closePlanMenu(false);
+  });
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   renderPlannerTable();
+  initDragAndDrop();
+  initDayTabs();
+
+  // Re-render once Firebase has restored the session, so the plan comes from the account.
+  let authSeen = false;
+  onAuthChange(() => {
+    if (authSeen) memoryPlans.clear();
+    authSeen = true;
+    renderPlannerTable();
+  });
+
+  // "Clear week" (in the actions menu)
+  document.getElementById("clear-week-btn")?.addEventListener("click", () => {
+    closePlanMenu(false);
+    clearWeek();
+  });
+  initPlanMenu();
 
   // "Add to Calendar" toolbar button
   const openDrawerBtn = document.getElementById("open-add-drawer-btn");
@@ -782,6 +1147,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const generateBtn = document.getElementById("generate-plan-btn");
   if (generateBtn) {
     generateBtn.addEventListener("click", () => {
+      closePlanMenu(false);
       const user = getCurrentUser();
       if (!user) {
         showAuthPromptModal({
@@ -880,6 +1246,11 @@ document.addEventListener("DOMContentLoaded", () => {
       renderPlannerTable();
     });
   }
+  document.getElementById("this-week-btn")?.addEventListener("click", () => {
+    weekOffset = 0;
+    mobileDay = null; // back to today on phones
+    renderPlannerTable();
+  });
 
   // Shopping list interactive preview handlers
   const shoppingGrid = document.getElementById("shopping-list-grid");
@@ -943,6 +1314,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   window.addEventListener("auth-changed", () => {
+    memoryPlans.clear();
     renderPlannerTable();
   });
   window.addEventListener("storage", (e) => {

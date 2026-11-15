@@ -8,4 +8,44 @@
   margin-bottom: var(--space-3);
 }
 
+/* Options in the sort menu and the "More" categories menu */
+.sort-option,
+.menu-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.75rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #44403c;
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+  transition: background-color 0.15s, color 0.15s;
+}
+.sort-option:hover,
+.sort-option:focus,
+.menu-option:hover,
+.menu-option:focus {
+  background-color: #fbf2ec;
+  color: #ca5c2e;
+}
+.sort-option[aria-selected="true"] {
+  font-weight: 600;
+  color: #ca5c2e;
+}
+.sort-option::after {
+  content: "";
+  width: 1rem;
+  height: 1rem;
+  flex-shrink: 0;
+}
+.sort-option[aria-selected="true"]::after {
+  background-color: #ca5c2e;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 13l4 4L19 7'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+
 /* TODO (Person 3): heart button (outline and filled), fade-out when a card is removed. */
