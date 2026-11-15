@@ -155,12 +155,12 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 ## Timeline
 
-Team dates (Oct 26 to Nov 29, feature freeze Nov 15):
+Team dates (Oct 26 to Nov 23, feature freeze Nov 21, submission Nov 23):
 
 | Week | Dates            | Goal                                                                                       |
 | ---- | ---------------- | ------------------------------------------------------------------------------------------ |
 | 1    | Oct 26 to Nov 1  | Repo, Firebase, auth and onboarding, recipe search, page shells                            |
 | 2    | Nov 2 to Nov 8   | Recipe detail, preferences checker on cards, favourites on Firestore, planner table        |
-| 3    | Nov 9 to Nov 15  | Ratings and comments, planner on Firestore, shopping list. **Feature freeze Nov 15** |
-| 4    | Nov 16 to Nov 22 | Testing, bug fixes, responsive and accessibility pass, README                              |
-| 5    | Nov 23 to Nov 29 | Deploy, final check, slides and demo                                                       |
+| 3    | Nov 9 to Nov 15  | Ratings and comments, planner on Firestore, profile and allergen checks                   |
+| 4    | Nov 16 to Nov 21 | Shopping list, day and meal dialog, cooking mode, last fixes. **Feature freeze Nov 21**    |
+| 5    | Nov 22 to Nov 23 | Testing with two accounts, bug fixes, final deploy (Nov 22), README, demo. **Submit Nov 23** |
