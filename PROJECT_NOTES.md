@@ -135,10 +135,10 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 - Planner: drag and drop between slots (tablet and desktop; dropping on a filled slot swaps them), day tabs on phones, Clear week with Undo, and a week switcher with a "Back to today" button.
 - The card heart buttons in `utils.js` and `search-cta.js` go through `toggleCardFavourite` (in `utils.js`), which calls `addFavourite` / `removeFavourite`. If the save fails, the heart flips back and an error toast shows.
 - The navbar loads the favourites list once per session after login, so card hearts are right on a new device. Favourite cards show a "You ★4" badge when the user has rated that recipe.
-- The shopping list on `planner.html` is still sample markup. It needs to be built from the plan using `combineIngredients` (Person 4).
+- The shopping list on `planner.html` is built dynamically from the plan using `combineIngredients`, with checkbox state saved to `shoppingList/{weekId}`, checked items struck through and moved to the bottom, and a "Copy list" button (Person 4).
 - Ratings and comments are built (`ratings.js`).
 - The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).
-- Still to do (Person 4), in this order: build the shopping list from the plan, save checkbox state to `shoppingList/{weekId}`, then the print view and Copy list.
+- Still to do (Person 4), in this order: print view.
 - "Fill from favourites" (in the planner's ⋯ menu, next to Clear week) is an extra we added.
 - Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
 

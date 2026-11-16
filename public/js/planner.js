@@ -3,14 +3,22 @@
 // (weekId like "2026-W46", see schema.js). A copy is kept in localStorage per user
 // so the page paints instantly and still works offline.
 
-import { showToast, toTitleCase, showAuthPromptModal, showConfirmModal, escapeHtml } from "./utils.js";
+import { showToast, toTitleCase, showAuthPromptModal, showConfirmModal, escapeHtml, combineIngredients } from "./utils.js";
 import { getFavourites } from "./favourites.js";
 import { confirmIfFlagged } from "./preferences.js";
 import { searchRecipes, getRecipeById } from "./api.js";
 import { estimateNutrition } from "./nutrition.js";
 import { getCurrentUser, onAuthChange } from "./auth.js";
 import { auth } from "./firebase-config.js";
-import { getCurrentWeekId, saveUserMealPlan, fetchUserMealPlan, createMealPlanDoc } from "./schema.js";
+import {
+  getCurrentWeekId,
+  saveUserMealPlan,
+  fetchUserMealPlan,
+  createMealPlanDoc,
+  createShoppingListDoc,
+  saveUserShoppingList,
+  fetchUserShoppingList
+} from "./schema.js";
 
 export const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 export const MEALS = ["Breakfast", "Lunch", "Dinner"];
@@ -221,7 +229,8 @@ export async function addToPlan(day, meal, recipe, options = {}) {
   plan[day][meal] = {
     id: recipe.id || "0",
     name: recipe.name,
-    image: recipe.image
+    image: recipe.image,
+    ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : []
   };
   await savePlan(plan);
   renderPlannerTable();
@@ -653,6 +662,7 @@ export async function renderPlannerTable() {
   }
 
   fillDayCalorieTotals(plan);
+  renderShoppingList(plan, shownWeekId());
 
   [host, cardsHost].filter(Boolean).forEach((root) => {
     root.querySelectorAll(".remove-plan-item").forEach((btn) => {
@@ -1105,6 +1115,293 @@ function initPlanMenu() {
   });
 }
 
+// ---------- Shopping List Storage & Helpers ----------
+
+const memoryShoppingLists = new Map(); // `${uid}/${weekId}` -> doc
+const fullRecipeCache = new Map(); // id -> Promise<recipe | null>
+let currentShoppingList = []; // [{ name, measure, checked }]
+let currentShoppingWeekId = null;
+let shoppingRenderToken = 0;
+
+function fetchRecipeWithCache(id) {
+  if (!id || id === "0") return Promise.resolve(null);
+  if (fullRecipeCache.has(id)) return fullRecipeCache.get(id);
+  const promise = getRecipeById(id).catch((e) => {
+    console.warn("Could not fetch recipe for shopping list:", id, e);
+    return null;
+  });
+  fullRecipeCache.set(id, promise);
+  return promise;
+}
+
+function shoppingCacheKey(uid) {
+  return `recipeplan_shopping_lists_${uid}`;
+}
+
+function readLocalShoppingLists(uid) {
+  try {
+    return JSON.parse(localStorage.getItem(shoppingCacheKey(uid)) || "{}") || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function writeLocalShoppingList(uid, weekId, doc) {
+  try {
+    const all = readLocalShoppingLists(uid);
+    all[weekId] = doc;
+    localStorage.setItem(shoppingCacheKey(uid), JSON.stringify(all));
+  } catch (e) {}
+}
+
+async function loadSavedShoppingDoc(weekId) {
+  const user = getCurrentUser();
+  const uid = user?.uid;
+  if (!uid) {
+    try {
+      return JSON.parse(localStorage.getItem(`recipeplan_shopping_guest_${weekId}`) || "null");
+    } catch (e) {
+      return null;
+    }
+  }
+
+  const memKey = `${uid}/${weekId}`;
+  if (memoryShoppingLists.has(memKey)) {
+    return memoryShoppingLists.get(memKey);
+  }
+
+  const local = readLocalShoppingLists(uid)[weekId] || null;
+  if (local) {
+    memoryShoppingLists.set(memKey, local);
+  }
+
+  if (cloudUid()) {
+    try {
+      const cloud = await fetchUserShoppingList(uid, weekId);
+      if (cloud) {
+        memoryShoppingLists.set(memKey, cloud);
+        writeLocalShoppingList(uid, weekId, cloud);
+        return cloud;
+      }
+    } catch (e) {
+      console.warn("Could not fetch shopping list from Firestore:", e);
+    }
+  }
+
+  return local;
+}
+
+async function persistShoppingList(weekId, items) {
+  const user = getCurrentUser();
+  const uid = user?.uid;
+  const docData = createShoppingListDoc(items);
+
+  if (!uid) {
+    try {
+      localStorage.setItem(`recipeplan_shopping_guest_${weekId}`, JSON.stringify(docData));
+    } catch (e) {}
+    return docData;
+  }
+
+  const memKey = `${uid}/${weekId}`;
+  memoryShoppingLists.set(memKey, docData);
+  writeLocalShoppingList(uid, weekId, docData);
+
+  if (cloudUid()) {
+    try {
+      await saveUserShoppingList(uid, weekId, items);
+    } catch (e) {
+      console.warn("Could not save shopping list to Firestore:", e);
+    }
+  }
+
+  return docData;
+}
+
+export function renderShoppingItemsDOM(weekId = shownWeekId()) {
+  const grid = document.getElementById("shopping-list-grid");
+  const progressBadge = document.getElementById("shopping-progress-badge");
+  const progressBar = document.getElementById("shopping-progress-bar");
+  const selectAllLabel = document.getElementById("select-all-label");
+
+  if (!grid) return;
+
+  // Split into unchecked and checked so checked items move to the bottom
+  const uncheckedItems = currentShoppingList.filter((item) => !item.checked);
+  const checkedItems = currentShoppingList.filter((item) => item.checked);
+  const sortedItems = [...uncheckedItems, ...checkedItems];
+
+  const total = currentShoppingList.length;
+  const checkedCount = checkedItems.length;
+
+  if (progressBadge) {
+    progressBadge.textContent = `${checkedCount} of ${total} items checked`;
+  }
+  if (progressBar) {
+    const pct = total > 0 ? Math.round((checkedCount / total) * 100) : 0;
+    progressBar.style.width = `${pct}%`;
+  }
+  if (selectAllLabel) {
+    selectAllLabel.textContent = total > 0 && checkedCount === total ? "Deselect All" : "Select All";
+  }
+
+  grid.innerHTML = sortedItems.map((item) => {
+    const isChecked = Boolean(item.checked);
+    const cardClass = isChecked
+      ? "shopping-item-card is-checked group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs"
+      : "shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs";
+
+    const nameClass = isChecked
+      ? "shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400"
+      : "shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800";
+
+    const measureClass = isChecked
+      ? "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs"
+      : "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs";
+
+    const measureHtml = item.measure && item.measure.trim()
+      ? `<span class="${measureClass}">${escapeHtml(item.measure.trim())}</span>`
+      : "";
+
+    return `
+      <label class="${cardClass}" data-name="${escapeHtml(item.name)}">
+        <div class="flex items-center gap-2.5 min-w-0">
+          <input type="checkbox" ${isChecked ? "checked" : ""} class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
+          <span class="${nameClass}">${escapeHtml(item.name)}</span>
+        </div>
+        ${measureHtml}
+      </label>
+    `;
+  }).join("");
+}
+
+export async function renderShoppingList(plan, weekId = shownWeekId()) {
+  const grid = document.getElementById("shopping-list-grid");
+  const progressBadge = document.getElementById("shopping-progress-badge");
+  const progressBar = document.getElementById("shopping-progress-bar");
+  const selectAllBtn = document.getElementById("clear-shopping-btn");
+  const selectAllLabel = document.getElementById("select-all-label");
+
+  if (!grid) return;
+
+  const currentToken = ++shoppingRenderToken;
+
+  if (!plan) {
+    plan = await getPlan(weekId);
+    if (currentToken !== shoppingRenderToken) return;
+  }
+
+  // Gather planned meals
+  const mealItems = [];
+  const recipeFetchPromises = [];
+
+  DAYS.forEach((day) => {
+    MEALS.forEach((meal) => {
+      const slot = plan?.[day]?.[meal];
+      if (slot && slot.id && slot.id !== "0") {
+        mealItems.push(slot);
+        if (!Array.isArray(slot.ingredients) || slot.ingredients.length === 0) {
+          recipeFetchPromises.push(
+            fetchRecipeWithCache(slot.id).then((fullRecipe) => {
+              if (fullRecipe && Array.isArray(fullRecipe.ingredients)) {
+                slot.ingredients = fullRecipe.ingredients;
+              }
+            })
+          );
+        }
+      }
+    });
+  });
+
+  if (recipeFetchPromises.length > 0) {
+    await Promise.all(recipeFetchPromises);
+    if (currentToken !== shoppingRenderToken) return;
+  }
+
+  // Collect raw ingredients from all meals
+  const rawIngredients = [];
+  mealItems.forEach((slot) => {
+    if (Array.isArray(slot.ingredients)) {
+      rawIngredients.push(...slot.ingredients);
+    }
+  });
+
+  // Combine ingredients across recipes
+  const combined = combineIngredients(rawIngredients);
+
+  if (combined.length === 0) {
+    currentShoppingList = [];
+    currentShoppingWeekId = weekId;
+    grid.innerHTML = `
+      <div class="col-span-full py-10 px-4 text-center">
+        <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[#faf7f2] border border-[#efe6dc] flex items-center justify-center text-stone-400">
+          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
+          </svg>
+        </div>
+        <p class="text-sm font-semibold text-stone-700">No ingredients yet</p>
+        <p class="text-xs text-stone-400 mt-1 max-w-sm mx-auto">Add meals to your weekly plan above to automatically generate your shopping list.</p>
+      </div>
+    `;
+    if (progressBadge) progressBadge.textContent = "0 items";
+    if (progressBar) progressBar.style.width = "0%";
+    if (selectAllBtn) {
+      selectAllBtn.disabled = true;
+      selectAllBtn.classList.add("opacity-50", "pointer-events-none");
+    }
+    const copyBtn = document.getElementById("copy-shopping-btn");
+    if (copyBtn) {
+      copyBtn.disabled = true;
+      copyBtn.classList.add("opacity-50", "pointer-events-none");
+    }
+    if (selectAllLabel) selectAllLabel.textContent = "Select All";
+    return;
+  }
+
+  if (selectAllBtn) {
+    selectAllBtn.disabled = false;
+    selectAllBtn.classList.remove("opacity-50", "pointer-events-none");
+  }
+  const copyBtn = document.getElementById("copy-shopping-btn");
+  if (copyBtn) {
+    copyBtn.disabled = false;
+    copyBtn.classList.remove("opacity-50", "pointer-events-none");
+  }
+
+  // Load saved checked status for this weekId
+  const savedDoc = await loadSavedShoppingDoc(weekId);
+  if (currentToken !== shoppingRenderToken) return;
+
+  const checkedSet = new Set();
+  if (currentShoppingWeekId === weekId && currentShoppingList.length > 0) {
+    currentShoppingList.forEach((item) => {
+      if (item.checked && item.name) {
+        checkedSet.add(item.name.trim().toLowerCase());
+      }
+    });
+  }
+  if (savedDoc?.items && Array.isArray(savedDoc.items)) {
+    savedDoc.items.forEach((item) => {
+      if (item.checked && item.name) {
+        checkedSet.add(item.name.trim().toLowerCase());
+      }
+    });
+  } else if (savedDoc?.checked && Array.isArray(savedDoc.checked)) {
+    savedDoc.checked.forEach((name) => {
+      if (name) checkedSet.add(String(name).trim().toLowerCase());
+    });
+  }
+
+  currentShoppingWeekId = weekId;
+  currentShoppingList = combined.map((item) => ({
+    name: item.name,
+    measure: item.measure || "",
+    checked: checkedSet.has(item.name.trim().toLowerCase())
+  }));
+
+  renderShoppingItemsDOM(weekId);
+}
+
 document.addEventListener("DOMContentLoaded", () => {
   renderPlannerTable();
   initDragAndDrop();
@@ -1252,69 +1549,98 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPlannerTable();
   });
 
-  // Shopping list interactive preview handlers
+  // Shopping list interactive event listeners
   const shoppingGrid = document.getElementById("shopping-list-grid");
   const selectAllBtn = document.getElementById("clear-shopping-btn");
-  const selectAllLabel = document.getElementById("select-all-label");
-  const progressBadge = document.getElementById("shopping-progress-badge");
-  const progressBar = document.getElementById("shopping-progress-bar");
-
-  function updateShoppingProgress() {
-    if (!shoppingGrid) return;
-    const cards = shoppingGrid.querySelectorAll(".shopping-item-card");
-    const total = cards.length;
-    let checkedCount = 0;
-
-    cards.forEach((card) => {
-      const checkbox = card.querySelector(".shopping-item-check");
-      const name = card.querySelector(".shopping-item-name");
-      const measure = card.querySelector(".shopping-item-measure");
-
-      if (checkbox && checkbox.checked) {
-        checkedCount++;
-        card.className = "shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs";
-        if (name) name.className = "shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400";
-        if (measure) measure.className = "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs";
-      } else if (checkbox) {
-        card.className = "shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs";
-        if (name) name.className = "shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800";
-        if (measure) measure.className = "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs";
-      }
-    });
-
-    if (progressBadge) {
-      progressBadge.textContent = `${checkedCount} of ${total} items checked`;
-    }
-    if (progressBar && total > 0) {
-      const pct = Math.round((checkedCount / total) * 100);
-      progressBar.style.width = `${pct}%`;
-    }
-    if (selectAllLabel) {
-      selectAllLabel.textContent = checkedCount === total ? "Deselect All" : "Select All";
-    }
-  }
 
   if (shoppingGrid) {
-    shoppingGrid.addEventListener("change", (e) => {
-      if (e.target.matches(".shopping-item-check")) {
-        updateShoppingProgress();
+    shoppingGrid.addEventListener("change", async (e) => {
+      const checkbox = e.target.closest(".shopping-item-check");
+      if (!checkbox) return;
+      const card = checkbox.closest(".shopping-item-card");
+      if (!card) return;
+      const name = card.dataset.name;
+      if (!name) return;
+
+      const item = currentShoppingList.find((i) => i.name === name);
+      if (item) {
+        item.checked = checkbox.checked;
+        const weekId = shownWeekId();
+        renderShoppingItemsDOM(weekId);
+        // Retain focus on toggled item's checkbox
+        const escaped = CSS.escape(name);
+        const newCard = shoppingGrid.querySelector(`.shopping-item-card[data-name="${escaped}"]`);
+        newCard?.querySelector(".shopping-item-check")?.focus();
+        await persistShoppingList(weekId, currentShoppingList);
       }
     });
   }
 
-  if (selectAllBtn && shoppingGrid) {
-    selectAllBtn.addEventListener("click", () => {
-      const checkboxes = shoppingGrid.querySelectorAll(".shopping-item-check");
-      const allChecked = Array.from(checkboxes).every((cb) => cb.checked);
-      checkboxes.forEach((cb) => {
-        cb.checked = !allChecked;
+  if (selectAllBtn) {
+    selectAllBtn.addEventListener("click", async () => {
+      if (!currentShoppingList || currentShoppingList.length === 0) return;
+      const allChecked = currentShoppingList.every((i) => i.checked);
+      currentShoppingList.forEach((i) => {
+        i.checked = !allChecked;
       });
-      updateShoppingProgress();
+      const weekId = shownWeekId();
+      renderShoppingItemsDOM(weekId);
+      await persistShoppingList(weekId, currentShoppingList);
+    });
+  }
+
+  const copyShoppingBtn = document.getElementById("copy-shopping-btn");
+  const copyShoppingLabel = document.getElementById("copy-shopping-label");
+
+  if (copyShoppingBtn) {
+    copyShoppingBtn.addEventListener("click", async () => {
+      if (!currentShoppingList || currentShoppingList.length === 0) {
+        showToast("Shopping list is empty.");
+        return;
+      }
+
+      const text = currentShoppingList
+        .map((item) => `${item.checked ? "✓ " : "• "}${item.name}${item.measure ? ` (${item.measure})` : ""}`)
+        .join("\n");
+
+      let copied = false;
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(text);
+          copied = true;
+        }
+      } catch (err) {}
+
+      if (!copied) {
+        try {
+          const textarea = document.createElement("textarea");
+          textarea.value = text;
+          textarea.style.position = "fixed";
+          textarea.style.opacity = "0";
+          document.body.appendChild(textarea);
+          textarea.select();
+          copied = document.execCommand("copy");
+          document.body.removeChild(textarea);
+        } catch (err) {}
+      }
+
+      if (copied) {
+        showToast("Shopping list copied to clipboard!");
+        if (copyShoppingLabel) copyShoppingLabel.textContent = "Copied!";
+        copyShoppingBtn.classList.add("text-emerald-700", "border-emerald-300", "bg-emerald-50");
+        setTimeout(() => {
+          if (copyShoppingLabel) copyShoppingLabel.textContent = "Copy list";
+          copyShoppingBtn.classList.remove("text-emerald-700", "border-emerald-300", "bg-emerald-50");
+        }, 2000);
+      } else {
+        showToast("Couldn't copy to clipboard.");
+      }
     });
   }
 
   window.addEventListener("auth-changed", () => {
     memoryPlans.clear();
+    memoryShoppingLists.clear();
     renderPlannerTable();
   });
   window.addEventListener("storage", (e) => {
