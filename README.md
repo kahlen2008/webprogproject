@@ -121,7 +121,7 @@ Deciding what to cook every day is time-consuming and often fragmented across bo
 | 📖 **Dynamic Recipe Details**         | Full instructions, ingredient quantities, YouTube video tutorials, and interactive serving-size scaling.                             |
 | 🛡️ **Dietary & Allergen Detection** | Real-time keyword scanning on recipe cards and detail views alerting users of matching allergen risks.                               |
 | 📅 **Weekly Meal Planner**            | 7-day schedule (Breakfast, Lunch, Dinner) saved per week to your account. Drag meals between slots, switch weeks, clear a week with Undo, and use day tabs on phones. |
-| 🛒 **Smart Shopping List**            | *In progress.* Will combine the ingredients from every planned recipe into one list, with check-off, a print view and Copy list. The section on the planner page is still sample data. |
+| 🛒 **Smart Shopping List**            | Combines the ingredients from every planned recipe into one list (same units added up), with ticks saved to your account, checked items moved to the bottom, a print view and a Copy list button. |
 | ❤️ **Personal Favourites**          | One-click saving to your account, live sync across devices, filter by category and sort by date or name, with an offline fallback. |
 | 👤 **User Accounts & Onboarding**     | Secure Firebase email/password & Google OAuth, 2-step onboarding wizard, password safety validation, and account profile management. |
 | 📜 **Legal & Compliance**             | Transparent British English Terms of Service and Privacy Policy pages.                                                               |
@@ -178,13 +178,13 @@ webprogproject/
     ├── onboarding.html         # 2-step diet and allergy setup
     ├── profile.html            # Profile, diet and allergy preferences, account settings
     ├── favourites.html         # Saved recipes with category filter and sort
-    ├── planner.html            # Weekly meal planner (shopping list in progress)
+    ├── planner.html            # Weekly meal planner and shopping list
     ├── terms.html              # Terms of Service
     ├── privacy.html            # Privacy Policy
     ├── 404.html                # Page not found
     ├── favicon.svg, favicon.ico, apple-touch-icon.png
     ├── css/
-    │   ├── tailwind.css        # Prebuilt Tailwind CSS used by the home and recipe pages
+    │   ├── tailwind.css        # Prebuilt Tailwind CSS used by the home and recipe pages (rebuild: see tailwind.config.js)
     │   ├── base.css            # Global variables, reset and typography
     │   ├── components.css      # Shared buttons, cards and modals
     │   ├── auth.css            # Login and sign-up pages

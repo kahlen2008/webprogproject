@@ -20,6 +20,9 @@ Course: K0126002 Web Programming, Gachon University, Fall 2026.
 
 - Plain HTML, CSS and JavaScript. No frameworks, no build step.
 - Tailwind CSS v3 via CDN (`https://cdn.tailwindcss.com`). Every page has the same `tailwind.config` block with the `brand` colours (`#ca5c2e` main). Copy it from an existing page.
+  - **Exception:** `index.html`, `recipes.html` and `recipe.html` load a pre-built `css/tailwind.css` instead (faster first load). It only contains the classes that existed when it was generated, so a Tailwind class that is new to those pages (in their HTML or in JS that renders there) does nothing until the file is regenerated. It also bundles `css/base.css`, `components.css` and `recipes.css`, so regenerate after editing those too. From the repo root:
+    `npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.input.css -o public/css/tailwind.css --minify`
+    (`tailwind.config.js` has the same theme as the CDN pages; neither file is deployed.)
 - Shared CSS files still exist: `css/base.css`, `css/components.css`, plus one CSS file per page where needed.
 - JavaScript uses ES modules (`<script type="module">`), so use a local server (`npx serve public`), not `file://`.
 - Firebase Authentication (email/password and Google) and Cloud Firestore.
@@ -98,11 +101,12 @@ Recipe object used everywhere:
 `watchFavourites` listens live with Firestore `onSnapshot` while signed in (localStorage when signed out or offline), calls `cb(favs, { pending })`, and returns a function that stops watching. `pending` is true while a signed-in session is still being restored.
 
 **`js/planner.js` (Person 4)**
-`DAYS`, `MEALS`, `emptyPlan()`, `shownWeekId()`, `getPlan(weekId?)`, `savePlan(plan, weekId?)`, `addToPlan(day, meal, recipe, options)`, `removeFromPlan(day, meal)`, `moveInPlan(fromDay, fromMeal, toDay, toMeal)`, `clearWeek()`, `generateFromFavourites()`, `renderPlannerTable()`.
-`weekId` defaults to the week shown on the planner (this week on other pages). `addToPlan` options: `{ skipConfirm }` skips the replace and allergen prompts, `{ skipAllergenCheck }` skips only the allergen prompt (use it when the caller already ran `confirmIfFlagged`). Other pages should call `addToPlan` instead of writing the plan themselves.
+`DAYS`, `MEALS`, `emptyPlan()`, `shownWeekId()`, `getPlan(weekId?)`, `savePlan(plan, weekId?)`, `addToPlan(day, meal, recipe, options)`, `removeFromPlan(day, meal)`, `moveInPlan(fromDay, fromMeal, toDay, toMeal)`, `clearWeek()`, `generateFromFavourites()`, `renderPlannerTable()`, `renderShoppingList(plan)`, `openAddToPlanDialog(recipe, options)`.
+`weekId` defaults to the week shown on the planner (this week on other pages). `addToPlan` options: `{ skipConfirm }` skips the replace and allergen prompts, `{ skipAllergenCheck }` skips only the allergen prompt (use it when the caller already ran `confirmIfFlagged`), `{ skipReplaceConfirm }` skips only the replace prompt. Other pages should call `addToPlan` instead of writing the plan themselves.
+`openAddToPlanDialog(recipe, { skipAllergenCheck, day, meal })` is the shared day and meal dialog: it shows this week's days and the three meals, says what is already in the chosen slot, saves through `addToPlan`, and resolves `{ day, meal }` (plus `unchanged: true` if that recipe was already there) or `null` if cancelled.
 
 **`js/utils.js` (shared)**
-`escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText`, `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items).
+`escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText`, `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
 
 **`js/firebase-config.js`** exports `app`, `auth`, `db`. Import these, never call `initializeApp` again.
 
@@ -131,14 +135,14 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 ## Current status vs plan (check before you build)
 
 - Favourites sync to Firestore live (`onSnapshot`) and store `ingredientNames`. The favourites page has category and sort menus.
-- The weekly plan is saved per week to `users/{uid}/mealPlan/{weekId}` through `schema.js`, with a localStorage copy per user. The week arrows now show each week's own plan. The recipe page's "Add to meal plan" goes through `addToPlan` (still always Mon Dinner).
+- The weekly plan is saved per week to `users/{uid}/mealPlan/{weekId}` through `schema.js`, with a localStorage copy per user. The week arrows now show each week's own plan. The recipe page's "Add to meal plan" goes through `addToPlan`.
 - Planner: drag and drop between slots (tablet and desktop; dropping on a filled slot swaps them), day tabs on phones, Clear week with Undo, and a week switcher with a "Back to today" button.
+- The recipe page's "Add to meal plan" opens the shared day and meal dialog (`openAddToPlanDialog`).
 - The card heart buttons in `utils.js` and `search-cta.js` go through `toggleCardFavourite` (in `utils.js`), which calls `addFavourite` / `removeFavourite`. If the save fails, the heart flips back and an error toast shows.
 - The navbar loads the favourites list once per session after login, so card hearts are right on a new device. Favourite cards show a "You ★4" badge when the user has rated that recipe.
-- The shopping list on `planner.html` is built dynamically from the plan using `combineIngredients`, with checkbox state saved to `shoppingList/{weekId}`, checked items struck through and moved to the bottom, and a "Copy list" button (Person 4).
+- The shopping list on `planner.html` is built from the shown week's plan with `combineIngredients` (a recipe planned twice counts twice). Slots added through `addToPlan` keep the recipe's `ingredients`, so the list only calls the API for older slots. Ticks are saved to `users/{uid}/shoppingList/{weekId}` (plus a localStorage copy). Items are grouped by aisle (keyword rules in `planner.js`: Produce, Meat & fish, Dairy & eggs, Bakery, Pantry, Herbs & spices, Frozen, Other) as compact checklist rows. Staples like salt, oil and water fold into "Probably in your cupboard". Checked items are struck through and move to a folded "In the basket" group at the bottom. Items that match the user's allergies or diet get a warning mark. On phones the list has its own tab (Meals / Shopping list). Copy list copies what is still to buy; Print shows only the list, in one column, with no navbar or buttons.
 - Ratings and comments are built (`ratings.js`).
 - The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).
-- Still to do (Person 4), in this order: print view.
 - "Fill from favourites" (in the planner's ⋯ menu, next to Clear week) is an extra we added.
 - Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
 
