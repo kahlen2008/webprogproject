@@ -1,0 +1,9 @@
+/* Input for public/css/tailwind.css (see tailwind.config.js for the build command).
+   The pages that use the pre-built file load nothing else, so the shared project CSS is
+   bundled in after the Tailwind utilities (hover/focus/responsive variants still come last). */
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+@import "./public/css/base.css";
+@import "./public/css/components.css";
+@import "./public/css/recipes.css";
