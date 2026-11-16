@@ -80,7 +80,7 @@ const GROUPS = {
   },
   eggs: {
     keywords: ["egg", "egg yolk", "egg white", "mayonnaise", "meringue", "aioli"],
-    exclude: [],
+    exclude: ["egg plant", "eggplant"], // aubergine, not egg
   },
   gluten: {
     keywords: [
@@ -426,6 +426,10 @@ export function describeResult(result) {
   return parts.join("; ");
 }
 
+function capitalizeWords(text) {
+  return String(text || "").replace(/(^|[\s(-])([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
+}
+
 // Custom modal dialog that warns the user when a recipe has allergens or diet conflicts
 export function openFlaggedRecipeModal(recipe, result) {
   return new Promise((resolve) => {
@@ -439,36 +443,30 @@ export function openFlaggedRecipeModal(recipe, result) {
     backdrop.setAttribute("role", "dialog");
     backdrop.setAttribute("aria-modal", "true");
 
-    const allergensList = (result.allergens || []).map((a) => `
-      <div class="flex items-start gap-2.5 bg-red-50/90 border border-red-200 rounded-xl p-3 text-left">
-        <span class="w-2 h-2 rounded-full bg-red-500 mt-1.5 flex-shrink-0"></span>
-        <div class="text-xs sm:text-sm">
-          <span class="font-bold text-red-900">${escapeHtml(a.name)}:</span>
-          <span class="text-red-700 ml-1 font-medium">${escapeHtml(a.matches.join(", "))}</span>
-        </div>
-      </div>
-    `).join("");
+    // Simple table rows: the allergen (or diet) on the left, the ingredients it came from on the right.
+    const flagRows = (items, titleOf) => items.map((item) => `
+      <li class="flex items-baseline justify-between gap-4 px-4 py-2.5">
+        <span class="text-sm font-semibold text-stone-900 shrink-0">${escapeHtml(titleOf(item))}</span>
+        <span class="text-sm text-stone-500 text-right">${escapeHtml(item.matches.map(capitalizeWords).join(", "))}</span>
+      </li>`).join("");
 
-    const dietConflictsList = (result.dietConflicts || []).map((d) => `
-      <div class="flex items-start gap-2.5 bg-amber-50/90 border border-amber-200 rounded-xl p-3 text-left">
-        <span class="w-2 h-2 rounded-full bg-amber-500 mt-1.5 flex-shrink-0"></span>
-        <div class="text-xs sm:text-sm">
-          <span class="font-bold text-amber-900">Not ${escapeHtml(dietLabel(d.name))}:</span>
-          <span class="text-amber-700 ml-1 font-medium">${escapeHtml(d.matches.join(", "))}</span>
-        </div>
-      </div>
-    `).join("");
+    const allergensList = (result.allergens || []).length
+      ? `<ul class="rounded-2xl bg-red-50/70 border border-red-100 divide-y divide-red-100 text-left">
+          ${flagRows(result.allergens, (a) => a.name)}
+        </ul>`
+      : "";
+
+    const dietConflictsList = (result.dietConflicts || []).length
+      ? `<ul class="rounded-2xl bg-amber-50/70 border border-amber-100 divide-y divide-amber-100 text-left">
+          ${flagRows(result.dietConflicts, (d) => `Not ${dietLabel(d.name)}`)}
+        </ul>`
+      : "";
 
     const recipeName = escapeHtml(recipe.name || "This recipe");
     const recipeImage = recipe.image ? escapeHtml(recipe.image) : "";
 
     backdrop.innerHTML = `
       <div class="relative w-full max-w-md bg-white rounded-3xl border border-[#efe6dc] shadow-2xl p-6 sm:p-7 transform scale-95 opacity-0 transition-all duration-200 ease-out">
-        <!-- Close Button -->
-        <button type="button" id="flagged-modal-close" class="absolute top-4 right-4 w-8 h-8 rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 flex items-center justify-center text-xl transition focus:outline-none" aria-label="Close modal">
-          &times;
-        </button>
-
         <!-- Top Header with Recipe Info -->
         <div class="flex items-center gap-3 text-left mb-4 p-3 bg-stone-50/90 rounded-2xl border border-stone-100">
           ${recipeImage ? `
@@ -486,6 +484,10 @@ export function openFlaggedRecipeModal(recipe, result) {
               ${result.hasAllergen ? 'Contains Allergens' : 'Diet Conflict'}
             </span>
           </div>
+          <!-- Close Button (inside the recipe box so it never overlaps it) -->
+          <button type="button" id="flagged-modal-close" class="self-start w-8 h-8 rounded-full text-stone-400 hover:text-stone-700 hover:bg-white flex items-center justify-center text-xl flex-shrink-0 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40" aria-label="Close modal">
+            &times;
+          </button>
         </div>
 
         <h3 class="text-lg font-bold text-stone-900 tracking-tight text-left">
@@ -496,10 +498,11 @@ export function openFlaggedRecipeModal(recipe, result) {
         </p>
 
         <!-- Flagged Items List -->
-        <div class="mt-3 space-y-2 max-h-48 overflow-y-auto pr-1">
+        <div class="mt-3 space-y-2 max-h-56 overflow-y-auto">
           ${allergensList}
           ${dietConflictsList}
         </div>
+        <p class="mt-2 text-[11px] text-stone-400 text-left">Matched on ingredient names, so this is a helper rather than a guarantee.</p>
 
         <p class="text-xs font-medium text-stone-600 mt-4 text-left">
           Would you like to add it to your meal plan anyway?
