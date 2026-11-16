@@ -120,6 +120,7 @@ export function createMealPlanDoc(plan = {}) {
             id: String(entry.id || "0"),
             name: String(entry.name || ""),
             image: String(entry.image || ""),
+            ...(Array.isArray(entry.ingredients) ? { ingredients: entry.ingredients } : {}),
           }
         : null;
     });
@@ -133,12 +134,14 @@ export function createMealPlanDoc(plan = {}) {
  * Path: users/{uid}/shoppingList/{weekId}
  */
 export function createShoppingListDoc(items = []) {
+  const normalized = (Array.isArray(items) ? items : []).map((item) => ({
+    name: String(item.name || "").trim(),
+    measure: String(item.measure || "").trim(),
+    checked: Boolean(item.checked),
+  }));
   return {
-    items: (Array.isArray(items) ? items : []).map((item) => ({
-      name: String(item.name || "").trim(),
-      measure: String(item.measure || "").trim(),
-      checked: Boolean(item.checked),
-    })),
+    items: normalized,
+    checked: normalized.filter((item) => item.checked).map((item) => item.name.toLowerCase()),
     updatedAt: new Date().toISOString(),
   };
 }

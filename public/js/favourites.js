@@ -98,11 +98,20 @@ export async function getFavourites() {
   return getLocalFavourites();
 }
 
+// Puts the local cache back after a failed save, so hearts and the badge flip back.
+function restoreLocalFavourites(list) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(sortBySavedAtDesc(list)));
+  } catch (e) {}
+  window.dispatchEvent(new CustomEvent("favourites-changed"));
+}
+
 /**
  * Adds a recipe to favourites in Firestore users/{uid}/favourites/{recipeId}
  * Using the recipe ID as the document ID prevents duplicates.
+ * options.throwOnError: if the Firestore write fails, undo the local change and throw.
  */
-export async function addFavourite(recipe) {
+export async function addFavourite(recipe, { throwOnError = false } = {}) {
   if (!recipe || !recipe.id) return;
 
   const nowIso = new Date().toISOString();
@@ -117,6 +126,7 @@ export async function addFavourite(recipe) {
 
   // Optimistically update local cache with consistent ordering
   const current = getLocalFavourites();
+  const before = current;
   const filtered = current.filter((f) => String(f.id) !== String(recipe.id));
   filtered.unshift(data);
   const sorted = sortBySavedAtDesc(filtered);
@@ -137,6 +147,10 @@ export async function addFavourite(recipe) {
       });
     } catch (err) {
       console.warn("Could not save favourite to Firestore:", err);
+      if (throwOnError) {
+        restoreLocalFavourites(before);
+        throw err;
+      }
     }
   }
 }
@@ -177,7 +191,7 @@ function withStoredIngredients(fav) {
 }
 
 // Favourites saved before ingredientNames existed (or saved by the card heart
-// buttons, which write to Firestore directly) get the field added once.
+// card buttons before they went through addFavourite) get the field added once.
 // updateDoc fails on a deleted document, so a favourite removed meanwhile is not recreated.
 const backfillAttempted = new Set();
 async function backfillIngredientNames(uid, favs) {
@@ -198,8 +212,9 @@ async function backfillIngredientNames(uid, favs) {
 
 /**
  * Removes a recipe from Firestore via deleteDoc on users/{uid}/favourites/{recipeId}.
+ * options.throwOnError: if the Firestore delete fails, undo the local change and throw.
  */
-export async function removeFavourite(recipeId) {
+export async function removeFavourite(recipeId, { throwOnError = false } = {}) {
   if (!recipeId) return [];
 
   // Optimistically update local cache
@@ -215,6 +230,10 @@ export async function removeFavourite(recipeId) {
       await deleteDoc(docRef);
     } catch (err) {
       console.warn("Could not delete favourite from Firestore:", err);
+      if (throwOnError) {
+        restoreLocalFavourites(current);
+        throw err;
+      }
     }
   }
 
@@ -537,6 +556,44 @@ function renderEmptyState() {
   }
 }
 
+// ---------- "Your rating" badge ----------
+// The signed-in user's own star rating, cached per page so live updates and
+// re-renders do not read Firestore again.
+const yourRatingCache = new Map();
+
+function getYourRating(uid, recipeId) {
+  const key = `${uid}/${recipeId}`;
+  if (!yourRatingCache.has(key)) {
+    yourRatingCache.set(
+      key,
+      import("./schema.js")
+        .then(({ fetchUserRating }) => fetchUserRating(String(recipeId), uid))
+        .then((r) => (r && Number(r.stars) > 0 ? Number(r.stars) : 0))
+        .catch(() => 0)
+    );
+  }
+  return yourRatingCache.get(key);
+}
+
+async function attachYourRating(card, recipeId) {
+  const uid = auth?.currentUser?.uid || getCurrentUser()?.uid;
+  if (!uid || !recipeId) return;
+  const stars = await getYourRating(uid, recipeId);
+  if (!stars || !card.isConnected) return;
+  const row = card.querySelector(".recipe-card-rating")?.parentElement;
+  if (!row || row.querySelector(".your-rating-badge")) return;
+  const badge = document.createElement("span");
+  badge.className =
+    "your-rating-badge inline-flex items-center gap-1 rounded-full bg-amber-50 text-amber-800 border border-amber-200 font-semibold";
+  badge.style.cssText = "font-size:12px;line-height:16px;padding:3px 9px";
+  badge.title = `You rated this ${stars} out of 5`;
+  badge.innerHTML = `<span aria-hidden="true">You</span><span class="text-amber-500" aria-hidden="true">★</span><span aria-hidden="true">${stars}</span><span class="sr-only">You rated this ${stars} out of 5</span>`;
+  row.appendChild(badge);
+}
+
+// Rating saved or deleted on the recipe page in another tab: drop the cached value.
+window.addEventListener("pageshow", () => yourRatingCache.clear());
+
 function renderCardsFast(favs) {
   if (!listEl) return;
   listEl.innerHTML = "";
@@ -544,6 +601,7 @@ function renderCardsFast(favs) {
   favs.forEach((recipe) => {
     const card = createRecipeCard(recipe, { isFavouritePage: true });
     card.setAttribute("data-card-id", String(recipe.id));
+    attachYourRating(card, recipe.id);
 
     // Attach removal listener with instant, simultaneous FLIP layout animation (Zero pause)
     const removeBtn = card.querySelector(".remove-favourite-btn");

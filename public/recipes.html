@@ -103,6 +103,9 @@
           placeholder="Search for a recipe, ingredient or cuisine..." 
           class="w-full pl-5 pr-4 py-2.5 bg-transparent border-none text-stone-800 placeholder-stone-400 text-sm sm:text-base focus:outline-none font-medium"
         >
+        <button type="button" id="search-clear" class="hidden w-9 h-9 shrink-0 items-center justify-center rounded-full text-stone-400 hover:text-stone-700 hover:bg-stone-100 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40" aria-label="Clear search">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+        </button>
         <button 
           type="submit" 
           id="search-btn"
@@ -118,60 +121,64 @@
     </section>
 
     <!-- Popular Categories -->
-    <section class="space-y-4">
-      <div class="flex items-end justify-between gap-3">
-        <div>
-          <h2 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight font-heading">Popular Categories</h2>
-          <p class="text-xs sm:text-sm text-stone-500 mt-0.5">Tap a category to filter the recipes below.</p>
-        </div>
-      </div>
-      <div class="grid grid-cols-3 sm:grid-cols-6 gap-3 sm:gap-4">
+    <section class="space-y-4" aria-labelledby="categories-heading">
+      <h2 id="categories-heading" class="visually-hidden">Popular categories</h2>
+      <!-- Round photos with the name underneath; swipe sideways on phones and small tablets, one even row from 768px up -->
+      <div class="category-row flex gap-3 overflow-x-auto -mx-4 px-4 sm:-mx-6 sm:px-6 py-2 md:mx-0 md:px-0 md:grid md:grid-cols-7 md:gap-4 md:overflow-visible">
+        <!-- Category: Breakfast (pairs with the planner's Breakfast slot) -->
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Breakfast">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
+            <img src="images/cat-breakfast.jpg" alt="Breakfast" width="96" height="96" decoding="async" class="w-full h-full object-cover">
+          </div>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Breakfast</span>
+        </button>
+
         <!-- Category: Chicken -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2.5 px-2 py-4 rounded-2xl bg-white border border-[#ede4da] shadow-2xs hover:border-[#ca5c2e]/50 hover:shadow-sm hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition duration-200" data-category="Chicken">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#ede4da] group-hover:scale-105 transition duration-300">
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Chicken">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
             <img src="images/cat-chicken.webp" alt="Chicken" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Chicken</span>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Chicken</span>
         </button>
 
         <!-- Category: Beef -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2.5 px-2 py-4 rounded-2xl bg-white border border-[#ede4da] shadow-2xs hover:border-[#ca5c2e]/50 hover:shadow-sm hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition duration-200" data-category="Beef">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#ede4da] group-hover:scale-105 transition duration-300">
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Beef">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
             <img src="images/cat-beef.webp" alt="Beef" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Beef</span>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Beef</span>
         </button>
 
         <!-- Category: Pasta -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2.5 px-2 py-4 rounded-2xl bg-white border border-[#ede4da] shadow-2xs hover:border-[#ca5c2e]/50 hover:shadow-sm hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition duration-200" data-category="Pasta">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#ede4da] group-hover:scale-105 transition duration-300">
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Pasta">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
             <img src="images/pasta-hero.webp" alt="Pasta" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Pasta</span>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Pasta</span>
         </button>
 
         <!-- Category: Vegetarian -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2.5 px-2 py-4 rounded-2xl bg-white border border-[#ede4da] shadow-2xs hover:border-[#ca5c2e]/50 hover:shadow-sm hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition duration-200" data-category="Vegetarian">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#ede4da] group-hover:scale-105 transition duration-300">
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Vegetarian">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
             <img src="images/cat-vegetarian.webp" alt="Vegetarian" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Vegetarian</span>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Vegetarian</span>
         </button>
 
         <!-- Category: Dessert -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2.5 px-2 py-4 rounded-2xl bg-white border border-[#ede4da] shadow-2xs hover:border-[#ca5c2e]/50 hover:shadow-sm hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition duration-200" data-category="Dessert">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#ede4da] group-hover:scale-105 transition duration-300">
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Dessert">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
             <img src="images/cat-dessert.webp" alt="Dessert" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Dessert</span>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Dessert</span>
         </button>
 
         <!-- Category: Seafood -->
-        <button type="button" class="category-chip flex flex-col items-center gap-2.5 px-2 py-4 rounded-2xl bg-white border border-[#ede4da] shadow-2xs hover:border-[#ca5c2e]/50 hover:shadow-sm hover:-translate-y-0.5 group focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 transition duration-200" data-category="Seafood">
-          <div class="w-16 h-16 sm:w-20 sm:h-20 rounded-full overflow-hidden border-2 border-white shadow-sm ring-1 ring-[#ede4da] group-hover:scale-105 transition duration-300">
+        <button type="button" class="category-chip group flex flex-col items-center gap-2.5 shrink-0 w-[84px] md:w-auto py-1 rounded-2xl focus:outline-none" data-category="Seafood">
+          <div class="category-circle w-[72px] h-[72px] md:w-20 md:h-20 lg:w-[88px] lg:h-[88px] rounded-full overflow-hidden bg-stone-100">
             <img src="images/cat-seafood.webp" alt="Seafood" width="96" height="96" decoding="async" class="w-full h-full object-cover">
           </div>
-          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition">Seafood</span>
+          <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-[#ca5c2e] transition-colors">Seafood</span>
         </button>
       </div>
     </section>
@@ -202,11 +209,6 @@
               </span>
             </label>
           </div>
-
-          <button id="view-more-btn" type="button" class="group inline-flex items-center gap-1.5 h-9 px-3.5 text-xs sm:text-sm font-semibold text-[#ca5c2e] hover:text-white bg-white hover:bg-[#ca5c2e] border border-[#ca5c2e]/30 hover:border-[#ca5c2e] rounded-full transition-all duration-200 shadow-2xs cursor-pointer active:scale-95 leading-none">
-            <span>View more</span>
-            <span class="transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden="true">&rarr;</span>
-          </button>
         </div>
       </div>
 
@@ -214,6 +216,9 @@
       
       <!-- Recipe Cards Grid -->
       <ul id="results" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 list-none p-0 m-0 min-h-[680px] content-start"></ul>
+
+      <!-- Page controls under the grid (filled by js/recipes.js) -->
+      <nav id="results-pagination" aria-label="Recipe pages" class="hidden pt-4"></nav>
     </section>
   </main>
 

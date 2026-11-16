@@ -537,124 +537,10 @@ export function createRecipeCard(recipe, options = {}) {
   if (!isFavouritePage) {
     const favBtn = item.querySelector(".favourite-btn");
     if (favBtn) {
-      favBtn.addEventListener("click", async (e) => {
+      favBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
-
-        const user = getCurrentUser();
-        if (!user) {
-          showAuthPromptModal({
-            title: "Log in to save favourites",
-            description: "Your saved recipes will be waiting for you on any device.",
-            redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
-            icon: "heart"
-          });
-          return;
-        }
-
-        let storedFavs = [];
-        try {
-          storedFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-        } catch (err) {}
-
-        const exists = storedFavs.some((f) => String(f.id) === String(recipe.id));
-        const icon = favBtn.querySelector(".heart-icon");
-
-        if (exists) {
-          storedFavs = storedFavs.filter((f) => String(f.id) !== String(recipe.id));
-          icon.setAttribute("fill", "none");
-          icon.classList.remove("text-[#ca5c2e]", "text-red-500");
-          favBtn.classList.remove("text-[#ca5c2e]", "text-red-500");
-          playHeartEffect(favBtn, false);
-          showToast(`Removed "${recipe.name}" from favourites`, {
-            duration: 5000,
-            action: {
-              label: "Undo",
-              onClick: () => {
-                let currentFavs = [];
-                try {
-                  currentFavs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
-                } catch (err) {}
-                const favItem = {
-                  id: String(recipe.id),
-                  name: recipe.name || "",
-                  image: recipe.image || "",
-                  category: recipe.category || "Main",
-                  area: recipe.area || "",
-                  savedAt: new Date().toISOString(),
-                };
-                currentFavs = currentFavs.filter((f) => String(f.id) !== String(recipe.id));
-                currentFavs.unshift(favItem);
-                localStorage.setItem("recipeplan_favourites", JSON.stringify(currentFavs));
-                window.dispatchEvent(new CustomEvent("favourites-changed"));
-
-                icon.setAttribute("fill", "#ca5c2e");
-                icon.classList.add("text-[#ca5c2e]");
-                favBtn.classList.add("text-[#ca5c2e]");
-                playHeartEffect(favBtn, true);
-
-                if (user && user.uid) {
-                  Promise.all([
-                    import("./firebase-config.js"),
-                    import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-                  ])
-                    .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
-                      setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
-                        ...favItem,
-                        savedAt: serverTimestamp(),
-                      })
-                    )
-                    .catch(console.warn);
-                }
-                showToast(`Restored "${recipe.name}" to favourites!`);
-              },
-            },
-          });
-          if (user && user.uid) {
-            Promise.all([
-              import("./firebase-config.js"),
-              import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-            ])
-              .then(([{ db }, { doc, deleteDoc }]) =>
-                deleteDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)))
-              )
-              .catch(console.warn);
-          }
-        } else {
-          const favItem = {
-            id: String(recipe.id),
-            name: recipe.name || "",
-            image: recipe.image || "",
-            category: recipe.category || "Main",
-            area: recipe.area || "",
-            savedAt: new Date().toISOString(),
-          };
-          storedFavs.unshift(favItem);
-          icon.setAttribute("fill", "#ca5c2e");
-          icon.classList.add("text-[#ca5c2e]");
-          favBtn.classList.add("text-[#ca5c2e]");
-          playHeartEffect(favBtn, true);
-          showToast(`Saved "${recipe.name}" to favourites!`);
-          if (user && user.uid) {
-            Promise.all([
-              import("./firebase-config.js"),
-              import("https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js"),
-            ])
-              .then(([{ db }, { doc, setDoc, serverTimestamp }]) =>
-                setDoc(doc(db, "users", user.uid, "favourites", String(recipe.id)), {
-                  id: String(recipe.id),
-                  name: recipe.name || "",
-                  image: recipe.image || "",
-                  category: recipe.category || "Main",
-                  area: recipe.area || "",
-                  savedAt: serverTimestamp(),
-                })
-              )
-              .catch(console.warn);
-          }
-        }
-        localStorage.setItem("recipeplan_favourites", JSON.stringify(storedFavs));
-        window.dispatchEvent(new CustomEvent("favourites-changed"));
+        toggleCardFavourite(favBtn, recipe);
       });
 
       // Check initial favourite state (only if user is logged in)
@@ -674,6 +560,74 @@ export function createRecipeCard(recipe, options = {}) {
   }
 
   return item;
+}
+
+function isSavedLocally(recipeId) {
+  try {
+    const favs = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
+    return favs.some((f) => String(f.id) === String(recipeId));
+  } catch (err) {
+    return false;
+  }
+}
+
+/**
+ * Heart button click on any recipe card (cards grid, hero fan).
+ * Saves through favourites.js so every save has the same fields (including
+ * ingredientNames). favourites.js updates the local cache and fires
+ * "favourites-changed", which refreshes every heart on the page; if the
+ * Firestore write fails it rolls the cache back and the heart flips back.
+ */
+export async function toggleCardFavourite(favBtn, recipe) {
+  if (!recipe || !recipe.id) return;
+  const name = recipe.name || "Recipe";
+
+  if (!getCurrentUser()) {
+    showAuthPromptModal({
+      title: "Log in to save favourites",
+      description: "Your saved recipes will be waiting for you on any device.",
+      redirectUrl: `recipe.html?id=${encodeURIComponent(recipe.id)}`,
+      icon: "heart",
+    });
+    return;
+  }
+
+  if (favBtn.dataset.busy === "true") return;
+  favBtn.dataset.busy = "true";
+
+  const wasSaved = isSavedLocally(recipe.id);
+  playHeartEffect(favBtn, !wasSaved);
+
+  try {
+    const { addFavourite, removeFavourite } = await import("./favourites.js");
+    if (wasSaved) {
+      const removing = removeFavourite(recipe.id, { throwOnError: true });
+      showToast(`Removed "${name}" from favourites`, {
+        duration: 5000,
+        action: {
+          label: "Undo",
+          onClick: () => {
+            addFavourite(recipe, { throwOnError: true })
+              .then(() => showToast(`Restored "${name}" to favourites!`))
+              .catch(() => showToast(`Couldn't restore "${name}". Please try again.`));
+          },
+        },
+      });
+      await removing;
+    } else {
+      const adding = addFavourite(recipe, { throwOnError: true });
+      showToast(`Saved "${name}" to favourites!`);
+      await adding;
+    }
+  } catch (err) {
+    console.warn("Favourite update failed:", err);
+    showToast(
+      wasSaved ? `Couldn't remove "${name}". Please try again.` : `Couldn't save "${name}". Please try again.`,
+
+    );
+  } finally {
+    delete favBtn.dataset.busy;
+  }
 }
 
 /**
@@ -1115,3 +1069,107 @@ export function combineIngredients(ingredients) {
 
 
 
+
+// Adds up measures for a shopping list. Unlike combineMeasures (which gives up and joins
+// everything with "+" as soon as one unit differs), this groups by unit:
+//   ["2 tbsp", "40g", "25g", "1 tsp"]          -> "65g + 2 1/3 tbsp"
+//   ["1 chopped", "1 small", "2"]              -> "4"
+//   ["Juice of 2", "Juice of 2", "Juice of 2"] -> "Juice of 2 (×3)"
+//   ["pinch", "Pinch", "to taste"]             -> "Pinch + To taste"
+// Grams and kilograms are merged, as are ml and litres, and teaspoons and tablespoons.
+// Words like "chopped", "large" or "ripe" after a number are treated as a plain count.
+// Parts already joined with " + " (from combineIngredients) are split first.
+const SHOPPING_COUNT_WORDS = new Set([
+  "large", "medium", "small", "big", "whole", "ripe", "fresh", "chopped", "diced", "sliced",
+  "minced", "grated", "peeled", "beaten", "crushed", "halved", "quartered", "cubed", "shredded",
+  "finely", "roughly", "thinly", "free-range", "skinless", "boneless", "x",
+]);
+
+const SHOPPING_UNIT_GROUPS = {
+  gram: { group: "mass", factor: 1 },
+  kilogram: { group: "mass", factor: 1000 },
+  milliliter: { group: "volume", factor: 1 },
+  liter: { group: "volume", factor: 1000 },
+  teaspoon: { group: "spoon", factor: 1 },
+  tablespoon: { group: "spoon", factor: 3 },
+};
+
+function formatShoppingGroup(group, amount) {
+  if (group === "mass") {
+    return amount >= 1000 ? `${Math.round(amount / 10) / 100}kg` : `${Math.round(amount)}g`;
+  }
+  if (group === "volume") {
+    return amount >= 1000 ? `${Math.round(amount / 10) / 100}l` : `${Math.round(amount)}ml`;
+  }
+  if (group === "spoon") {
+    return amount >= 3 ? `${formatQuantity(amount / 3)} tbsp` : `${formatQuantity(amount)} tsp`;
+  }
+  return null;
+}
+
+export function sumShoppingMeasures(measureList) {
+  const parts = (measureList || [])
+    .flatMap((m) => (typeof m === "string" ? m.split(/\s+\+\s+/) : []))
+    .map((m) => m.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return "";
+
+  const groups = new Map(); // key -> { amount, label?, def? }
+  const texts = new Map(); // lowercased text -> { text, count }
+  const add = (key, amount, extra = {}) => {
+    const g = groups.get(key) || { amount: 0, ...extra };
+    g.amount += amount;
+    groups.set(key, g);
+  };
+
+  for (const raw of parts) {
+    const parsed = parseMeasure(raw);
+    const p = parsed?.primary;
+    if (!p || p.amount == null || !(p.amount > 0)) {
+      const key = raw.toLowerCase();
+      const t = texts.get(key) || { text: raw, count: 0 };
+      t.count += 1;
+      texts.set(key, t);
+      continue;
+    }
+    // A range like "1-2" counts as the top of the range, so there is enough.
+    const amount = p.range ? p.range[1] : p.amount;
+    const unitKey = p.unitKey || "__count__";
+    const known = SHOPPING_UNIT_GROUPS[unitKey];
+
+    if (known) {
+      add(`group:${known.group}`, amount * known.factor, { group: known.group });
+    } else if (unitKey === "__count__" || SHOPPING_COUNT_WORDS.has(unitKey)) {
+      add("count", amount);
+    } else if (p.unitDef) {
+      add(`unit:${unitKey}`, amount, { def: p.unitDef });
+    } else {
+      // Unknown unit word, e.g. "bunch" or "handful": group by the word itself.
+      const word = unitKey.replace(/(es|s)$/, "");
+      add(`word:${word}`, amount, { label: p.unitRaw });
+    }
+  }
+
+  const order = ["group:mass", "group:volume", "group:spoon"];
+  const keys = [...groups.keys()].sort((a, b) => {
+    const rank = (k) => (order.includes(k) ? order.indexOf(k) : k === "count" ? 99 : 50);
+    return rank(a) - rank(b);
+  });
+
+  const out = keys.map((key) => {
+    const g = groups.get(key);
+    if (g.group) return formatShoppingGroup(g.group, g.amount);
+    const qty = formatQuantity(g.amount);
+    if (key === "count") return qty;
+    if (g.def) return `${qty} ${g.amount > 1 ? g.def.plural : g.def.singular}`;
+    const plural = g.amount > 1 && !/s$/i.test(g.label) ? (/(ch|sh|x)$/i.test(g.label) ? "es" : "s") : "";
+    return `${qty} ${g.label}${plural}`;
+  });
+
+  for (const { text, count } of texts.values()) {
+    const label = text.charAt(0).toUpperCase() + text.slice(1);
+    // "Juice of 2" twice means two lots; "to taste" twice is still just "to taste".
+    out.push(count > 1 && /\d/.test(text) ? `${label} (×${count})` : label);
+  }
+  return out.join(" + ");
+}

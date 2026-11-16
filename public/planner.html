@@ -48,11 +48,11 @@
 <body class="bg-[#faf7f2] text-stone-800 min-h-screen flex flex-col font-sans antialiased">
   <header id="navbar" class="w-full sticky top-0 z-40"></header>
 
-  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10 space-y-6">
+  <main class="flex-1 max-w-6xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 md:py-10">
     
     <div id="planner-logged-out-empty-state" class="hidden"></div>
 
-    <div id="planner-main-content" class="space-y-6">
+    <div id="planner-main-content" class="space-y-6" data-mobile-view="meals">
       <!-- Planner Header & Toolbar -->
       <div class="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
         <div class="min-w-0">
@@ -78,17 +78,18 @@
         </div>
 
         <!-- Actions: one main button, the rest in a menu -->
-        <div class="flex items-center gap-2">
+        <div class="relative flex items-center gap-2">
           <button id="open-add-drawer-btn" type="button" class="inline-flex items-center gap-1.5 bg-[#ca5c2e] hover:bg-[#b34d23] text-white pl-3.5 pr-4 h-10 rounded-full text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ca5c2e]/50 shadow-sm">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
             Add meal
           </button>
 
-          <div class="relative">
+          <!-- Phones: the menu anchors to the whole button group (left edge); sm+: to the ⋯ button -->
+          <div class="sm:relative">
             <button id="plan-menu-btn" type="button" aria-haspopup="menu" aria-expanded="false" aria-controls="plan-menu" aria-label="More plan actions" class="w-10 h-10 inline-flex items-center justify-center rounded-full bg-white border border-[#ede4da] text-stone-500 hover:text-[#ca5c2e] hover:border-[#ca5c2e]/50 aria-expanded:text-[#ca5c2e] aria-expanded:border-[#ca5c2e]/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 shadow-2xs">
               <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.8"></circle><circle cx="12" cy="12" r="1.8"></circle><circle cx="19" cy="12" r="1.8"></circle></svg>
             </button>
-            <div id="plan-menu" role="menu" aria-labelledby="plan-menu-btn" tabindex="-1" class="focus:outline-none hidden absolute right-0 top-full mt-2 w-60 bg-white rounded-2xl shadow-lg border border-[#efe6dc] p-1.5 z-30 origin-top-right opacity-0 scale-95 transition duration-150 ease-out">
+            <div id="plan-menu" role="menu" aria-labelledby="plan-menu-btn" tabindex="-1" class="focus:outline-none hidden absolute left-0 sm:left-auto sm:right-0 top-full mt-2 w-60 max-w-[calc(100vw-2rem)] bg-white rounded-2xl shadow-lg border border-[#efe6dc] p-1.5 z-30 origin-top-left sm:origin-top-right opacity-0 scale-95 transition duration-150 ease-out">
               <button id="generate-plan-btn" type="button" role="menuitem" tabindex="-1" class="w-full flex items-start gap-3 px-3 py-2.5 rounded-xl text-left hover:bg-[#fbf2ec] focus-visible:bg-[#fbf2ec] focus:outline-none transition group">
                 <svg class="w-4 h-4 mt-0.5 shrink-0 text-[#ca5c2e]" fill="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/></svg>
                 <span>
@@ -129,93 +130,90 @@
       </div>
     </div>
 
+    <!-- Phones: switch between the meals and the shopping list -->
+    <div id="planner-view-tabs" role="tablist" aria-label="Planner view" class="sm:hidden grid grid-cols-2 gap-1 bg-white rounded-2xl border border-[#efe6dc] p-1 shadow-2xs">
+      <button type="button" role="tab" id="view-tab-meals" data-view="meals" aria-controls="planner-cards" aria-selected="true" tabindex="0" class="view-tab py-2 rounded-xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">Meals</button>
+      <button type="button" role="tab" id="view-tab-shopping" data-view="shopping" aria-controls="shopping-section" aria-selected="false" tabindex="-1" class="view-tab py-2 rounded-xl text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">
+        Shopping List <span id="view-tab-shopping-count" class="ml-1 text-xs font-bold"></span>
+      </button>
+    </div>
+
     <!-- Weekly Planner Day Cards (phones) -->
     <div id="planner-cards" class="sm:hidden space-y-3"></div>
 
-    <!-- Integrated Shopping List Section -->
-    <section class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-5 sm:p-7 space-y-4">
+    <!-- Shopping list: built from the plan by js/planner.js -->
+    <section id="shopping-section" aria-labelledby="shopping-title" class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-5 sm:p-7 space-y-4">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <div class="w-10 h-10 rounded-2xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/20 shrink-0 shadow-2xs">
+        <div class="flex items-center gap-3 min-w-0">
+          <div class="shopping-icon w-10 h-10 rounded-2xl bg-[#ca5c2e]/10 text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/20 shrink-0 shadow-2xs" aria-hidden="true">
             <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
               <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
             </svg>
           </div>
-          <div>
+          <div class="min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <h2 class="text-base sm:text-lg font-bold text-stone-900 tracking-tight">Shopping List</h2>
-              <span id="shopping-progress-badge" class="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200/60">
-                2 of 6 items checked
-              </span>
+              <h2 id="shopping-title" class="text-base sm:text-lg font-bold text-stone-900 tracking-tight">Shopping List</h2>
+              <span id="shopping-progress-badge" class="hidden text-xs font-semibold px-2.5 py-0.5 rounded-full bg-stone-100 text-stone-600 border border-stone-200/60"></span>
             </div>
-            <p class="text-xs text-stone-500 mt-0.5">Auto-generated ingredients for this week's meals</p>
+            <p id="shopping-subtitle" class="text-xs text-stone-500 mt-0.5">Ingredients from this week's meals, added together</p>
           </div>
         </div>
 
-        <!-- Controls -->
-        <div class="flex items-center gap-2 self-start sm:self-auto">
-          <button id="clear-shopping-btn" type="button" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[#efe6dc] bg-[#fcf9f5] hover:bg-white text-xs font-semibold text-stone-700 hover:text-[#ca5c2e] transition shadow-2xs focus:outline-none">
-            <svg class="w-3.5 h-3.5 text-stone-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
-            <span id="select-all-label">Select All</span>
+        <!-- Controls (hidden when printing) -->
+        <div id="shopping-actions" class="flex items-center gap-1.5 self-start sm:self-auto">
+          <!-- Changes the list: its own pill, same height and outline as the share pill -->
+          <button id="check-all-shopping-btn" type="button" disabled class="group inline-flex items-center gap-1.5 h-9 px-3.5 rounded-full bg-white border border-[#ede4da] shadow-2xs text-sm font-semibold text-stone-700 hover:bg-[#fbf2ec] hover:border-[#ca5c2e]/50 hover:text-[#ca5c2e] active:scale-[0.97] transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 disabled:opacity-40 disabled:pointer-events-none">
+            <svg class="w-4 h-4 text-stone-400 group-hover:text-[#ca5c2e] transition" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+            <span id="check-all-label">Check all</span>
           </button>
+
+          <!-- Takes the list elsewhere: one joined pill, styled like the ⋯ menu button above -->
+          <div role="group" aria-label="Share shopping list" class="inline-flex items-stretch h-9 rounded-full bg-white border border-[#ede4da] shadow-2xs divide-x divide-[#ede4da] overflow-hidden">
+            <button id="copy-shopping-btn" type="button" disabled class="shopping-share-btn group inline-flex items-center gap-1.5 pl-3.5 pr-3 text-sm font-semibold text-stone-700 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] transition focus:outline-none focus-visible:bg-[#fbf2ec] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ca5c2e]/40 disabled:opacity-40 disabled:pointer-events-none">
+              <svg class="copy-icon w-4 h-4 text-stone-400 group-hover:text-[#ca5c2e] transition" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2"></rect><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"></path></svg>
+              <svg class="copied-icon w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              <span id="copy-shopping-label">Copy list</span>
+            </button>
+            <button id="print-shopping-btn" type="button" disabled class="shopping-share-btn group inline-flex items-center gap-1.5 pl-3 pr-3.5 text-sm font-semibold text-stone-700 hover:bg-[#fbf2ec] hover:text-[#ca5c2e] transition focus:outline-none focus-visible:bg-[#fbf2ec] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[#ca5c2e]/40 disabled:opacity-40 disabled:pointer-events-none">
+              <svg class="w-4 h-4 text-stone-400 group-hover:text-[#ca5c2e] transition" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2M6 14h12v8H6z"></path></svg>
+              Print
+            </button>
+          </div>
         </div>
       </div>
 
-      <!-- Slim Progress Bar -->
-      <div class="w-full bg-[#efe6dc]/60 rounded-full h-1.5 overflow-hidden">
-        <div id="shopping-progress-bar" class="bg-[#ca5c2e] h-full rounded-full transition-all duration-300" style="width: 33%"></div>
+      <!-- Progress bar -->
+      <div id="shopping-progress-track" class="hidden w-full bg-[#efe6dc]/60 rounded-full h-1.5 overflow-hidden" role="progressbar" aria-label="Items checked" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div id="shopping-progress-bar" class="bg-[#ca5c2e] h-full rounded-full transition-all duration-300" style="width: 0%"></div>
       </div>
 
-      <!-- Items Grid -->
-      <div id="shopping-list-grid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 pt-1">
-        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <input type="checkbox" checked class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400">Spaghetti</span>
-          </div>
-          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs">200g</span>
-        </label>
+      <!-- Loading, empty and error states -->
+      <div id="shopping-status" aria-live="polite"></div>
 
-        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <input type="checkbox" checked class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400">Pancetta</span>
-          </div>
-          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs">100g</span>
-        </label>
+      <!-- Items still to buy, grouped by aisle -->
+      <div id="shopping-groups" class="space-y-5"></div>
 
-        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Eggs</span>
-          </div>
-          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">6 large</span>
-        </label>
+      <!-- Salt, oil, water and the like: listed, but folded away -->
+      <details id="shopping-staples" class="shopping-fold hidden rounded-2xl border border-[#efe6dc] bg-[#fcf9f5]">
+        <summary class="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer select-none list-none rounded-2xl text-xs font-bold uppercase tracking-wider text-stone-500 hover:text-[#ca5c2e] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">
+          <span id="shopping-staples-title">Probably in your cupboard</span>
+          <svg class="shopping-fold-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </summary>
+        <ul id="shopping-list-staples" class="shopping-list sm:columns-2 gap-x-10 px-4 pb-2"></ul>
+      </details>
 
-        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Parmesan Cheese</span>
-          </div>
-          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">100g</span>
-        </label>
+      <!-- Ticked items, struck through, folded away at the bottom -->
+      <details id="shopping-done-wrap" class="shopping-fold hidden rounded-2xl border border-stone-200/80 bg-stone-50/60">
+        <summary class="flex items-center justify-between gap-2 px-4 py-2.5 cursor-pointer select-none list-none rounded-2xl text-xs font-bold uppercase tracking-wider text-stone-400 hover:text-[#ca5c2e] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">
+          <span id="shopping-done-title">In the basket</span>
+          <svg class="shopping-fold-chevron w-4 h-4 transition-transform" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+        </summary>
+        <ul id="shopping-list-done" class="shopping-list sm:columns-2 gap-x-10 px-4 pb-2"></ul>
+      </details>
 
-        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Greek Yogurt</span>
-          </div>
-          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">500g</span>
-        </label>
-
-        <label class="shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs">
-          <div class="flex items-center gap-2.5 min-w-0">
-            <input type="checkbox" class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-            <span class="shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800">Avocados</span>
-          </div>
-          <span class="shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs">2 ripe</span>
-        </label>
-      </div>
+      <p id="shopping-note" class="hidden text-[11px] text-stone-400 leading-relaxed">
+        Amounts with the same unit are added together; different units are listed side by side. Allergy marks are keyword matches on ingredient names, a helper rather than a guarantee.
+      </p>
     </section>
     </div>
 
