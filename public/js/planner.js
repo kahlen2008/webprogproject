@@ -3,9 +3,9 @@
 // (weekId like "2026-W46", see schema.js). A copy is kept in localStorage per user
 // so the page paints instantly and still works offline.
 
-import { showToast, toTitleCase, showAuthPromptModal, showConfirmModal, escapeHtml, combineIngredients } from "./utils.js";
+import { showToast, toTitleCase, showAuthPromptModal, showConfirmModal, escapeHtml, combineIngredients, sumShoppingMeasures } from "./utils.js";
 import { getFavourites } from "./favourites.js";
-import { confirmIfFlagged } from "./preferences.js";
+import { confirmIfFlagged, checkIngredients } from "./preferences.js";
 import { searchRecipes, getRecipeById } from "./api.js";
 import { estimateNutrition } from "./nutrition.js";
 import { getCurrentUser, onAuthChange } from "./auth.js";
@@ -15,7 +15,6 @@ import {
   saveUserMealPlan,
   fetchUserMealPlan,
   createMealPlanDoc,
-  createShoppingListDoc,
   saveUserShoppingList,
   fetchUserShoppingList
 } from "./schema.js";
@@ -205,6 +204,7 @@ export async function savePlan(plan, weekId = shownWeekId()) {
  * Puts a recipe in a slot of the shown week.
  * options.skipConfirm: skip the replace and allergen prompts (used by Undo and moves).
  * options.skipAllergenCheck: skip only the allergen prompt (the caller already asked).
+ * options.skipReplaceConfirm: skip only the replace prompt (the day and meal dialog already showed it).
  * A boolean is still accepted in place of options, meaning skipConfirm.
  */
 export async function addToPlan(day, meal, recipe, options = {}) {
@@ -212,7 +212,7 @@ export async function addToPlan(day, meal, recipe, options = {}) {
   const plan = await getPlan();
   const existingMeal = plan[day]?.[meal];
 
-  if (!opts.skipConfirm && existingMeal && existingMeal.name) {
+  if (!opts.skipConfirm && !opts.skipReplaceConfirm && existingMeal && existingMeal.name) {
     const existingName = toTitleCase(existingMeal.name);
     const newName = toTitleCase(recipe.name || "this recipe");
     const confirmed = await showConfirmModal({
@@ -230,6 +230,7 @@ export async function addToPlan(day, meal, recipe, options = {}) {
     id: recipe.id || "0",
     name: recipe.name,
     image: recipe.image,
+    // Kept with the slot so the shopping list can be built without calling the API again.
     ingredients: Array.isArray(recipe.ingredients) ? recipe.ingredients : []
   };
   await savePlan(plan);
@@ -416,13 +417,29 @@ export function updatePlannerAuthUI() {
 // Per-serving calorie estimate for one planned recipe, cached by recipe id.
 // TheMealDB has no nutrition data, so this comes from nutrition.js.
 const kcalCache = new Map();
+const recipeCache = new Map(); // id -> Promise<recipe | null>, shared by calories and the shopping list
+
+function getPlannedRecipe(id) {
+  if (!id || id === "0") return Promise.resolve(null);
+  if (!recipeCache.has(id)) {
+    const promise = getRecipeById(id).catch((err) => {
+      recipeCache.delete(id); // let a later render try again
+      throw err;
+    });
+    recipeCache.set(id, promise);
+  }
+  return recipeCache.get(id);
+}
 
 async function getRecipeKcal(id) {
   if (!id || id === "0") return null;
   if (kcalCache.has(id)) return kcalCache.get(id);
-  const promise = getRecipeById(id)
+  const promise = getPlannedRecipe(id)
     .then((recipe) => (recipe ? estimateNutrition(recipe.ingredients).perServing.kcal : null))
-    .catch(() => null);
+    .catch(() => {
+      kcalCache.delete(id);
+      return null;
+    });
   kcalCache.set(id, promise);
   return promise;
 }
@@ -474,21 +491,25 @@ function formatShortDate(d) {
   return `${d.getDate()} ${MONTHS[d.getMonth()]}`;
 }
 
+// "9 – 15 Nov 2026", or "30 Nov – 6 Dec 2026" when the week crosses a month
+// (and "29 Dec 2026 – 4 Jan 2027" across a year).
+function weekRangeText(offset = weekOffset) {
+  const dates = getWeekDates(offset);
+  const first = dates[0];
+  const last = dates[6];
+  if (first.getFullYear() !== last.getFullYear()) {
+    return `${formatShortDate(first)} ${first.getFullYear()} – ${formatShortDate(last)} ${last.getFullYear()}`;
+  }
+  if (first.getMonth() !== last.getMonth()) {
+    return `${formatShortDate(first)} – ${formatShortDate(last)} ${last.getFullYear()}`;
+  }
+  return `${first.getDate()} – ${formatShortDate(last)} ${last.getFullYear()}`;
+}
+
 function updateWeekLabel() {
   const label = document.getElementById("week-label");
   if (!label) return;
-  const dates = getWeekDates();
-  const first = dates[0];
-  const last = dates[6];
-  // "9 – 15 Nov 2026", or "30 Nov – 6 Dec 2026" when the week crosses a month
-  // (and "29 Dec 2026 – 4 Jan 2027" across a year).
-  if (first.getFullYear() !== last.getFullYear()) {
-    label.textContent = `${formatShortDate(first)} ${first.getFullYear()} – ${formatShortDate(last)} ${last.getFullYear()}`;
-  } else if (first.getMonth() !== last.getMonth()) {
-    label.textContent = `${formatShortDate(first)} – ${formatShortDate(last)} ${last.getFullYear()}`;
-  } else {
-    label.textContent = `${first.getDate()} – ${formatShortDate(last)} ${last.getFullYear()}`;
-  }
+  label.textContent = weekRangeText();
   const backBtn = document.getElementById("this-week-btn");
   backBtn?.classList.toggle("hidden", weekOffset === 0);
   backBtn?.classList.toggle("inline-flex", weekOffset !== 0);
@@ -662,7 +683,7 @@ export async function renderPlannerTable() {
   }
 
   fillDayCalorieTotals(plan);
-  renderShoppingList(plan, shownWeekId());
+  renderShoppingList(plan);
 
   [host, cardsHost].filter(Boolean).forEach((root) => {
     root.querySelectorAll(".remove-plan-item").forEach((btn) => {
@@ -677,6 +698,801 @@ export async function renderPlannerTable() {
         const { day, meal } = btn.dataset;
         openMealDrawer(day, meal);
       });
+    });
+  });
+}
+
+// ---------- Shopping list ----------
+// Built from the shown week's plan: every planned meal's ingredients go through
+// combineIngredients, so each ingredient appears once with its amounts added up.
+// Ticks are saved to users/{uid}/shoppingList/{weekId}, with a localStorage copy.
+
+let shoppingItems = []; // [{ key, name, measure, checked, recipes: [], flags: [] }]
+let shoppingWeekId = null;
+let shoppingMeta = { mealCount: 0, failed: 0 };
+let shoppingToken = 0;
+const savedChecks = new Map(); // `${uid}/${weekId}` -> Map(ingredient key -> true)
+const shoppingSaveTimers = new Map(); // weekId -> timeout
+
+function shoppingCacheKey(uid) {
+  return `recipeplan_shopping_${uid}`;
+}
+
+function readAllLocalChecks(uid) {
+  try {
+    return JSON.parse(localStorage.getItem(shoppingCacheKey(uid)) || "{}") || {};
+  } catch (e) {
+    return {};
+  }
+}
+
+function readLocalChecks(uid, weekId) {
+  return new Map(Object.keys(readAllLocalChecks(uid)[weekId] || {}).map((key) => [key, true]));
+}
+
+function writeLocalChecks(uid, weekId, checks) {
+  try {
+    const all = readAllLocalChecks(uid);
+    if (checks.size) all[weekId] = Object.fromEntries([...checks.keys()].map((key) => [key, true]));
+    else delete all[weekId];
+    localStorage.setItem(shoppingCacheKey(uid), JSON.stringify(all));
+  } catch (e) {}
+}
+
+// Which ingredients are ticked for a week. Firestore when signed in, else the local copy.
+async function loadShoppingChecks(weekId) {
+  const user = getCurrentUser();
+  if (!user) return new Map();
+  const uid = cloudUid();
+  const localUid = uid || user.uid;
+  const key = `${localUid}/${weekId}`;
+  if (savedChecks.has(key)) return savedChecks.get(key);
+
+  if (uid) {
+    try {
+      const saved = await fetchUserShoppingList(uid, weekId);
+      const checks = saved
+        ? new Map((saved.items || []).filter((i) => i.checked && i.name).map((i) => [i.name.trim().toLowerCase(), true]))
+        : readLocalChecks(uid, weekId);
+      savedChecks.set(key, checks);
+      return checks;
+    } catch (err) {
+      console.warn("Could not load shopping list from Firestore, using local copy:", err);
+    }
+  }
+  return readLocalChecks(localUid, weekId);
+}
+
+// Saves the shown list's ticks locally at once, then to Firestore (debounced per week).
+function saveShoppingChecks() {
+  const user = getCurrentUser();
+  if (!user || !shoppingWeekId) return;
+  const weekId = shoppingWeekId;
+  const uid = cloudUid() || user.uid;
+  const checks = new Map(shoppingItems.filter((i) => i.checked).map((i) => [i.key, true]));
+  const items = shoppingItems.map(({ name, measure, checked }) => ({ name, measure, checked }));
+
+  savedChecks.set(`${uid}/${weekId}`, checks);
+  writeLocalChecks(uid, weekId, checks);
+
+  clearTimeout(shoppingSaveTimers.get(weekId));
+  shoppingSaveTimers.set(
+    weekId,
+    setTimeout(async () => {
+      shoppingSaveTimers.delete(weekId);
+      if (!cloudUid()) return;
+      try {
+        await saveUserShoppingList(cloudUid(), weekId, items);
+      } catch (err) {
+        console.warn("Could not save shopping list to Firestore:", err);
+        showToast("Couldn't save your ticks to your account. They're kept on this device for now.");
+      }
+    }, 500)
+  );
+}
+
+function plannedMeals(plan) {
+  const meals = [];
+  DAYS.forEach((day) =>
+    MEALS.forEach((meal) => {
+      const item = plan?.[day]?.[meal];
+      if (item && item.id && item.id !== "0") meals.push(item);
+    })
+  );
+  return meals;
+}
+
+// Merges every planned meal's ingredients into one list. Slots saved with their
+// ingredients are used as they are; older slots fetch the recipe from the API.
+// A recipe planned twice counts twice, so its amounts are doubled.
+async function buildShoppingItems(plan) {
+  const meals = plannedMeals(plan);
+  const recipes = await Promise.all(
+    meals.map((m) =>
+      Array.isArray(m.ingredients) && m.ingredients.length
+        ? { name: m.name, ingredients: m.ingredients }
+        : getPlannedRecipe(m.id).catch(() => undefined)
+    )
+  );
+  const failed = recipes.filter((r) => r === undefined).length;
+
+  const all = [];
+  const sources = new Map(); // ingredient key -> Set of recipe names
+  const measures = new Map(); // ingredient key -> every measure, for sumShoppingMeasures
+  recipes.forEach((recipe, i) => {
+    if (!recipe) return;
+    const label = toTitleCase(recipe.name || meals[i].name || "Recipe");
+    (recipe.ingredients || []).forEach((ing) => {
+      if (!ing?.name || !ing.name.trim()) return;
+      all.push(ing);
+      const key = ing.name.trim().toLowerCase();
+      if (!sources.has(key)) sources.set(key, new Set());
+      sources.get(key).add(label);
+      if (!measures.has(key)) measures.set(key, []);
+      if (ing.measure) measures.get(key).push(ing.measure);
+    });
+  });
+
+  const combined = combineIngredients(all);
+  const check = checkIngredients(combined.map((i) => i.name));
+  const items = combined.map((i) => {
+    const key = i.name.trim().toLowerCase();
+    return {
+      key,
+      name: i.name,
+      // combineIngredients merges the names; amounts are added up per unit here, because
+      // combineMeasures joins everything with "+" as soon as one unit differs.
+      measure: sumShoppingMeasures(measures.get(key) || []) || i.measure || "",
+      checked: false,
+      recipes: [...(sources.get(key) || [])],
+      aisle: aisleFor(i.name),
+      staple: isStaple(i.name),
+      flags: check.byIngredient[key] || []
+    };
+  });
+  return { items, mealCount: meals.length, failed };
+}
+
+const SPINNER_SVG = `<svg class="w-5 h-5 animate-spin text-[#ca5c2e]" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
+
+function setShoppingControls({ enabled, showProgress }) {
+  ["copy-shopping-btn", "print-shopping-btn", "check-all-shopping-btn"].forEach((id) => {
+    const btn = document.getElementById(id);
+    if (btn) btn.disabled = !enabled;
+  });
+  document.getElementById("shopping-progress-badge")?.classList.toggle("hidden", !showProgress);
+  document.getElementById("shopping-progress-track")?.classList.toggle("hidden", !showProgress);
+  document.getElementById("shopping-note")?.classList.toggle("hidden", !showProgress);
+}
+
+// Loading, empty and error states. Clears the item lists.
+function paintShoppingState(state) {
+  const status = document.getElementById("shopping-status");
+  const groupsEl = document.getElementById("shopping-groups");
+  const subtitle = document.getElementById("shopping-subtitle");
+  const tabCount = document.getElementById("view-tab-shopping-count");
+  if (!status) return;
+
+  if (groupsEl) groupsEl.innerHTML = "";
+  document.getElementById("shopping-staples")?.classList.add("hidden");
+  document.getElementById("shopping-done-wrap")?.classList.add("hidden");
+  setShoppingControls({ enabled: false, showProgress: false });
+  if (tabCount) tabCount.textContent = "";
+  const week = escapeHtml(weekRangeText());
+
+  if (state === "loading") {
+    if (subtitle) subtitle.textContent = `Ingredients for ${weekRangeText()}`;
+    status.innerHTML = `
+      <div class="py-8 flex flex-col items-center justify-center gap-2 text-xs text-stone-400">
+        ${SPINNER_SVG}
+        <span>Building your shopping list…</span>
+      </div>`;
+  } else if (state === "empty" || state === "no-ingredients") {
+    if (subtitle) subtitle.textContent = `Ingredients for ${weekRangeText()}`;
+    const message = state === "empty"
+      ? "Plan some meals and their ingredients will show up here, added together."
+      : "The planned recipes don't list any ingredients.";
+    status.innerHTML = `
+      <div class="py-8 px-4 text-center space-y-3 rounded-2xl border-2 border-dashed border-stone-200">
+        <p class="text-sm font-semibold text-stone-700">${state === "empty" ? `No meals planned for ${week}` : "Nothing to buy yet"}</p>
+        <p class="text-xs text-stone-500 max-w-xs mx-auto">${message}</p>
+        ${state === "empty" ? `<button type="button" id="shopping-add-meal-btn" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-[#ca5c2e] text-white hover:bg-[#b34d23] transition shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ca5c2e]/50">+ Add a meal</button>` : ""}
+      </div>`;
+  } else if (state === "error") {
+    if (subtitle) subtitle.textContent = `Ingredients for ${weekRangeText()}`;
+    status.innerHTML = `
+      <div class="py-8 px-4 text-center space-y-3 rounded-2xl bg-red-50/60 border border-red-100" role="alert">
+        <p class="text-sm font-semibold text-red-700">Couldn't load the recipes for your shopping list.</p>
+        <p class="text-xs text-stone-500">Check your connection and try again.</p>
+        <button type="button" id="shopping-retry-btn" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-white border border-[#efe6dc] text-stone-700 hover:text-[#ca5c2e] hover:border-[#ca5c2e]/50 transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40">Try again</button>
+      </div>`;
+  }
+}
+
+// ---------- Aisles ----------
+// TheMealDB has no shop categories, so ingredients are sorted into aisles by keyword.
+// Rules are checked in order: the specific ones first ("chicken stock" is Pantry, not
+// Meat; "garlic powder" is Spices, not Produce). Anything unmatched goes to "Other".
+const AISLES = ["Produce", "Meat & fish", "Dairy & eggs", "Bakery", "Pantry", "Herbs & spices", "Frozen", "Other"];
+
+const AISLE_RULES = [
+  ["Frozen", /\bfrozen\b|\bice cream\b/],
+  ["Pantry", /\bbaking\b|\bstock\b|\bbroth\b|\bbouillon\b|\bcoconut (milk|cream)\b|\bpeanut butter\b|\bsauce\b|\bketchup\b|\bvinegar\b|\boil\b|\bpaste\b|\bpur[eé]e\b|\btinned\b|\bcanned\b|\bchopped tomatoes\b|\bflour\b|\bcorn ?starch\b|\bcornflour\b|\bnoodles?\b|\b(kidney|black|butter|cannellini|baked|haricot|pinto|borlotti) beans\b|\bchickpeas?\b|\blentils?\b/],
+  ["Herbs & spices", /\bpowder\b|\bdried\b|\bsalt\b|\b(black|white|cayenne) pepper\b|^pepper$|\bpeppercorns?\b|\bcumin\b|\bpaprika\b|\bturmeric\b|\bcinnamon\b|\bnutmeg\b|\bgaram masala\b|\bcardamom\b|\bsaffron\b|\bfive spice\b|\ballspice\b|\bbay lea(f|ves)\b|\bcloves\b|\bstar anise\b|\bfennel seeds?\b|\bcoriander seeds?\b|\bmustard seeds?\b|\bchill?i flakes\b|\bseasoning\b|\bvanilla\b|\boregano\b/],
+  ["Meat & fish", /\bchicken\b|\bbeef\b|\bpork\b|\blamb\b|\bbacon\b|\bsausages?\b|\bmince\b|\bham\b|\bturkey\b|\bduck\b|\bchorizo\b|\bpancetta\b|\bprosciutto\b|\bsalami\b|\bprawns?\b|\bshrimps?\b|\bsalmon\b|\btuna\b|\bcod\b|\bfish\b|\bhaddock\b|\bmackerel\b|\bsardines?\b|\bcrab\b|\bmussels\b|\bclams\b|\bsquid\b|\boctopus\b|\banchov|\bsteak\b|\bveal\b|\bgoat\b|\bvenison\b|\bliver\b|\bkidneys?\b|\bscallops?\b|\blobster\b|\btilapia\b|\btrout\b|\bthighs?\b|\bdrumsticks?\b|\bbreasts?\b/],
+  ["Dairy & eggs", /\bmilk\b|\bcream\b|\bbutter\b|\bcheese\b|\byogh?urt\b|\beggs?\b|\byolks?\b|\bparmesan\b|\bparmigiano\b|\bmozzarella\b|\bcheddar\b|\bfeta\b|\bricotta\b|\bmascarpone\b|\bcr[eè]me fra[iî]che\b|\bghee\b|\bbuttermilk\b|\bcustard\b|\bgruy[eè]re\b|\bhalloumi\b|\bpaneer\b|\bgorgonzola\b|\bbrie\b/],
+  ["Bakery", /\bbread\b|\btortillas?\b|\bwraps?\b|\bpitt?a\b|\bbuns?\b|\bbaguette\b|\bnaan\b|\bpastry\b|\bcroissants?\b|\bbagels?\b|\bciabatta\b|\bbrioche\b|\bmuffins?\b|\bbreadcrumbs\b|\bpanko\b/],
+  ["Produce", /\bonions?\b|\bshallots?\b|\bgarlic\b|\btomato(es)?\b|\bpotato(es)?\b|\bcarrots?\b|\blemons?\b|\blimes?\b|\bapples?\b|\bbananas?\b|\bginger\b|\bchill?(i|ies)\b|\bpeppers?\b|\bspinach\b|\blettuce\b|\bcabbage\b|\bbroccoli\b|\bmushrooms?\b|\bcourgettes?\b|\bzucchini\b|\baubergines?\b|\beggplants?\b|\bcelery\b|\bleeks?\b|\bcucumbers?\b|\bavocados?\b|\bscallions?\b|\bpeas\b|\bsweetcorn\b|\bcorn\b|\bgreen beans\b|\bkale\b|\bparsley\b|\bcoriander\b|\bcilantro\b|\bbasil\b|\bmint\b|\bdill\b|\bthyme\b|\brosemary\b|\bsage\b|\bchives\b|\btarragon\b|\w*berr(y|ies)\b|\boranges?\b|\bmangoe?s?\b|\bpumpkin\b|\bsquash\b|\bbeetroot\b|\bradish(es)?\b|\basparagus\b|\bcauliflower\b|\bfennel\b|\bpears?\b|\bgrapes?\b|\bpineapple\b|\bpeach(es)?\b|\bplums?\b|\bcherr(y|ies)\b|\byams?\b|\bokra\b|\blemongrass\b|\bbean sprouts\b|\bpak choi\b|\bbok choy\b|\brocket\b|\barugula\b|\bwatercress\b|\bsalad\b|\bherbs?\b|\bkiwi\b|\bmelon\b|\bfigs?\b|\bdates\b|\bplantain\b|\bcassava\b/],
+  ["Pantry", /\brice\b|\bpasta\b|\bspaghetti\b|\bpenne\b|\bfusilli\b|\btagliatelle\b|\blinguine\b|\bmacaroni\b|\blasagne\b|\bcouscous\b|\bquinoa\b|\bbulgur\b|\boats\b|\bsugar\b|\bhoney\b|\bsyrup\b|\bmustard\b|\bmayonnaise\b|\bjam\b|\bchocolate\b|\bcocoa\b|\byeast\b|\bnuts?\b|\balmonds?\b|\bwalnuts?\b|\bcashews?\b|\bpeanuts?\b|\bsesame\b|\braisins?\b|\bsultanas?\b|\bcoconut\b|\btofu\b|\bwine\b|\bbeer\b|\bgelatine?\b|\bbeans\b|\bolives?\b|\bcapers\b|\bwater chestnuts\b|\bdesiccated\b/],
+];
+
+// Cupboard staples: still listed, but folded away under "Probably in your cupboard".
+const STAPLES = new Set([
+  "water", "cold water", "hot water", "boiling water", "warm water", "ice", "salt", "sea salt", "table salt",
+  "pepper", "black pepper", "ground black pepper", "salt and pepper", "olive oil", "extra virgin olive oil",
+  "vegetable oil", "sunflower oil", "oil", "cooking oil", "sugar", "caster sugar", "granulated sugar",
+]);
+
+function aisleFor(name) {
+  const n = String(name || "").toLowerCase().trim();
+  for (const [aisle, rule] of AISLE_RULES) {
+    if (rule.test(n)) return aisle;
+  }
+  return "Other";
+}
+
+function isStaple(name) {
+  return STAPLES.has(String(name || "").toLowerCase().trim());
+}
+
+function sortedShoppingItems() {
+  return [...shoppingItems].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+// Splits the list the way it is shown: aisles of things to buy, staples, then ticked items.
+function shoppingSections() {
+  const sorted = sortedShoppingItems();
+  const done = sorted.filter((i) => i.checked);
+  const staples = sorted.filter((i) => !i.checked && i.staple);
+  const aisles = AISLES.map((aisle) => ({
+    aisle,
+    items: sorted.filter((i) => !i.checked && !i.staple && i.aisle === aisle)
+  })).filter((g) => g.items.length);
+  return { sorted, aisles, staples, done, todoCount: sorted.length - done.length };
+}
+
+const expandedShoppingSources = new Set(); // item keys whose recipe names are shown
+
+function shoppingItemHtml(item, index) {
+  const id = `shop-item-${index}`;
+  const name = escapeHtml(item.name);
+  const measure = item.measure ? escapeHtml(item.measure) : "";
+  const flagText = item.flags.join(", ");
+  const expanded = expandedShoppingSources.has(item.key);
+  const recipes = item.recipes;
+
+  // One recipe: just name it. Several: a small "3 recipes" toggle that reveals them.
+  let sourceHtml = "";
+  if (recipes.length === 1) {
+    sourceHtml = `<span class="shopping-source block text-[11px] text-stone-400 truncate">${escapeHtml(recipes[0])}</span>`;
+  } else if (recipes.length > 1) {
+    sourceHtml = `
+      <button type="button" class="shopping-sources-btn text-[11px] text-stone-400 hover:text-[#ca5c2e] focus:outline-none focus-visible:underline" aria-expanded="${expanded}" aria-controls="${id}-sources">${recipes.length} recipes ${expanded ? "▴" : "▾"}</button>
+      <span id="${id}-sources" class="shopping-source ${expanded ? "block" : "hidden"} text-[11px] text-stone-500 leading-snug">${escapeHtml(recipes.join(", "))}</span>`;
+  }
+
+  return `
+    <li class="shopping-item${item.checked ? " is-checked" : ""} break-inside-avoid border-b border-stone-100" data-key="${escapeHtml(item.key)}">
+      <div class="flex items-start gap-3 py-2">
+        <input id="${id}" type="checkbox" class="shopping-item-check mt-0.5 w-4 h-4 rounded accent-[#ca5c2e] cursor-pointer shrink-0" ${item.checked ? "checked" : ""}>
+        <div class="flex-1 min-w-0">
+          <div class="flex items-baseline gap-2">
+            <label for="${id}" class="shopping-item-name text-sm font-medium text-stone-800 cursor-pointer select-none">${name}</label>
+            ${flagText ? `<span class="shrink-0 text-[10px] font-semibold px-1.5 py-px rounded-md bg-amber-50 text-amber-700 border border-amber-200" title="Matches your diet or allergy settings (keyword match, not a guarantee)">⚠ ${escapeHtml(flagText)}</span>` : ""}
+            <span class="shopping-leader flex-1 min-w-[1rem] border-b border-dotted border-stone-200" aria-hidden="true"></span>
+            ${measure ? `<span class="shopping-item-measure text-sm tabular-nums text-stone-600 text-right max-w-[55%]">${measure}</span>` : ""}
+          </div>
+          ${sourceHtml}
+        </div>
+      </div>
+    </li>`;
+}
+
+// Draws the list: aisles to buy, folded staples, folded basket of ticked (struck-through) items.
+function paintShoppingList(focusKey = null) {
+  const status = document.getElementById("shopping-status");
+  const groupsEl = document.getElementById("shopping-groups");
+  const staplesWrap = document.getElementById("shopping-staples");
+  const staplesEl = document.getElementById("shopping-list-staples");
+  const doneWrap = document.getElementById("shopping-done-wrap");
+  const doneEl = document.getElementById("shopping-list-done");
+  if (!status || !groupsEl || !doneEl || !staplesEl) return;
+
+  const { sorted, aisles, staples, done, todoCount } = shoppingSections();
+  const total = sorted.length;
+  const { mealCount, failed } = shoppingMeta;
+  let index = 0;
+  const rows = (items) => items.map((item) => shoppingItemHtml(item, index++)).join("");
+
+  status.innerHTML = failed
+    ? `<p class="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2" role="alert">
+        ${failed} recipe${failed === 1 ? "" : "s"} couldn't be loaded, so some items may be missing.
+        <button type="button" id="shopping-retry-btn" class="ml-1 font-semibold underline hover:text-amber-900">Try again</button>
+      </p>`
+    : "";
+
+  if (aisles.length) {
+    groupsEl.innerHTML = aisles.map(({ aisle, items }) => {
+      const headingId = `shop-aisle-${aisle.toLowerCase().replace(/[^a-z]+/g, "-")}`;
+      return `
+        <div class="shopping-aisle">
+          <h3 id="${headingId}" class="flex items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-[#ca5c2e] mb-1">
+            ${escapeHtml(aisle)} <span class="text-stone-400 font-semibold">${items.length}</span>
+          </h3>
+          <ul class="shopping-list sm:columns-2 gap-x-10" aria-labelledby="${headingId}">${rows(items)}</ul>
+        </div>`;
+    }).join("");
+  } else {
+    groupsEl.innerHTML = `
+      <p class="py-4 text-center text-sm font-semibold text-emerald-700 bg-emerald-50/70 border border-emerald-100 rounded-2xl">
+        ${staples.length ? "Just the cupboard staples left" : "Everything is in the basket 🎉"}
+      </p>`;
+  }
+
+  staplesEl.innerHTML = rows(staples);
+  staplesWrap?.classList.toggle("hidden", staples.length === 0);
+  const staplesTitle = document.getElementById("shopping-staples-title");
+  if (staplesTitle) staplesTitle.textContent = `Probably in your cupboard (${staples.length})`;
+
+  doneEl.innerHTML = rows(done);
+  doneWrap?.classList.toggle("hidden", done.length === 0);
+  const doneTitle = document.getElementById("shopping-done-title");
+  if (doneTitle) doneTitle.textContent = `In the basket (${done.length})`;
+
+  const pct = total ? Math.round((done.length / total) * 100) : 0;
+  const badge = document.getElementById("shopping-progress-badge");
+  if (badge) badge.textContent = `${done.length} of ${total} checked`;
+  const bar = document.getElementById("shopping-progress-bar");
+  if (bar) bar.style.width = `${pct}%`;
+  document.getElementById("shopping-progress-track")?.setAttribute("aria-valuenow", String(pct));
+
+  const checkAllLabel = document.getElementById("check-all-label");
+  if (checkAllLabel) checkAllLabel.textContent = todoCount === 0 ? "Uncheck all" : "Check all";
+  setShoppingControls({ enabled: true, showProgress: true });
+
+  const subtitle = document.getElementById("shopping-subtitle");
+  if (subtitle) {
+    subtitle.textContent = `${total} item${total === 1 ? "" : "s"} from ${mealCount} planned meal${mealCount === 1 ? "" : "s"} · ${weekRangeText()}`;
+  }
+  const tabCount = document.getElementById("view-tab-shopping-count");
+  if (tabCount) tabCount.textContent = todoCount ? `(${todoCount})` : "✓";
+
+  // The ticked item moved, so put focus back on its checkbox (or on the fold it went into).
+  if (focusKey) {
+    const li = document.querySelector(`#shopping-section .shopping-item[data-key="${CSS.escape(focusKey)}"]`);
+    const fold = li?.closest("details");
+    if (fold && !fold.open) fold.querySelector("summary")?.focus();
+    else li?.querySelector(".shopping-item-check")?.focus();
+  }
+}
+
+export async function renderShoppingList(plan) {
+  if (!document.getElementById("shopping-section")) return;
+  const weekId = shownWeekId();
+  const token = ++shoppingToken;
+
+  if (plannedMeals(plan).length === 0) {
+    shoppingItems = [];
+    shoppingWeekId = weekId;
+    paintShoppingState("empty");
+    return;
+  }
+
+  // Keep the old list on screen while a change to the same week rebuilds it.
+  if (shoppingWeekId !== weekId || shoppingItems.length === 0) paintShoppingState("loading");
+
+  try {
+    const [built, checks] = await Promise.all([buildShoppingItems(plan), loadShoppingChecks(weekId)]);
+    if (token !== shoppingToken) return;
+    if (built.items.length === 0 && built.failed) throw new Error("No planned recipes could be loaded");
+
+    built.items.forEach((item) => (item.checked = checks.get(item.key) === true));
+    shoppingItems = built.items;
+    shoppingWeekId = weekId;
+    shoppingMeta = { mealCount: built.mealCount, failed: built.failed };
+
+    if (shoppingItems.length === 0) paintShoppingState("no-ingredients");
+    else paintShoppingList();
+  } catch (err) {
+    if (token !== shoppingToken) return;
+    console.warn("Could not build the shopping list:", err);
+    shoppingItems = [];
+    shoppingWeekId = weekId;
+    paintShoppingState("error");
+  }
+}
+
+// Plain-text list for the clipboard, grouped by aisle: what is still to buy
+// (or everything, if all is ticked).
+function shoppingListText() {
+  const { sorted, aisles, staples, todoCount } = shoppingSections();
+  const line = (i) => `- ${i.name}${i.measure ? `: ${i.measure}` : ""}`;
+  const blocks = [];
+  if (todoCount === 0) {
+    blocks.push(sorted.map(line).join("\n"));
+  } else {
+    aisles.forEach(({ aisle, items }) => blocks.push(`${aisle}\n${items.map(line).join("\n")}`));
+    if (staples.length) blocks.push(`Probably in your cupboard\n${staples.map(line).join("\n")}`);
+  }
+  return {
+    text: [`Shopping list (${weekRangeText()})`, ...blocks].join("\n\n"),
+    count: todoCount || sorted.length,
+    onlyTodo: todoCount > 0 && todoCount < sorted.length
+  };
+}
+
+async function copyTextToClipboard(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (e) {
+    // Fall back for older browsers and pages without clipboard permission.
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.setAttribute("readonly", "");
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    const ok = document.execCommand("copy");
+    ta.remove();
+    return ok;
+  } catch (e) {
+    return false;
+  }
+}
+
+// Shows "Copied" with a tick on the Copy list button for a moment.
+let copiedTimer = null;
+function flashCopied() {
+  const btn = document.getElementById("copy-shopping-btn");
+  const label = document.getElementById("copy-shopping-label");
+  if (!btn || !label) return;
+  btn.classList.add("is-copied");
+  label.textContent = "Copied";
+  clearTimeout(copiedTimer);
+  copiedTimer = setTimeout(() => {
+    btn.classList.remove("is-copied");
+    label.textContent = "Copy list";
+  }, 1800);
+}
+
+function initShoppingList() {
+  const section = document.getElementById("shopping-section");
+  if (!section) return;
+
+  section.addEventListener("change", (e) => {
+    const cb = e.target.closest(".shopping-item-check");
+    if (!cb) return;
+    const key = cb.closest(".shopping-item")?.dataset.key;
+    const item = shoppingItems.find((i) => i.key === key);
+    if (!item) return;
+    item.checked = cb.checked;
+    saveShoppingChecks();
+    paintShoppingList(key);
+  });
+
+  section.addEventListener("click", async (e) => {
+    if (e.target.closest("#shopping-retry-btn")) {
+      renderPlannerTable();
+    } else if (e.target.closest("#shopping-add-meal-btn")) {
+      openMealDrawer("Mon", "Dinner");
+    } else if (e.target.closest("#check-all-shopping-btn")) {
+      if (!shoppingItems.length) return;
+      const checkAll = shoppingItems.some((i) => !i.checked);
+      shoppingItems.forEach((i) => (i.checked = checkAll));
+      saveShoppingChecks();
+      paintShoppingList();
+    } else if (e.target.closest("#copy-shopping-btn")) {
+      if (!shoppingItems.length) return;
+      const { text, count, onlyTodo } = shoppingListText();
+      const ok = await copyTextToClipboard(text);
+      showToast(ok
+        ? `Copied ${count} item${count === 1 ? "" : "s"}${onlyTodo ? " still to buy" : ""}`
+        : "Couldn't copy the list. Your browser blocked the clipboard.");
+      if (ok) flashCopied();
+    } else if (e.target.closest("#print-shopping-btn")) {
+      window.print();
+    } else if (e.target.closest(".shopping-sources-btn")) {
+      const key = e.target.closest(".shopping-item")?.dataset.key;
+      if (!key) return;
+      if (expandedShoppingSources.has(key)) expandedShoppingSources.delete(key);
+      else expandedShoppingSources.add(key);
+      paintShoppingList();
+      document.querySelector(`#shopping-section .shopping-item[data-key="${CSS.escape(key)}"] .shopping-sources-btn`)?.focus();
+    }
+  });
+
+  // Closed <details> don't print, so open the staples while printing (the basket stays hidden).
+  const staples = document.getElementById("shopping-staples");
+  let staplesWereOpen = false;
+  window.addEventListener("beforeprint", () => {
+    staplesWereOpen = Boolean(staples?.open);
+    if (staples) staples.open = true;
+  });
+  window.addEventListener("afterprint", () => {
+    if (staples) staples.open = staplesWereOpen;
+  });
+}
+
+// ---------- Phones: Meals / Shopping list tabs ----------
+function setMobileView(view, focus = false) {
+  const main = document.getElementById("planner-main-content");
+  if (!main) return;
+  main.dataset.mobileView = view;
+  document.querySelectorAll("#planner-view-tabs .view-tab").forEach((tab) => {
+    const selected = tab.dataset.view === view;
+    tab.setAttribute("aria-selected", String(selected));
+    tab.tabIndex = selected ? 0 : -1;
+    if (selected && focus) tab.focus();
+  });
+}
+
+function initViewTabs() {
+  const tabs = document.getElementById("planner-view-tabs");
+  if (!tabs) return;
+  tabs.addEventListener("click", (e) => {
+    const tab = e.target.closest(".view-tab");
+    if (tab) setMobileView(tab.dataset.view);
+  });
+  tabs.addEventListener("keydown", (e) => {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+    e.preventDefault();
+    const current = document.getElementById("planner-main-content")?.dataset.mobileView;
+    let next = current === "meals" ? "shopping" : "meals";
+    if (e.key === "Home") next = "meals";
+    if (e.key === "End") next = "shopping";
+    setMobileView(next, true);
+  });
+}
+
+// ---------- Day and meal dialog (shared with the recipe page) ----------
+// Lets the user pick which day and meal of this week a recipe goes in, shows what is
+// already in that slot, then saves through addToPlan. Resolves { day, meal } or null.
+// options.skipAllergenCheck: the caller already ran confirmIfFlagged.
+// options.day / options.meal: preselect a slot.
+
+function suggestedMeal() {
+  const hour = new Date().getHours();
+  if (hour < 10) return "Breakfast";
+  if (hour < 15) return "Lunch";
+  return "Dinner";
+}
+
+// The dialog brings its own styles: recipe.html uses a pre-built tailwind.css that does
+// not contain every utility class, so the dialog must not depend on Tailwind.
+const PLAN_SLOT_DIALOG_CSS = `
+.psd-backdrop{position:fixed;inset:0;z-index:50;display:flex;align-items:flex-end;justify-content:center;background:rgba(28,25,23,.6);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);opacity:0;transition:opacity .2s ease}
+.psd-backdrop.is-open{opacity:1}
+.psd-panel{position:relative;width:100%;max-height:100vh;overflow-y:auto;box-sizing:border-box;background:#fff;color:#292524;font-family:Inter,system-ui,sans-serif;border:1px solid #f5f5f4;border-radius:24px 24px 0 0;box-shadow:0 25px 50px -12px rgba(0,0,0,.25);padding:20px;transform:translateY(24px);transition:transform .2s ease}
+.psd-backdrop.is-open .psd-panel{transform:none}
+@media (min-width:640px){
+  .psd-backdrop{align-items:center;padding:16px}
+  .psd-panel{max-width:28rem;border-radius:24px;padding:24px;transform:scale(.95)}
+}
+.psd-close{position:absolute;top:16px;right:16px;display:inline-flex;padding:8px;border:0;border-radius:9999px;background:none;color:#a8a29e;cursor:pointer;transition:color .15s,background-color .15s}
+.psd-close:hover{color:#44403c;background:#f5f5f4}
+.psd-head{display:flex;align-items:center;gap:12px;padding-right:40px}
+.psd-head-text{min-width:0}
+.psd-thumb{width:48px;height:48px;flex-shrink:0;border-radius:12px;object-fit:cover;background:#f5f5f4}
+.psd-title{margin:0;font-size:18px;line-height:1.4;font-weight:700;letter-spacing:-.01em;color:#1c1917}
+.psd-sub{margin:0;font-size:12px;color:#78716c;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psd-form{display:flex;flex-direction:column;gap:16px;margin-top:20px}
+.psd-fieldset{min-width:0;margin:0;padding:0;border:0}
+.psd-legend{padding:0;margin-bottom:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:#a8a29e}
+.psd-days{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.psd-meals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.psd-option{position:relative;display:block}
+.psd-option input{position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
+.psd-chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border:1px solid #efe6dc;border-radius:12px;background:#fff;color:#57534e;cursor:pointer;user-select:none;transition:background-color .15s,border-color .15s,color .15s}
+.psd-chip:hover{border-color:rgba(202,92,46,.5)}
+.psd-option input:checked+.psd-chip{background:#ca5c2e;border-color:#ca5c2e;color:#fff}
+.psd-option input:focus-visible+.psd-chip{box-shadow:0 0 0 2px rgba(202,92,46,.45)}
+.psd-chip-day{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
+.psd-chip-date{font-size:14px;font-weight:700;line-height:1}
+.psd-chip.is-today .psd-chip-day{color:#ca5c2e}
+.psd-option input:checked+.psd-chip.is-today .psd-chip-day{color:#fff}
+.psd-dot{width:4px;height:4px;border-radius:9999px;background:transparent}
+.psd-dot.is-filled{background:#ca5c2e}
+.psd-option input:checked+.psd-chip .psd-dot.is-filled{background:#fff}
+.psd-meal-chip{padding:8px 0;font-size:14px;font-weight:600}
+.psd-status{margin:0;padding:8px 12px;border:1px solid #f5f5f4;border-radius:12px;background:#fafaf9;color:#78716c;font-size:12px}
+.psd-status.is-replace{border-color:#fde68a;background:#fffbeb;color:#92400e}
+.psd-actions{display:flex;gap:12px;padding-top:4px}
+.psd-btn{flex:1;padding:10px 16px;border-radius:12px;font:600 14px/1.25 Inter,system-ui,sans-serif;cursor:pointer;transition:background-color .15s,border-color .15s}
+.psd-btn-secondary{border:1px solid #e7e5e4;background:#fff;color:#44403c}
+.psd-btn-secondary:hover{background:#fafaf9}
+.psd-btn-primary{border:1px solid #ca5c2e;background:#ca5c2e;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.psd-btn-primary:hover{background:#b34d23;border-color:#b34d23}
+.psd-btn:disabled{opacity:.6;cursor:default}
+.psd-btn:focus-visible,.psd-close:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(202,92,46,.5)}
+@media (prefers-reduced-motion:reduce){.psd-backdrop,.psd-panel{transition:none}}
+`;
+
+function ensurePlanSlotDialogStyles() {
+  if (document.getElementById("plan-slot-dialog-styles")) return;
+  const style = document.createElement("style");
+  style.id = "plan-slot-dialog-styles";
+  style.textContent = PLAN_SLOT_DIALOG_CSS;
+  document.head.appendChild(style);
+}
+
+export async function openAddToPlanDialog(recipe, options = {}) {
+  if (!recipe || !getCurrentUser()) return null;
+  document.getElementById("plan-slot-dialog")?.remove();
+
+  const weekId = shownWeekId();
+  const plan = await getPlan(weekId);
+  const dates = getWeekDates();
+  const todayIndex = dates.findIndex(isToday);
+  let day = DAYS.includes(options.day) ? options.day : DAYS[todayIndex >= 0 ? todayIndex : 0];
+  let meal = MEALS.includes(options.meal) ? options.meal : suggestedMeal();
+  const recipeName = toTitleCase(recipe.name || "this recipe");
+  const relative = weekOffset === 0 ? "This week" : "Shown week";
+  const previousFocus = document.activeElement;
+
+  ensurePlanSlotDialogStyles();
+
+  const dayChips = DAYS.map((d, i) => `
+    <label class="psd-option">
+      <input type="radio" name="plan-slot-day" value="${d}" ${d === day ? "checked" : ""}>
+      <span class="psd-chip${isToday(dates[i]) ? " is-today" : ""}">
+        <span class="psd-chip-day">${d}</span>
+        <span class="psd-chip-date">${dates[i].getDate()}</span>
+        <span class="psd-dot" data-day="${d}" aria-hidden="true"></span>
+      </span>
+    </label>`).join("");
+
+  const mealChips = MEALS.map((m) => `
+    <label class="psd-option">
+      <input type="radio" name="plan-slot-meal" value="${m}" ${m === meal ? "checked" : ""}>
+      <span class="psd-chip psd-meal-chip">${m}</span>
+    </label>`).join("");
+
+  const backdrop = document.createElement("div");
+  backdrop.id = "plan-slot-dialog";
+  backdrop.className = "psd-backdrop";
+  backdrop.innerHTML = `
+    <div role="dialog" aria-modal="true" aria-labelledby="plan-slot-title" class="psd-panel">
+      <button type="button" class="psd-close plan-slot-cancel" aria-label="Close dialog">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+
+      <div class="psd-head">
+        <img src="${escapeHtml(recipe.image || FALLBACK_MEAL_IMG)}" alt="" class="psd-thumb">
+        <div class="psd-head-text">
+          <h2 id="plan-slot-title" class="psd-title">Add to meal plan</h2>
+          <p class="psd-sub">${escapeHtml(recipeName)}</p>
+        </div>
+      </div>
+
+      <form class="psd-form">
+        <fieldset class="psd-fieldset">
+          <legend class="psd-legend">Day · ${escapeHtml(relative)}, ${escapeHtml(weekRangeText())}</legend>
+          <div class="psd-days">${dayChips}</div>
+        </fieldset>
+        <fieldset class="psd-fieldset">
+          <legend class="psd-legend">Meal</legend>
+          <div class="psd-meals">${mealChips}</div>
+        </fieldset>
+
+        <p class="psd-status" aria-live="polite"></p>
+
+        <div class="psd-actions">
+          <button type="button" class="psd-btn psd-btn-secondary plan-slot-cancel">Cancel</button>
+          <button type="submit" class="psd-btn psd-btn-primary plan-slot-submit">Add</button>
+        </div>
+      </form>
+    </div>`;
+
+  document.body.appendChild(backdrop);
+  const form = backdrop.querySelector("form");
+  const panel = backdrop.querySelector(".psd-panel");
+  const statusEl = backdrop.querySelector(".psd-status");
+  const submitBtn = backdrop.querySelector(".plan-slot-submit");
+
+  // Shows what is in the chosen slot and marks the days that already have this meal.
+  function refresh() {
+    const existing = plan[day]?.[meal];
+    if (existing && existing.name) {
+      const sameRecipe = String(existing.id) === String(recipe.id);
+      statusEl.classList.add("is-replace");
+      statusEl.textContent = sameRecipe
+        ? `${recipeName} is already planned for ${day} ${meal}.`
+        : `Replaces "${toTitleCase(existing.name)}" on ${day} ${meal}.`;
+      submitBtn.textContent = sameRecipe ? "Keep it" : `Replace ${day} ${meal}`;
+    } else {
+      statusEl.classList.remove("is-replace");
+      statusEl.textContent = `${day} ${meal} is free.`;
+      submitBtn.textContent = `Add to ${day} ${meal}`;
+    }
+    backdrop.querySelectorAll(".psd-dot").forEach((dot) => {
+      dot.classList.toggle("is-filled", Boolean(plan[dot.dataset.day]?.[meal]));
+    });
+  }
+  refresh();
+
+  requestAnimationFrame(() => {
+    backdrop.classList.add("is-open");
+    backdrop.querySelector(`input[name="plan-slot-day"][value="${day}"]`)?.focus();
+  });
+
+  return new Promise((resolve) => {
+    let closed = false;
+    function close(result) {
+      if (closed) return;
+      closed = true;
+      document.removeEventListener("keydown", onKeyDown, true);
+      backdrop.classList.remove("is-open");
+      setTimeout(() => backdrop.remove(), 200);
+      if (previousFocus && typeof previousFocus.focus === "function") previousFocus.focus();
+      resolve(result);
+    }
+
+    function onKeyDown(e) {
+      // Leave keys alone while another dialog (e.g. the allergen warning) is on top.
+      if (document.getElementById("custom-confirm-modal")) return;
+      if (e.key === "Escape") {
+        e.preventDefault();
+        close(null);
+      } else if (e.key === "Tab") {
+        // Keep focus inside the dialog.
+        const focusable = Array.from(panel.querySelectorAll("button, input:checked")).filter((el) => !el.disabled);
+        const first = focusable[0];
+        const last = focusable[focusable.length - 1];
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    }
+    document.addEventListener("keydown", onKeyDown, true);
+
+    backdrop.addEventListener("click", (e) => {
+      if (e.target === backdrop) close(null);
+    });
+    backdrop.querySelectorAll(".plan-slot-cancel").forEach((btn) => btn.addEventListener("click", () => close(null)));
+
+    form.addEventListener("change", (e) => {
+      if (e.target.name === "plan-slot-day") day = e.target.value;
+      if (e.target.name === "plan-slot-meal") meal = e.target.value;
+      refresh();
+    });
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const existing = plan[day]?.[meal];
+      if (existing && String(existing.id) === String(recipe.id)) {
+        close({ day, meal, unchanged: true });
+        return;
+      }
+      submitBtn.disabled = true;
+      try {
+        const added = await addToPlan(day, meal, recipe, {
+          skipAllergenCheck: Boolean(options.skipAllergenCheck),
+          skipReplaceConfirm: true
+        });
+        close(added ? { day, meal } : null);
+      } catch (err) {
+        console.warn("Could not add to meal plan:", err);
+        submitBtn.disabled = false;
+        showToast("Couldn't add this recipe to your plan. Please try again.");
+      }
     });
   });
 }
@@ -910,7 +1726,7 @@ async function renderFavouritesList(filterText = "") {
 
     container.innerHTML = `
       <div class="py-10 text-center text-xs text-stone-500 space-y-1">
-        <p class="font-medium text-stone-700">${/[^\u0000-\u007f]/.test(filterText) ? `<span>No favourites match </span><span translate="no" class="notranslate">"${filterText}"</span>` : `No favourites match "${filterText}"`}</p>
+        <p class="font-medium text-stone-700">${/[^\u0000-\u007f]/.test(filterText) ? `<span>No favourites match </span><span translate="no" class="notranslate">"${escapeHtml(filterText)}"</span>` : `No favourites match "${escapeHtml(filterText)}"`}</p>
         <p class="text-stone-400">Try a different search term or browse all recipes.</p>
       </div>
     `;
@@ -967,7 +1783,7 @@ async function performSearch(query) {
   container.innerHTML = `
     <div class="py-12 text-center text-xs text-stone-400 flex flex-col items-center justify-center gap-2">
       <svg class="w-6 h-6 animate-spin text-[#ca5c2e]" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>
-      <span>${/[^\u0000-\u007f]/.test(query) ? `<span>Searching: </span><span translate="no" class="notranslate">"${query}"</span>...` : `Searching for "${query}"...`}</span>
+      <span>${/[^\u0000-\u007f]/.test(query) ? `<span>Searching: </span><span translate="no" class="notranslate">"${escapeHtml(query)}"</span>...` : `Searching for "${escapeHtml(query)}"...`}</span>
     </div>
   `;
 
@@ -976,7 +1792,7 @@ async function performSearch(query) {
     if (!results || results.length === 0) {
       container.innerHTML = `
         <div class="py-10 text-center space-y-1.5">
-          <p class="text-xs font-bold text-stone-700">${/[^\u0000-\u007f]/.test(query) ? `<span>No recipes found: </span><span translate="no" class="notranslate">"${query}"</span>` : `No recipes found for "${query}"`}</p>
+          <p class="text-xs font-bold text-stone-700">${/[^\u0000-\u007f]/.test(query) ? `<span>No recipes found: </span><span translate="no" class="notranslate">"${escapeHtml(query)}"</span>` : `No recipes found for "${escapeHtml(query)}"`}</p>
           <p class="text-xs text-stone-400">Try searching for keywords like "Pasta", "Chicken", or "Curry".</p>
         </div>
       `;
@@ -1005,10 +1821,10 @@ function createDrawerRecipeRow(recipe) {
   const categoryText = [recipe.category, recipe.area].filter(Boolean).join(" • ") || "Recipe";
 
   item.innerHTML = `
-    <img src="${imgSrc}" alt="${recipe.name}" class="w-12 h-12 rounded-xl object-cover flex-shrink-0 bg-stone-100 border border-stone-200/50">
+    <img src="${escapeHtml(imgSrc)}" alt="${escapeHtml(toTitleCase(recipe.name))}" class="w-12 h-12 rounded-xl object-cover flex-shrink-0 bg-stone-100 border border-stone-200/50">
     <div class="flex-1 min-w-0">
-      <h4 class="text-xs sm:text-sm font-bold text-stone-800 truncate">${toTitleCase(recipe.name)}</h4>
-      <p class="text-[11px] text-stone-400 truncate">${categoryText}</p>
+      <h4 class="text-xs sm:text-sm font-bold text-stone-800 truncate">${escapeHtml(toTitleCase(recipe.name))}</h4>
+      <p class="text-[11px] text-stone-400 truncate">${escapeHtml(categoryText)}</p>
     </div>
     <button type="button" class="drawer-add-recipe-btn px-3 py-1.5 rounded-xl bg-[#ca5c2e]/10 hover:bg-[#ca5c2e] text-[#ca5c2e] hover:text-white text-xs font-bold transition flex items-center gap-1 flex-shrink-0 focus:outline-none">
       <span class="text-sm leading-none">+</span> Add
@@ -1115,302 +1931,20 @@ function initPlanMenu() {
   });
 }
 
-// ---------- Shopping List Storage & Helpers ----------
-
-const memoryShoppingLists = new Map(); // `${uid}/${weekId}` -> doc
-const fullRecipeCache = new Map(); // id -> Promise<recipe | null>
-let currentShoppingList = []; // [{ name, measure, checked }]
-let currentShoppingWeekId = null;
-let shoppingRenderToken = 0;
-
-function fetchRecipeWithCache(id) {
-  if (!id || id === "0") return Promise.resolve(null);
-  if (fullRecipeCache.has(id)) return fullRecipeCache.get(id);
-  const promise = getRecipeById(id).catch((e) => {
-    console.warn("Could not fetch recipe for shopping list:", id, e);
-    return null;
-  });
-  fullRecipeCache.set(id, promise);
-  return promise;
-}
-
-function shoppingCacheKey(uid) {
-  return `recipeplan_shopping_lists_${uid}`;
-}
-
-function readLocalShoppingLists(uid) {
-  try {
-    return JSON.parse(localStorage.getItem(shoppingCacheKey(uid)) || "{}") || {};
-  } catch (e) {
-    return {};
-  }
-}
-
-function writeLocalShoppingList(uid, weekId, doc) {
-  try {
-    const all = readLocalShoppingLists(uid);
-    all[weekId] = doc;
-    localStorage.setItem(shoppingCacheKey(uid), JSON.stringify(all));
-  } catch (e) {}
-}
-
-async function loadSavedShoppingDoc(weekId) {
-  const user = getCurrentUser();
-  const uid = user?.uid;
-  if (!uid) {
-    try {
-      return JSON.parse(localStorage.getItem(`recipeplan_shopping_guest_${weekId}`) || "null");
-    } catch (e) {
-      return null;
-    }
-  }
-
-  const memKey = `${uid}/${weekId}`;
-  if (memoryShoppingLists.has(memKey)) {
-    return memoryShoppingLists.get(memKey);
-  }
-
-  const local = readLocalShoppingLists(uid)[weekId] || null;
-  if (local) {
-    memoryShoppingLists.set(memKey, local);
-  }
-
-  if (cloudUid()) {
-    try {
-      const cloud = await fetchUserShoppingList(uid, weekId);
-      if (cloud) {
-        memoryShoppingLists.set(memKey, cloud);
-        writeLocalShoppingList(uid, weekId, cloud);
-        return cloud;
-      }
-    } catch (e) {
-      console.warn("Could not fetch shopping list from Firestore:", e);
-    }
-  }
-
-  return local;
-}
-
-async function persistShoppingList(weekId, items) {
-  const user = getCurrentUser();
-  const uid = user?.uid;
-  const docData = createShoppingListDoc(items);
-
-  if (!uid) {
-    try {
-      localStorage.setItem(`recipeplan_shopping_guest_${weekId}`, JSON.stringify(docData));
-    } catch (e) {}
-    return docData;
-  }
-
-  const memKey = `${uid}/${weekId}`;
-  memoryShoppingLists.set(memKey, docData);
-  writeLocalShoppingList(uid, weekId, docData);
-
-  if (cloudUid()) {
-    try {
-      await saveUserShoppingList(uid, weekId, items);
-    } catch (e) {
-      console.warn("Could not save shopping list to Firestore:", e);
-    }
-  }
-
-  return docData;
-}
-
-export function renderShoppingItemsDOM(weekId = shownWeekId()) {
-  const grid = document.getElementById("shopping-list-grid");
-  const progressBadge = document.getElementById("shopping-progress-badge");
-  const progressBar = document.getElementById("shopping-progress-bar");
-  const selectAllLabel = document.getElementById("select-all-label");
-
-  if (!grid) return;
-
-  // Split into unchecked and checked so checked items move to the bottom
-  const uncheckedItems = currentShoppingList.filter((item) => !item.checked);
-  const checkedItems = currentShoppingList.filter((item) => item.checked);
-  const sortedItems = [...uncheckedItems, ...checkedItems];
-
-  const total = currentShoppingList.length;
-  const checkedCount = checkedItems.length;
-
-  if (progressBadge) {
-    progressBadge.textContent = `${checkedCount} of ${total} items checked`;
-  }
-  if (progressBar) {
-    const pct = total > 0 ? Math.round((checkedCount / total) * 100) : 0;
-    progressBar.style.width = `${pct}%`;
-  }
-  if (selectAllLabel) {
-    selectAllLabel.textContent = total > 0 && checkedCount === total ? "Deselect All" : "Select All";
-  }
-
-  grid.innerHTML = sortedItems.map((item) => {
-    const isChecked = Boolean(item.checked);
-    const cardClass = isChecked
-      ? "shopping-item-card is-checked group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-stone-50/70 border-stone-200/80 hover:bg-white hover:border-[#ca5c2e]/40 shadow-2xs"
-      : "shopping-item-card group flex items-center justify-between gap-3 p-3 rounded-2xl border transition-all duration-200 cursor-pointer select-none bg-white border-[#efe6dc] hover:border-[#ca5c2e]/50 hover:shadow-xs";
-
-    const nameClass = isChecked
-      ? "shopping-item-name text-xs sm:text-sm font-semibold truncate transition line-through text-stone-400"
-      : "shopping-item-name text-xs sm:text-sm font-semibold truncate transition text-stone-800";
-
-    const measureClass = isChecked
-      ? "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-white border border-[#efe6dc] text-stone-400 transition shrink-0 shadow-2xs"
-      : "shopping-item-measure text-[11px] font-medium px-2 py-0.5 rounded-lg bg-[#faf7f2] border border-[#efe6dc] text-stone-600 transition shrink-0 shadow-2xs";
-
-    const measureHtml = item.measure && item.measure.trim()
-      ? `<span class="${measureClass}">${escapeHtml(item.measure.trim())}</span>`
-      : "";
-
-    return `
-      <label class="${cardClass}" data-name="${escapeHtml(item.name)}">
-        <div class="flex items-center gap-2.5 min-w-0">
-          <input type="checkbox" ${isChecked ? "checked" : ""} class="shopping-item-check w-4 h-4 rounded text-[#ca5c2e] accent-[#ca5c2e] focus:ring-0 focus:ring-offset-0 cursor-pointer">
-          <span class="${nameClass}">${escapeHtml(item.name)}</span>
-        </div>
-        ${measureHtml}
-      </label>
-    `;
-  }).join("");
-}
-
-export async function renderShoppingList(plan, weekId = shownWeekId()) {
-  const grid = document.getElementById("shopping-list-grid");
-  const progressBadge = document.getElementById("shopping-progress-badge");
-  const progressBar = document.getElementById("shopping-progress-bar");
-  const selectAllBtn = document.getElementById("clear-shopping-btn");
-  const selectAllLabel = document.getElementById("select-all-label");
-
-  if (!grid) return;
-
-  const currentToken = ++shoppingRenderToken;
-
-  if (!plan) {
-    plan = await getPlan(weekId);
-    if (currentToken !== shoppingRenderToken) return;
-  }
-
-  // Gather planned meals
-  const mealItems = [];
-  const recipeFetchPromises = [];
-
-  DAYS.forEach((day) => {
-    MEALS.forEach((meal) => {
-      const slot = plan?.[day]?.[meal];
-      if (slot && slot.id && slot.id !== "0") {
-        mealItems.push(slot);
-        if (!Array.isArray(slot.ingredients) || slot.ingredients.length === 0) {
-          recipeFetchPromises.push(
-            fetchRecipeWithCache(slot.id).then((fullRecipe) => {
-              if (fullRecipe && Array.isArray(fullRecipe.ingredients)) {
-                slot.ingredients = fullRecipe.ingredients;
-              }
-            })
-          );
-        }
-      }
-    });
-  });
-
-  if (recipeFetchPromises.length > 0) {
-    await Promise.all(recipeFetchPromises);
-    if (currentToken !== shoppingRenderToken) return;
-  }
-
-  // Collect raw ingredients from all meals
-  const rawIngredients = [];
-  mealItems.forEach((slot) => {
-    if (Array.isArray(slot.ingredients)) {
-      rawIngredients.push(...slot.ingredients);
-    }
-  });
-
-  // Combine ingredients across recipes
-  const combined = combineIngredients(rawIngredients);
-
-  if (combined.length === 0) {
-    currentShoppingList = [];
-    currentShoppingWeekId = weekId;
-    grid.innerHTML = `
-      <div class="col-span-full py-10 px-4 text-center">
-        <div class="w-12 h-12 mx-auto mb-3 rounded-2xl bg-[#faf7f2] border border-[#efe6dc] flex items-center justify-center text-stone-400">
-          <svg class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path>
-          </svg>
-        </div>
-        <p class="text-sm font-semibold text-stone-700">No ingredients yet</p>
-        <p class="text-xs text-stone-400 mt-1 max-w-sm mx-auto">Add meals to your weekly plan above to automatically generate your shopping list.</p>
-      </div>
-    `;
-    if (progressBadge) progressBadge.textContent = "0 items";
-    if (progressBar) progressBar.style.width = "0%";
-    if (selectAllBtn) {
-      selectAllBtn.disabled = true;
-      selectAllBtn.classList.add("opacity-50", "pointer-events-none");
-    }
-    const copyBtn = document.getElementById("copy-shopping-btn");
-    if (copyBtn) {
-      copyBtn.disabled = true;
-      copyBtn.classList.add("opacity-50", "pointer-events-none");
-    }
-    if (selectAllLabel) selectAllLabel.textContent = "Select All";
-    return;
-  }
-
-  if (selectAllBtn) {
-    selectAllBtn.disabled = false;
-    selectAllBtn.classList.remove("opacity-50", "pointer-events-none");
-  }
-  const copyBtn = document.getElementById("copy-shopping-btn");
-  if (copyBtn) {
-    copyBtn.disabled = false;
-    copyBtn.classList.remove("opacity-50", "pointer-events-none");
-  }
-
-  // Load saved checked status for this weekId
-  const savedDoc = await loadSavedShoppingDoc(weekId);
-  if (currentToken !== shoppingRenderToken) return;
-
-  const checkedSet = new Set();
-  if (currentShoppingWeekId === weekId && currentShoppingList.length > 0) {
-    currentShoppingList.forEach((item) => {
-      if (item.checked && item.name) {
-        checkedSet.add(item.name.trim().toLowerCase());
-      }
-    });
-  }
-  if (savedDoc?.items && Array.isArray(savedDoc.items)) {
-    savedDoc.items.forEach((item) => {
-      if (item.checked && item.name) {
-        checkedSet.add(item.name.trim().toLowerCase());
-      }
-    });
-  } else if (savedDoc?.checked && Array.isArray(savedDoc.checked)) {
-    savedDoc.checked.forEach((name) => {
-      if (name) checkedSet.add(String(name).trim().toLowerCase());
-    });
-  }
-
-  currentShoppingWeekId = weekId;
-  currentShoppingList = combined.map((item) => ({
-    name: item.name,
-    measure: item.measure || "",
-    checked: checkedSet.has(item.name.trim().toLowerCase())
-  }));
-
-  renderShoppingItemsDOM(weekId);
-}
-
 document.addEventListener("DOMContentLoaded", () => {
   renderPlannerTable();
   initDragAndDrop();
   initDayTabs();
+  initViewTabs();
+  initShoppingList();
 
   // Re-render once Firebase has restored the session, so the plan comes from the account.
   let authSeen = false;
   onAuthChange(() => {
-    if (authSeen) memoryPlans.clear();
+    if (authSeen) {
+      memoryPlans.clear();
+      savedChecks.clear();
+    }
     authSeen = true;
     renderPlannerTable();
   });
@@ -1549,98 +2083,9 @@ document.addEventListener("DOMContentLoaded", () => {
     renderPlannerTable();
   });
 
-  // Shopping list interactive event listeners
-  const shoppingGrid = document.getElementById("shopping-list-grid");
-  const selectAllBtn = document.getElementById("clear-shopping-btn");
-
-  if (shoppingGrid) {
-    shoppingGrid.addEventListener("change", async (e) => {
-      const checkbox = e.target.closest(".shopping-item-check");
-      if (!checkbox) return;
-      const card = checkbox.closest(".shopping-item-card");
-      if (!card) return;
-      const name = card.dataset.name;
-      if (!name) return;
-
-      const item = currentShoppingList.find((i) => i.name === name);
-      if (item) {
-        item.checked = checkbox.checked;
-        const weekId = shownWeekId();
-        renderShoppingItemsDOM(weekId);
-        // Retain focus on toggled item's checkbox
-        const escaped = CSS.escape(name);
-        const newCard = shoppingGrid.querySelector(`.shopping-item-card[data-name="${escaped}"]`);
-        newCard?.querySelector(".shopping-item-check")?.focus();
-        await persistShoppingList(weekId, currentShoppingList);
-      }
-    });
-  }
-
-  if (selectAllBtn) {
-    selectAllBtn.addEventListener("click", async () => {
-      if (!currentShoppingList || currentShoppingList.length === 0) return;
-      const allChecked = currentShoppingList.every((i) => i.checked);
-      currentShoppingList.forEach((i) => {
-        i.checked = !allChecked;
-      });
-      const weekId = shownWeekId();
-      renderShoppingItemsDOM(weekId);
-      await persistShoppingList(weekId, currentShoppingList);
-    });
-  }
-
-  const copyShoppingBtn = document.getElementById("copy-shopping-btn");
-  const copyShoppingLabel = document.getElementById("copy-shopping-label");
-
-  if (copyShoppingBtn) {
-    copyShoppingBtn.addEventListener("click", async () => {
-      if (!currentShoppingList || currentShoppingList.length === 0) {
-        showToast("Shopping list is empty.");
-        return;
-      }
-
-      const text = currentShoppingList
-        .map((item) => `${item.checked ? "✓ " : "• "}${item.name}${item.measure ? ` (${item.measure})` : ""}`)
-        .join("\n");
-
-      let copied = false;
-      try {
-        if (navigator.clipboard && navigator.clipboard.writeText) {
-          await navigator.clipboard.writeText(text);
-          copied = true;
-        }
-      } catch (err) {}
-
-      if (!copied) {
-        try {
-          const textarea = document.createElement("textarea");
-          textarea.value = text;
-          textarea.style.position = "fixed";
-          textarea.style.opacity = "0";
-          document.body.appendChild(textarea);
-          textarea.select();
-          copied = document.execCommand("copy");
-          document.body.removeChild(textarea);
-        } catch (err) {}
-      }
-
-      if (copied) {
-        showToast("Shopping list copied to clipboard!");
-        if (copyShoppingLabel) copyShoppingLabel.textContent = "Copied!";
-        copyShoppingBtn.classList.add("text-emerald-700", "border-emerald-300", "bg-emerald-50");
-        setTimeout(() => {
-          if (copyShoppingLabel) copyShoppingLabel.textContent = "Copy list";
-          copyShoppingBtn.classList.remove("text-emerald-700", "border-emerald-300", "bg-emerald-50");
-        }, 2000);
-      } else {
-        showToast("Couldn't copy to clipboard.");
-      }
-    });
-  }
-
   window.addEventListener("auth-changed", () => {
     memoryPlans.clear();
-    memoryShoppingLists.clear();
+    savedChecks.clear();
     renderPlannerTable();
   });
   window.addEventListener("storage", (e) => {

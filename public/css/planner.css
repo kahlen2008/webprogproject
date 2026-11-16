@@ -1,6 +1,151 @@
 /* Meal planner and shopping list page. Owner: Person 4. */
 
-/* Shopping list: checked items struck through */
-.shopping-item-card.is-checked .shopping-item-name {
+/* ---------- Phones: meals and shopping list on separate tabs ---------- */
+.view-tab[aria-selected="true"] {
+  background: #ca5c2e;
+  color: #fff;
+  box-shadow: 0 1px 2px rgb(0 0 0 / 0.08);
+}
+.view-tab[aria-selected="false"] {
+  color: #57534e;
+}
+
+@media (max-width: 639.98px) {
+  #planner-main-content[data-mobile-view="meals"] #shopping-section,
+  #planner-main-content[data-mobile-view="shopping"] #planner-cards {
+    display: none;
+  }
+}
+
+/* ---------- Shopping list items ---------- */
+.shopping-item.is-checked .shopping-item-name {
   text-decoration: line-through;
+  color: #a8a29e;
+}
+.shopping-item.is-checked .shopping-item-measure {
+  color: #a8a29e;
+}
+.shopping-item:last-child {
+  border-bottom: 0;
+}
+
+/* Copy list button: swaps to a green tick and "Copied" for a moment */
+#copy-shopping-btn .copied-icon {
+  display: none;
+}
+#copy-shopping-btn.is-copied {
+  color: #047857;
+  background: #ecfdf5;
+}
+#copy-shopping-btn.is-copied .copy-icon {
+  display: none;
+}
+#copy-shopping-btn.is-copied .copied-icon {
+  display: inline;
+}
+
+/* Folded sections (cupboard staples, basket): no default marker, chevron turns when open */
+.shopping-fold > summary::-webkit-details-marker {
+  display: none;
+}
+.shopping-fold[open] .shopping-fold-chevron {
+  transform: rotate(180deg);
+}
+
+/* ---------- Print: only the shopping list, one column ---------- */
+@media print {
+  @page {
+    margin: 14mm;
+  }
+
+  /* Navbar, footer, drawer, toasts and dialogs */
+  body > *:not(main) {
+    display: none !important;
+  }
+  /* The page is a full-height flex column on screen; plain blocks break across pages better. */
+  body {
+    background: #fff !important;
+    display: block !important;
+    min-height: 0 !important;
+  }
+  main {
+    padding: 0 !important;
+    max-width: none !important;
+  }
+
+  /* Everything on the page except the shopping list */
+  main > *:not(#planner-main-content),
+  #planner-main-content > *:not(#shopping-section) {
+    display: none !important;
+  }
+
+  #shopping-section {
+    display: block !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    border-radius: 0 !important;
+  }
+  #shopping-section > * + * {
+    margin-top: 10px;
+  }
+
+  /* Buttons, progress and the icon */
+  #shopping-actions,
+  #shopping-progress-track,
+  #shopping-progress-badge,
+  #shopping-status,
+  .shopping-icon,
+  button {
+    display: none !important;
+  }
+
+  /* The basket (already bought) and the fold chevrons */
+  #shopping-done-wrap,
+  .shopping-fold-chevron {
+    display: none !important;
+  }
+  .shopping-fold {
+    border: 0 !important;
+    background: none !important;
+  }
+  .shopping-fold > summary {
+    padding: 0 0 4px !important;
+  }
+  .shopping-fold > ul {
+    padding: 0 !important;
+  }
+
+  /* One column, plain rows */
+  .shopping-list {
+    columns: 1 !important;
+  }
+  /* Aisles may split across pages (a long aisle would otherwise jump to the next page and
+     leave the first one empty); single rows don't split, and a heading stays with its first row. */
+  .shopping-item {
+    break-inside: avoid;
+  }
+  .shopping-aisle h3 {
+    color: #1c1917 !important;
+    break-after: avoid;
+    margin-bottom: 0 !important;
+  }
+  #shopping-groups > * + * {
+    margin-top: 12px !important;
+  }
+
+  /* Recipe names under each item aren't needed on paper */
+  .shopping-source {
+    display: none !important;
+  }
+  .shopping-item > div {
+    padding: 3px 0 !important;
+  }
+  .shopping-item-measure {
+    color: #44403c !important;
+  }
+  .shopping-item input[type="checkbox"] {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
 }
