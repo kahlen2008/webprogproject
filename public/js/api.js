@@ -121,3 +121,69 @@ export async function filterByCategory(category) {
     category: category,
   }));
 }
+
+// ---------- Beyond the 25-result cap ----------
+// TheMealDB's free name search (search.php?s=) never returns more than 25 meals.
+// The category and ingredient filters return every match, so these two helpers use
+// them to reach the whole catalogue. Filter results only have id, name, image (and
+// category), like filterByCategory; use getRecipeById(id) for the full recipe.
+
+function filterMealToRecipe(meal, extra = {}) {
+  return {
+    id: String(meal.idMeal),
+    name: toTitleCase(meal.strMeal),
+    image: meal.strMealThumb,
+    category: extra.category || "",
+    area: meal.strArea || "",
+  };
+}
+
+function uniqueById(lists) {
+  const seen = new Set();
+  const out = [];
+  lists.flat().forEach((recipe) => {
+    if (!recipe || seen.has(recipe.id)) return;
+    seen.add(recipe.id);
+    out.push(recipe);
+  });
+  return out;
+}
+
+// Every recipe, gathered category by category and interleaved (one from each category
+// in turn) so the list is varied instead of starting with every beef dish.
+export async function listAllRecipes() {
+  const data = await fetchJson("list.php?c=list");
+  const categories = (data.meals || []).map((m) => m.strCategory).filter(Boolean);
+  const lists = await Promise.all(categories.map((c) => filterByCategory(c).catch(() => [])));
+  const interleaved = [];
+  const longest = Math.max(0, ...lists.map((l) => l.length));
+  for (let i = 0; i < longest; i++) {
+    lists.forEach((list) => {
+      if (list[i]) interleaved.push(list[i]);
+    });
+  }
+  return uniqueById([interleaved]);
+}
+
+// Name search plus meals that use the word as an ingredient ("chicken" -> 20 more) or
+// belong to a category of that name. Name matches come first. Same input as searchRecipes.
+export async function searchRecipesWide(query) {
+  const englishQuery = (await translateQueryToEnglish(query)).trim();
+  const byName = await searchRecipes(query);
+  if (!englishQuery) return byName;
+
+  const ingredient = englishQuery.toLowerCase().replace(/\s+/g, "_");
+  const singular = englishQuery.toLowerCase().replace(/s$/, "");
+  const [byIngredient, byCategory] = await Promise.all([
+    fetchJson(`filter.php?i=${encodeURIComponent(ingredient)}`)
+      .then((d) => (Array.isArray(d.meals) ? d.meals.map((m) => filterMealToRecipe(m)) : []))
+      .catch(() => []),
+    fetchJson("list.php?c=list")
+      .then((d) => (d.meals || []).map((m) => m.strCategory))
+      .then((cats) => cats.find((c) => [englishQuery.toLowerCase(), singular].includes(c.toLowerCase())))
+      .then((cat) => (cat ? filterByCategory(cat) : []))
+      .catch(() => []),
+  ]);
+  return uniqueById([byName, byCategory, byIngredient]);
+}
+

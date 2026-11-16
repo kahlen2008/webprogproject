@@ -1,7 +1,7 @@
 // Home page (search/categories) and recipe detail page.
 // Matches the design and interactions shown in RecipePlan mockup.
 
-import { searchRecipes, getRecipeById, filterByCategory } from "./api.js";
+import { searchRecipes, searchRecipesWide, listAllRecipes, getRecipeById, filterByCategory } from "./api.js";
 import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect } from "./utils.js";
@@ -321,7 +321,7 @@ function applyHideFilterAnimated(hide) {
   return true;
 }
 
-async function renderRecipeCards(recipesList, { isSuggested = false } = {}) {
+async function renderRecipeCards(recipesList, { isSuggested = false, paged = false } = {}) {
   if (!results) return;
   if (finishFilterAnimation) finishFilterAnimation();
   results.innerHTML = "";
@@ -337,7 +337,9 @@ async function renderRecipeCards(recipesList, { isSuggested = false } = {}) {
     if (message) {
       message.className = "text-sm text-stone-500 py-6 text-center";
       message.textContent = prefs.hideFlagged && checked.length > 0
-        ? "All matching recipes contain ingredients you're allergic to. Uncheck 'Hide allergen recipes' to view them."
+        ? paged
+          ? "Every recipe on this page contains ingredients you're allergic to. Try another page, or uncheck 'Hide allergen recipes' to view them."
+          : "All matching recipes contain ingredients you're allergic to. Uncheck 'Hide allergen recipes' to view them."
         : "No recipes found matching your criteria.";
     }
     return;
@@ -355,6 +357,153 @@ async function renderRecipeCards(recipesList, { isSuggested = false } = {}) {
     cardCache.set(String(recipe.id), card);
     results.appendChild(card);
   });
+}
+
+// ---------- Pagination ----------
+// Searches and categories return the full list from the API, which is kept here and
+// shown 12 at a time with ‹ 1 … 4 [5] 6 … 67 › under the grid. The page number is kept
+// in the URL (?page=5), so coming Back from a recipe returns to the same page.
+const PAGE_SIZE = 12;
+let allResults = [];
+let currentPage = 1;
+let resultsSuggested = false;
+let pendingPage = 0; // page to open on the next showResults (from the URL, or the allergen toggle)
+
+function totalPages() {
+  return Math.max(1, Math.ceil(allResults.length / PAGE_SIZE));
+}
+
+function syncPageToUrl() {
+  try {
+    const url = new URL(window.location.href);
+    if (currentPage > 1) url.searchParams.set("page", String(currentPage));
+    else url.searchParams.delete("page");
+    window.history.replaceState(null, "", url.pathname + url.search + url.hash);
+  } catch (e) {}
+}
+
+// Page numbers to show: first, last, and the pages around the current one, with gaps.
+function pageList(page, total) {
+  const pages = new Set([1, total, page - 1, page, page + 1]);
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b);
+  const out = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push(p - sorted[i - 1] === 2 ? p - 1 : "…");
+    out.push(p);
+  });
+  return out;
+}
+
+// The page controls bring their own styles: this page uses a pre-built tailwind.css that
+// only has the classes in use when it was generated, so these controls don't rely on it.
+const PAGINATION_CSS = `
+.rp-pagination{display:flex;flex-direction:column;align-items:center;gap:12px}
+.rp-pages{display:none;align-items:center;gap:6px;margin:0;padding:0;list-style:none}
+.rp-pages-phone{display:flex;align-items:center;gap:16px}
+@media (min-width:640px){.rp-pages{display:flex}.rp-pages-phone{display:none}}
+.rp-page-btn{display:inline-flex;align-items:center;justify-content:center;gap:4px;box-sizing:border-box;height:40px;min-width:40px;padding:0 12px;border:1px solid #ede4da;border-radius:9999px;background:#fff;color:#44403c;font:600 14px/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums;box-shadow:0 1px 2px rgba(0,0,0,.04);cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
+.rp-page-btn:hover{border-color:rgba(202,92,46,.5);background:#fbf2ec;color:#ca5c2e}
+.rp-page-btn:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(202,92,46,.45)}
+.rp-page-btn[aria-current="page"]{border-color:#ca5c2e;background:#ca5c2e;color:#fff;box-shadow:0 1px 3px rgba(202,92,46,.35);cursor:default}
+.rp-page-btn:disabled{opacity:.35;pointer-events:none}
+.rp-page-btn.rp-prev{padding:0 16px 0 12px}
+.rp-page-btn.rp-next{padding:0 12px 0 16px}
+.rp-page-btn.rp-arrow{width:44px;height:44px;padding:0}
+.rp-page-gap{display:inline-flex;justify-content:center;width:28px;color:#a8a29e;font-size:14px}
+.rp-page-label{color:#44403c;font:600 14px/1 Inter,system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.rp-page-range{margin:0;color:#a8a29e;font-size:12px;font-variant-numeric:tabular-nums}
+`;
+
+function ensurePaginationStyles() {
+  if (document.getElementById("rp-pagination-styles")) return;
+  const style = document.createElement("style");
+  style.id = "rp-pagination-styles";
+  style.textContent = PAGINATION_CSS;
+  document.head.appendChild(style);
+}
+
+const ARROW_LEFT = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>`;
+const ARROW_RIGHT = `<svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="9 18 15 12 9 6"></polyline></svg>`;
+
+function renderPagination() {
+  const nav = document.getElementById("results-pagination");
+  if (!nav) return;
+  const total = totalPages();
+  if (allResults.length <= PAGE_SIZE) {
+    nav.innerHTML = "";
+    nav.classList.add("hidden");
+    return;
+  }
+  ensurePaginationStyles();
+  nav.classList.remove("hidden");
+
+  const prev = currentPage > 1 ? currentPage - 1 : 0;
+  const next = currentPage < total ? currentPage + 1 : 0;
+  const first = (currentPage - 1) * PAGE_SIZE + 1;
+  const last = Math.min(currentPage * PAGE_SIZE, allResults.length);
+
+  const numbers = pageList(currentPage, total).map((p) => {
+    if (p === "…") return `<li><span class="rp-page-gap" aria-hidden="true">…</span></li>`;
+    const current = p === currentPage;
+    return `<li><button type="button" class="rp-page-btn" data-page="${p}" ${current ? 'aria-current="page"' : ""} aria-label="Page ${p}">${p}</button></li>`;
+  }).join("");
+
+  nav.innerHTML = `
+    <div class="rp-pagination">
+      <ul class="rp-pages">
+        <li><button type="button" class="rp-page-btn rp-prev" data-page="${prev}" ${prev ? "" : "disabled"} aria-label="Previous page">${ARROW_LEFT}Prev</button></li>
+        ${numbers}
+        <li><button type="button" class="rp-page-btn rp-next" data-page="${next}" ${next ? "" : "disabled"} aria-label="Next page">Next${ARROW_RIGHT}</button></li>
+      </ul>
+      <div class="rp-pages-phone">
+        <button type="button" class="rp-page-btn rp-arrow" data-page="${prev}" ${prev ? "" : "disabled"} aria-label="Previous page">${ARROW_LEFT}</button>
+        <span class="rp-page-label">Page ${currentPage} of ${total}</span>
+        <button type="button" class="rp-page-btn rp-arrow" data-page="${next}" ${next ? "" : "disabled"} aria-label="Next page">${ARROW_RIGHT}</button>
+      </div>
+      <p class="rp-page-range">Recipes ${first}–${last} of ${allResults.length}</p>
+    </div>`;
+}
+
+async function renderCurrentPage() {
+  const start = (currentPage - 1) * PAGE_SIZE;
+  await renderRecipeCards(allResults.slice(start, start + PAGE_SIZE), {
+    isSuggested: resultsSuggested,
+    paged: allResults.length > PAGE_SIZE
+  });
+  renderPagination();
+}
+
+async function showResults(recipes, { isSuggested = false } = {}) {
+  allResults = Array.isArray(recipes) ? recipes : [];
+  resultsSuggested = isSuggested;
+  currentPage = Math.min(Math.max(1, pendingPage || 1), totalPages());
+  pendingPage = 0;
+  syncPageToUrl();
+  await renderCurrentPage();
+}
+
+function clearResultsPaging() {
+  allResults = [];
+  currentPage = 1;
+  renderPagination();
+}
+
+// Goes to a page, then brings the top of the grid into view so reading starts at card 1.
+async function goToPage(page) {
+  const target = Math.min(Math.max(1, page), totalPages());
+  if (target === currentPage) return;
+  currentPage = target;
+  syncPageToUrl();
+  await renderCurrentPage();
+  const section = document.getElementById("recipes-section");
+  section?.scrollIntoView({ behavior: "smooth", block: "start" });
+  // Move focus to the section title (without a second jump) so keyboard and screen
+  // reader users continue from the top of the new page.
+  const title = document.getElementById("recipes-section-title");
+  if (title) {
+    title.setAttribute("tabindex", "-1");
+    title.focus({ preventScroll: true });
+  }
 }
 
 // Remembers the last search so toggling "Hide allergen recipes" re-runs the same search.
@@ -509,7 +658,10 @@ async function runSearch(query, title = "Search Results") {
   renderRecipesLoading("Loading delicious recipes...");
 
   try {
-    let recipes = await searchRecipes(query);
+    // The name search stops at 25 results, so browsing uses every category and
+    // searches add ingredient and category matches (see api.js).
+    const browseAll = !query || !query.trim() || query.trim().toLowerCase() === "a";
+    let recipes = browseAll ? await listAllRecipes() : await searchRecipesWide(query);
     let isSuggested = false;
 
     if (!recipes || recipes.length === 0) {
@@ -521,6 +673,7 @@ async function runSearch(query, title = "Search Results") {
 
     if (!recipes || recipes.length === 0) {
       results.innerHTML = "";
+      clearResultsPaging();
       if (message) {
         message.className = "py-12 sm:py-16 text-center max-w-xl mx-auto";
         const safeQ = /[^\u0000-\u007f]/.test(query)
@@ -610,10 +763,10 @@ async function runSearch(query, title = "Search Results") {
       }
     }
 
-    await renderRecipeCards(recipes.slice(0, 12), { isSuggested });
+    await showResults(recipes, { isSuggested });
   } catch (error) {
     console.warn("Recipe fetch failed, displaying curated recipes:", error);
-    await renderRecipeCards(DEFAULT_FALLBACK_RECIPES);
+    await showResults(DEFAULT_FALLBACK_RECIPES);
   }
 }
 
@@ -626,15 +779,17 @@ async function runCategoryFilter(category) {
     const recipes = await filterByCategory(category);
     if (!recipes || recipes.length === 0) {
       results.innerHTML = "";
+      clearResultsPaging();
       if (message) {
         message.className = "text-sm text-stone-500 py-12 text-center";
         message.textContent = `No recipes found in ${category}.`;
       }
       return;
     }
-    await renderRecipeCards(recipes.slice(0, 12));
+    await showResults(recipes);
   } catch (error) {
     results.innerHTML = "";
+    clearResultsPaging();
     if (message) {
       message.className = "text-sm text-stone-500 py-12 text-center";
       message.textContent = "Could not load recipes right now.";
@@ -668,6 +823,23 @@ if (searchForm) {
       }
     }
   });
+
+  // Grey clear (×) button inside the search bar (the browser's own one is hidden in CSS).
+  const queryInput = searchForm.querySelector('input[name="query"]');
+  const clearBtn = document.getElementById("search-clear");
+  const syncClearButton = () => {
+    const show = Boolean(queryInput?.value);
+    clearBtn?.classList.toggle("hidden", !show);
+    clearBtn?.classList.toggle("inline-flex", show);
+  };
+  queryInput?.addEventListener("input", syncClearButton);
+  clearBtn?.addEventListener("click", () => {
+    if (!queryInput) return;
+    queryInput.value = "";
+    syncClearButton();
+    queryInput.focus();
+  });
+  window.addEventListener("pageshow", syncClearButton); // e.g. a value restored by Back
 
   // Category buttons: toggle active selection, unclick, and scroll to recipes
   categoryChips.forEach((chip) => {
@@ -705,16 +877,14 @@ if (searchForm) {
     });
   });
 
-  const viewMoreBtn = document.getElementById("view-more-btn");
-  if (viewMoreBtn) {
-    viewMoreBtn.addEventListener("click", () => {
-      activeCategory = null;
-      categoryChips.forEach((c) => c.classList.remove("active"));
-      runSearch("a", "All Recipes");
-      const recipesSection = document.getElementById("recipes-section");
-      if (recipesSection) {
-        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+  // Pagination buttons (‹ Prev, page numbers, Next ›)
+  const pagination = document.getElementById("results-pagination");
+  if (pagination) {
+    pagination.addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-page]");
+      const page = Number(btn?.dataset.page);
+      if (!btn || btn.disabled || !page) return;
+      goToPage(page);
     });
   }
 
@@ -727,6 +897,7 @@ if (searchForm) {
         return;
       }
       await saving;
+      pendingPage = currentPage; // stay on the same page after the re-run
       if (activeCategory) {
         runCategoryFilter(activeCategory);
       } else {
@@ -742,6 +913,7 @@ if (searchForm) {
 
   // Handle URL query parameters (e.g. from index.html search bar)
   const urlParams = new URLSearchParams(window.location.search);
+  pendingPage = parseInt(urlParams.get("page"), 10) || 0; // e.g. coming Back from a recipe
   const searchParam = urlParams.get("search") || urlParams.get("query") || urlParams.get("q");
   const categoryParam = urlParams.get("category");
 
@@ -1376,12 +1548,16 @@ async function showRecipe(id) {
         }
 
         if (!(await confirmIfFlagged(recipe))) return;
-        // Save through the planner so it goes to this week's plan on the account (Firestore).
-        // addToPlan asks before replacing a meal that is already there.
+        // The planner's day and meal dialog (Person 4) picks the slot, shows what is
+        // already there, and saves to this week's plan on the account (Firestore).
         try {
-          const { addToPlan } = await import("./planner.js");
-          const added = await addToPlan("Mon", "Dinner", recipe, { skipAllergenCheck: true });
-          if (added) showToast(`Added "${toTitleCase(recipe.name)}" to Mon Dinner!`);
+          const { openAddToPlanDialog } = await import("./planner.js");
+          const slot = await openAddToPlanDialog(recipe, { skipAllergenCheck: true });
+          if (slot && !slot.unchanged) {
+            showToast(`Added "${toTitleCase(recipe.name)}" to ${slot.day} ${slot.meal}!`, {
+              action: { label: "View plan", onClick: () => (window.location.href = "planner.html") }
+            });
+          }
         } catch (e) {
           console.warn("Could not add to meal plan:", e);
           showToast("Couldn't add this recipe to your plan. Please try again.");
