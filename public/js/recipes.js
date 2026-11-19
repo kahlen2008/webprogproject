@@ -1070,6 +1070,30 @@ async function showRecipe(id) {
       const items = [];
       let currentSection = null;
 
+      // Short ALL-CAPS lines like "MARINATING THE CHICKEN." or "BOILING THE WHITE RICE" are
+      // section titles, not steps. Skipped when the recipe itself is written in capitals (a
+      // long all-caps line, or most lines in caps), since then capitals don't mark anything out.
+      // "STEP 1"-style marker lines are left out of the count, as they're dropped anyway.
+      const isAllCapsLine = (str) => {
+        const letters = str.replace(/[^\p{L}]/gu, "");
+        return letters.length >= 3 && letters === letters.toUpperCase() && letters !== letters.toLowerCase();
+      };
+      const contentLines = lines.filter((l) => !standaloneHeaderRegex.test(l));
+      const capsLines = contentLines.filter(isAllCapsLine);
+      const capsHeadersEnabled =
+        !capsLines.some((l) => l.length > 60) && capsLines.length <= contentLines.length * 0.6;
+
+      function isAllCapsHeader(str) {
+        if (!capsHeadersEnabled) return false;
+        const body = str.replace(prefixRegex, "").trim();
+        if (!body || standaloneHeaderRegex.test(body)) return false; // "STEP 3" etc. are dropped later
+        if (body.length > 50 || body.split(/\s+/).length > 7) return false;
+        if (/[!?]$/.test(body)) return false;
+        // Timed or measured lines are real instructions, e.g. "BAKE FOR 20 MINUTES"
+        if (/\d+\s*(?:minutes?|mins?|hours?|hrs?|seconds?|secs?|cups?|tbsp|tsp|g|kg|ml|l|oz|lbs?|degrees?|°)/i.test(body)) return false;
+        return isAllCapsLine(body);
+      }
+
       function ensureFullStop(str) {
         if (!str) return "";
         const trimmed = str.trim();
@@ -1112,9 +1136,9 @@ async function showRecipe(id) {
           return true;
         }
 
-        if (isComponentHeader(line)) {
+        if (isComponentHeader(line) || isAllCapsHeader(line)) {
           currentSection = null; // Reset bullet section so subsequent items are numbered cooking steps
-          const cleanHeader = line.replace(/[:.-]+$/, "").trim();
+          const cleanHeader = line.replace(prefixRegex, "").replace(/[:.\s-]+$/, "").trim();
           items.push({
             type: "header",
             header: {
@@ -1323,12 +1347,15 @@ async function showRecipe(id) {
       <div class="space-y-10">
         ${warningBannerHtml}
         <!-- Top Hero Section: Photo + Meta Details -->
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          
-          <!-- Image Column -->
-          <div class="md:col-span-5">
-            <div class="overflow-hidden rounded-2xl border border-[#efe6dc] shadow-sm bg-stone-100 aspect-[4/3]">
-              <img id="main-recipe-image" class="w-full h-full aspect-[4/3] object-cover" src="${safeImage}" width="480" height="360" fetchpriority="high" decoding="async" alt="${safeName}">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start md:items-stretch">
+
+          <!-- Image Column: 4:3 on phones; on wider screens it takes exactly the height of the
+               details column, so the photo lines up with the title at the top and the description
+               at the bottom whether the title is one line or two. The image is absolutely
+               positioned so it never makes the row taller than the details. -->
+          <div class="md:col-span-5 flex">
+            <div class="relative w-full overflow-hidden rounded-2xl border border-[#efe6dc] shadow-sm bg-stone-100 aspect-[4/3] md:aspect-auto">
+              <img id="main-recipe-image" class="absolute inset-0 w-full h-full object-cover" src="${safeImage}" width="480" height="360" fetchpriority="high" decoding="async" alt="${safeName}">
             </div>
           </div>
 

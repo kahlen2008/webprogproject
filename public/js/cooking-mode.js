@@ -9,7 +9,7 @@
 // - Screen wake lock so display stays awake in the kitchen
 // - Celebratory completion view with quick link to leave a review
 
-import { escapeHtml, capitalizeIngredient } from "./utils.js";
+import { escapeHtml, capitalizeIngredient, showConfirmModal } from "./utils.js";
 
 /**
  * Converts parsed instruction items into sequential cooking steps.
@@ -63,7 +63,8 @@ export function detectCookingTimer(text) {
   if (!text) return null;
 
   // Match durations: e.g. "for 35 minutes", "15 mins", "1-2 mins", "30 seconds", "1 hour"
-  const regex = /\b(?:(?:for|about|approx(?:imately)?)\s+)?(\d+(?:\s*(?:-|to)\s*\d+)?)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/i;
+  // Decimals are allowed so "1.5 hours" isn't read as "5 hours".
+  const regex = /(?:^|[^\d.])(\d+(?:\.\d+)?(?:\s*(?:-|–|—|to)\s*\d+(?:\.\d+)?)?)\s*(hours?|hrs?|minutes?|mins?|seconds?|secs?)\b/i;
   const match = text.match(regex);
   if (!match) return null;
 
@@ -71,7 +72,7 @@ export function detectCookingTimer(text) {
   const unit = match[2].toLowerCase();
 
   let num = 0;
-  if (rawNum.includes("-") || rawNum.includes("to")) {
+  if (/[-–—]|to/.test(rawNum)) {
     const parts = rawNum.split(/[-–—]|to/).map((p) => parseFloat(p.trim())).filter((n) => !isNaN(n));
     num = parts.length ? parts[parts.length - 1] : 0;
   } else {
@@ -86,14 +87,14 @@ export function detectCookingTimer(text) {
   if (/hour|hr/.test(unit)) {
     if (num > 12) return null;
     totalSeconds = Math.round(num * 3600);
-    label = `${num} hr${num === 1 ? "" : "s"}`;
+    label = `${num} hour${num === 1 ? "" : "s"}`;
   } else if (/min/.test(unit)) {
     if (num > 300) return null;
     totalSeconds = Math.round(num * 60);
-    label = `${num} min${num === 1 ? "" : "s"}`;
+    label = `${num} minute${num === 1 ? "" : "s"}`;
   } else if (/sec/.test(unit)) {
     totalSeconds = Math.round(num);
-    label = `${num} sec${num === 1 ? "" : "s"}`;
+    label = `${num} second${num === 1 ? "" : "s"}`;
   }
 
   return totalSeconds > 0 ? { seconds: totalSeconds, label } : null;
@@ -151,6 +152,13 @@ function releaseScreenWakeLock() {
   }
 }
 
+// The browser drops the wake lock whenever the tab is hidden, so take it again on return.
+function reacquireWakeLockOnVisible() {
+  if (document.visibilityState === "visible" && document.getElementById("cooking-mode-overlay")) {
+    requestScreenWakeLock();
+  }
+}
+
 /**
  * Launches the full-screen Cooking Mode overlay.
  * @param {Object} options
@@ -160,27 +168,36 @@ function releaseScreenWakeLock() {
  * @param {Function} [options.onSwitchTab] - Callback to switch tabs on the recipe page
  */
 export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSwitchTab }) {
-  // Remove any existing instance
-  document.getElementById("cooking-mode-overlay")?.remove();
+  // Only one instance at a time; reuse the open one rather than stacking listeners.
+  if (document.getElementById("cooking-mode-overlay")) return;
 
   const steps = prepareCookingSteps(parsedItems, recipe.instructions);
   const totalSteps = steps.length;
   let currentStepIndex = 0;
+  let isComplete = false;
   const completedSteps = new Set();
   const checkedIngredients = new Set();
 
-  // Active kitchen timer state
-  let timerInterval = null;
-  let timerSecondsLeft = 0;
-  let timerTotalSeconds = 0;
-  let isTimerRunning = false;
+  // Kitchen timers, keyed by the step that started them. They live at the overlay level so
+  // they keep counting while the cook moves between steps, and several can run at once.
+  // Each countdown uses an end timestamp so it stays accurate when the browser throttles
+  // timers in a background tab.
+  // { label, endsAt, remaining (seconds), running, done }
+  const timers = new Map();
+  let timerTick = null;
+  let currentDetectedTimer = null;
 
-  // Lock body scroll
+  // Lock body scroll and remember focus so it can be restored on exit
   const prevOverflow = document.body.style.overflow;
   document.body.style.overflow = "hidden";
+  const prevFocus = document.activeElement;
 
   // Request screen wake lock
   requestScreenWakeLock();
+  document.addEventListener("visibilitychange", reacquireWakeLockOnVisible);
+
+  // Keycap style for the shortcut hints in the footer
+  const KBD = "inline-flex items-center justify-center min-w-[22px] h-[22px] px-1.5 rounded-md border border-stone-200 border-b-2 bg-stone-50 font-sans text-[10px] font-semibold text-stone-500";
 
   // Create overlay container
   const overlay = document.createElement("div");
@@ -240,27 +257,29 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
           <span id="cm-step-indicator" class="text-xs sm:text-sm font-extrabold text-[#ca5c2e] tracking-tight uppercase">
             Step 1 of ${totalSteps}
           </span>
-          <span id="cm-progress-percentage" class="text-xs font-semibold text-stone-400">
+          <span id="cm-progress-percentage" class="hidden sm:inline text-xs font-semibold text-stone-400">
             (0% completed)
           </span>
         </div>
 
-        <!-- Quick Jump Step Pills -->
-        <nav id="cm-step-pills" class="flex items-center gap-1.5 overflow-x-auto py-1 scrollbar-none" aria-label="Step navigation">
+        <!-- Quick Jump Step Pills (min-w-0 lets the row shrink and scroll instead of overflowing) -->
+        <nav id="cm-step-pills" class="min-w-0 flex items-center gap-1.5 overflow-x-auto px-1 py-1 scrollbar-none" aria-label="Step navigation">
           <!-- Rendered dynamically -->
         </nav>
       </div>
     </div>
 
     <!-- Main Content Area -->
-    <div class="flex-1 overflow-y-auto relative p-4 sm:p-6 lg:p-8 flex items-center justify-center">
+    <!-- No items-center here: centring a scrollable flex child cuts off the top of long steps.
+         The child's my-auto centres short steps and still scrolls from the top on long ones. -->
+    <div id="cm-main" class="flex-1 overflow-y-auto relative p-4 sm:p-6 lg:p-8 flex">
       <!-- Active Step Container -->
       <div id="cm-step-container" class="max-w-3xl w-full mx-auto my-auto space-y-6">
         <!-- Step card injected here -->
       </div>
 
       <!-- Slide-over Ingredients Checklist Drawer -->
-      <aside id="cm-ingredients-drawer" class="fixed inset-y-0 right-0 w-full sm:w-96 max-w-full bg-white shadow-2xl border-l border-[#ede4da] z-40 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" aria-label="Ingredients Checklist">
+      <aside id="cm-ingredients-drawer" class="fixed inset-y-0 right-0 w-full sm:w-96 max-w-full bg-white shadow-2xl border-l border-[#ede4da] z-40 transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col" aria-label="Ingredients Checklist" inert>
         <!-- Drawer Header -->
         <div class="p-4 sm:p-5 border-b border-[#ede4da] flex items-center justify-between bg-[#faf7f2]">
           <div>
@@ -294,6 +313,11 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
       <div id="cm-drawer-backdrop" class="fixed inset-0 bg-stone-900/30 backdrop-blur-2xs z-30 hidden" aria-hidden="true"></div>
     </div>
 
+    <!-- Running Timers Bar (shown on every step while any timer exists) -->
+    <div id="cm-timer-tray" class="flex-shrink-0 hidden" aria-label="Kitchen timers">
+      <div id="cm-timer-list" class="max-w-3xl mx-auto px-4 sm:px-8 pb-3 flex flex-wrap items-center justify-center gap-2" aria-live="polite"></div>
+    </div>
+
     <!-- Sticky Bottom Navigation -->
     <footer class="flex-shrink-0 bg-white border-t border-[#ede4da] px-4 sm:px-8 py-3.5 sm:py-4 shadow-lg">
       <div class="max-w-3xl mx-auto flex items-center justify-between gap-4">
@@ -306,17 +330,17 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
         </button>
 
         <!-- Center Indicator & Keyboard Tip -->
-        <div class="text-center">
-          <div id="cm-bottom-step-indicator" class="text-xs sm:text-sm font-bold text-stone-700">
-            Step 1 of ${totalSteps}
-          </div>
-          <div class="hidden sm:block text-[11px] text-stone-400 font-normal">
-            Shortcuts: &larr; Back &bull; &rarr; Next &bull; Esc Exit
+        <div class="text-center min-w-0">
+          <div id="cm-bottom-step-indicator" class="text-sm font-medium text-stone-400 tabular-nums"></div>
+          <div class="hidden md:flex items-center justify-center gap-3 mt-1.5 text-[11px] font-medium text-stone-400" aria-hidden="true">
+            <span class="inline-flex items-center gap-1"><kbd class="${KBD}">&larr;</kbd><kbd class="${KBD}">&rarr;</kbd> Steps</span>
+            <span class="inline-flex items-center gap-1"><kbd class="${KBD}">I</kbd> Ingredients</span>
+            <span class="inline-flex items-center gap-1"><kbd class="${KBD}">Esc</kbd> Exit</span>
           </div>
         </div>
 
         <!-- Next / Finish Button -->
-        <button id="cm-next-btn" type="button" class="inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-2xl bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-bold text-sm sm:text-base transition shadow-sm hover:shadow focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40">
+        <button id="cm-next-btn" type="button" class="inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 sm:py-3 rounded-2xl bg-[#ca5c2e] hover:bg-[#b34d23] text-white font-bold text-sm sm:text-base whitespace-nowrap transition shadow-sm hover:shadow disabled:opacity-50 disabled:pointer-events-none focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/40">
           <span id="cm-next-btn-text">Next</span>
           <svg id="cm-next-btn-icon" class="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
             <polyline points="9 18 15 12 9 6"></polyline>
@@ -349,20 +373,268 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
   const checkAllBtn = overlay.querySelector("#cm-check-all-btn");
   const resetChecksBtn = overlay.querySelector("#cm-reset-checks-btn");
 
+  const timerTray = overlay.querySelector("#cm-timer-tray");
+  const timerList = overlay.querySelector("#cm-timer-list");
+
   // Timer helpers
-  function stopActiveTimer() {
-    if (timerInterval) {
-      clearInterval(timerInterval);
-      timerInterval = null;
-    }
-    isTimerRunning = false;
+  function formatTime(totalSeconds) {
+    const hrs = Math.floor(totalSeconds / 3600);
+    const mins = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    const mmss = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+    return hrs > 0 ? `${hrs}:${mmss}` : mmss;
   }
 
-  function formatTime(totalSeconds) {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
+  function hasActiveTimers() {
+    return [...timers.values()].some((t) => !t.done);
   }
+
+  function startTimer(stepIndex, seconds, label) {
+    timers.set(stepIndex, { label, total: seconds, endsAt: Date.now() + seconds * 1000, remaining: seconds, running: true, done: false });
+    ensureTicking();
+    renderTimers();
+  }
+
+  function toggleTimer(stepIndex) {
+    const t = timers.get(stepIndex);
+    if (!t || t.done) return;
+    t.running = !t.running;
+    // Resuming: push the end time forward by however long it was paused
+    if (t.running) t.endsAt = Date.now() + t.remaining * 1000;
+    ensureTicking();
+    renderTimers();
+  }
+
+  function removeTimer(stepIndex) {
+    timers.delete(stepIndex);
+    renderTimers();
+  }
+
+  function ensureTicking() {
+    if (timerTick) return;
+    timerTick = setInterval(() => {
+      let changed = false;
+      timers.forEach((t, stepIndex) => {
+        if (!t.running) return;
+        t.remaining = Math.max(0, Math.ceil((t.endsAt - Date.now()) / 1000));
+        if (t.remaining === 0) {
+          t.running = false;
+          t.done = true;
+          changed = true;
+          playTimerChime();
+          navigator.vibrate?.([200, 100, 200]);
+        } else {
+          overlay.querySelectorAll(`[data-timer-display="${stepIndex}"]`).forEach((el) => {
+            el.textContent = formatTime(t.remaining);
+          });
+          overlay.querySelectorAll(`[data-timer-ring="${stepIndex}"]`).forEach((el) => {
+            el.setAttribute("stroke-dashoffset", ringOffset(t).toFixed(2));
+          });
+        }
+      });
+      if (changed) renderTimers();
+      if (![...timers.values()].some((t) => t.running)) {
+        clearInterval(timerTick);
+        timerTick = null;
+      }
+    }, 250);
+  }
+
+  function clearAllTimers() {
+    if (timerTick) clearInterval(timerTick);
+    timerTick = null;
+    timers.clear();
+  }
+
+  // Rebuilds the timer bar and the current step's timer widget, keeping focus on the
+  // control that was pressed (the buttons are recreated).
+  function renderTimers() {
+    const focused = document.activeElement;
+    const focusKey = overlay.contains(focused) && focused?.dataset.timerAction
+      ? `[data-timer-action="${focused.dataset.timerAction}"][data-step="${focused.dataset.step}"]`
+      : null;
+
+    const entries = [...timers.entries()].sort((a, b) => a[0] - b[0]);
+    timerTray.classList.toggle("hidden", entries.length === 0);
+    // Compact versions of the step timer panel: mini ring, step + time, round controls
+    const chipBtn = "w-8 h-8 rounded-full inline-flex items-center justify-center transition focus:outline-none focus-visible:ring-2";
+    timerList.innerHTML = entries
+      .map(([stepIndex, t]) => {
+        const state = t.done ? "done" : t.running ? "running" : "paused";
+        const c = {
+          running: { chip: "bg-white border-amber-200", track: "text-amber-100", bar: "text-amber-500", eyebrow: "text-amber-700", time: "text-stone-900" },
+          paused: { chip: "bg-white border-stone-200", track: "text-stone-100", bar: "text-stone-300", eyebrow: "text-stone-400", time: "text-stone-400" },
+          done: { chip: "bg-emerald-50 border-emerald-300 ring-4 ring-emerald-100", track: "text-emerald-500", bar: "", eyebrow: "text-emerald-700", time: "text-emerald-800" },
+        }[state];
+
+        const ring = `
+          <span class="relative w-9 h-9 flex-shrink-0">
+            <svg class="w-9 h-9 -rotate-90" viewBox="0 0 52 52" aria-hidden="true">
+              <circle cx="26" cy="26" r="22" fill="${state === "done" ? "currentColor" : "none"}" stroke="currentColor" stroke-width="6" class="${c.track}"></circle>
+              ${state !== "done" ? `
+                <circle data-timer-ring="${stepIndex}" cx="26" cy="26" r="22" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"
+                  class="${c.bar} transition-[stroke-dashoffset] duration-300 ease-linear"
+                  stroke-dasharray="${RING_CIRCUMFERENCE.toFixed(2)}" stroke-dashoffset="${ringOffset(t).toFixed(2)}"></circle>` : ""}
+            </svg>
+            ${state === "done" ? `<span class="absolute inset-0 flex items-center justify-center text-white">${ICONS.checkSmall}</span>` : ""}
+          </span>`;
+
+        const controls = state === "done"
+          ? `<button type="button" data-timer-action="remove" data-step="${stepIndex}" class="h-8 px-3.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300">Dismiss</button>`
+          : `
+            <button type="button" data-timer-action="toggle" data-step="${stepIndex}" class="${chipBtn} ${state === "running" ? "bg-amber-100 hover:bg-amber-200 text-amber-800 focus-visible:ring-amber-300" : "bg-stone-900 hover:bg-stone-800 text-white focus-visible:ring-stone-300"}" aria-label="${state === "running" ? "Pause" : "Resume"} step ${stepIndex + 1} timer">
+              ${state === "running" ? ICONS.pauseSmall : ICONS.playSmall}
+            </button>
+            <button type="button" data-timer-action="remove" data-step="${stepIndex}" class="${chipBtn} text-stone-400 hover:bg-stone-100 hover:text-stone-700 focus-visible:ring-stone-300" aria-label="Cancel step ${stepIndex + 1} timer">
+              ${ICONS.close}
+            </button>`;
+
+        return `
+          <div class="inline-flex items-center gap-2.5 pl-1.5 pr-1.5 py-1.5 rounded-full border ${c.chip} shadow-sm">
+            <button type="button" data-timer-action="goto" data-step="${stepIndex}" class="group inline-flex items-center gap-2.5 rounded-full text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-300" aria-label="Go to step ${stepIndex + 1}">
+              ${ring}
+              <span class="leading-none pr-1">
+                <span class="block text-[10px] font-bold uppercase tracking-wider ${c.eyebrow} group-hover:underline">
+                  Step ${stepIndex + 1}${state === "paused" ? " · Paused" : ""}
+                </span>
+                <span ${state === "done" ? "" : `data-timer-display="${stepIndex}"`} class="block mt-1 font-heading text-base font-bold tabular-nums ${c.time}">
+                  ${state === "done" ? "Time's up!" : formatTime(t.remaining)}
+                </span>
+              </span>
+            </button>
+            <span class="flex items-center gap-1">${controls}</span>
+          </div>
+        `;
+      })
+      .join("");
+
+    renderStepTimerWidget();
+    renderStepPills();
+    // The timer bar takes space from the step area when it appears, so refit the card
+    if (!isComplete) fitStepCard();
+
+    if (focusKey) {
+      // A pressed "Start" button turns into the countdown, so move focus to its pause button
+      const toggleKey = `[data-timer-action="toggle"][data-step="${focused.dataset.step}"]`;
+      const target = focused.dataset.timerAction === "start"
+        ? overlay.querySelector(toggleKey) || overlay.querySelector(focusKey)
+        : overlay.querySelector(focusKey) || overlay.querySelector(toggleKey);
+      target?.focus({ preventScroll: true });
+    }
+  }
+
+  // The right-hand side of the "Timer detected" row on the current step card.
+  // Progress ring geometry (r = 22 in a 52×52 viewBox)
+  const RING_CIRCUMFERENCE = 2 * Math.PI * 22;
+  const ringOffset = (t) => (t ? RING_CIRCUMFERENCE * (1 - t.remaining / t.total) : 0);
+
+  const ICONS = {
+    clock: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"></circle><path stroke-linecap="round" stroke-linejoin="round" d="M12 7v5l3 2"></path></svg>`,
+    play: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 001.5.86l10.5-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    pause: `<svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
+    reset: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 12a8 8 0 1 0 2.34-5.66M4 4v4h4"/></svg>`,
+    check: `<svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`,
+    checkSmall: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="3" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"/></svg>`,
+    playSmall: `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 001.5.86l10.5-6.5a1 1 0 000-1.72L9.5 4.64A1 1 0 008 5.5z"/></svg>`,
+    pauseSmall: `<svg class="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`,
+    close: `<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>`,
+  };
+
+  // The timer panel on the current step card: idle, running, paused or finished.
+  function renderStepTimerWidget() {
+    const panel = stepContainer.querySelector("#cm-step-timer");
+    if (!panel || !currentDetectedTimer || isComplete) return;
+
+    const step = currentStepIndex;
+    const t = timers.get(step);
+    const state = !t ? "idle" : t.done ? "done" : t.running ? "running" : "paused";
+    const seconds = t ? t.remaining : currentDetectedTimer.seconds;
+
+    const theme = {
+      idle: { panel: "bg-[#fdf8f4] border-[#f3e3d6]", ring: "text-[#f3e3d6]", bar: "text-[#ca5c2e]", icon: "text-[#ca5c2e]", eyebrow: "text-[#a04e28]", time: "text-stone-900" },
+      running: { panel: "bg-amber-50 border-amber-200", ring: "text-amber-100", bar: "text-amber-500", icon: "text-amber-600", eyebrow: "text-amber-700", time: "text-amber-950" },
+      paused: { panel: "bg-stone-50 border-stone-200", ring: "text-stone-200", bar: "text-stone-400", icon: "text-stone-400", eyebrow: "text-stone-500", time: "text-stone-500" },
+      done: { panel: "bg-emerald-50 border-emerald-200", ring: "text-emerald-500", bar: "text-emerald-500", icon: "text-emerald-600", eyebrow: "text-emerald-700", time: "text-emerald-800" },
+    }[state];
+
+    const eyebrow = { idle: "Suggested timer", running: "Timer running", paused: "Paused", done: "Time's up" }[state];
+    const caption = {
+      idle: `${currentDetectedTimer.label}. It keeps running when you change steps.`,
+      running: "Keeps running when you change steps.",
+      paused: "Resume when you're ready.",
+      done: "This step's timer has finished.",
+    }[state];
+
+    const roundBtn = "w-10 h-10 rounded-full inline-flex items-center justify-center transition focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2";
+    let actions = "";
+    if (state === "idle") {
+      actions = `
+        <button type="button" data-timer-action="start" data-step="${step}" class="inline-flex items-center gap-2 pl-4 pr-5 h-10 rounded-full bg-stone-900 hover:bg-stone-800 text-white text-sm font-semibold transition shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-stone-400">
+          ${ICONS.play}<span>Start</span>
+        </button>`;
+    } else if (state === "done") {
+      actions = `
+        <button type="button" data-timer-action="start" data-step="${step}" class="inline-flex items-center gap-2 px-4 h-10 rounded-full bg-white border border-emerald-200 hover:bg-emerald-100 text-emerald-800 text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400">
+          ${ICONS.reset}<span>Again</span>
+        </button>
+        <button type="button" data-timer-action="remove" data-step="${step}" class="inline-flex items-center px-4 h-10 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-emerald-400">
+          Dismiss
+        </button>`;
+    } else {
+      actions = `
+        <button type="button" data-timer-action="toggle" data-step="${step}" class="${roundBtn} ${state === "running" ? "bg-amber-500 hover:bg-amber-600 text-white focus-visible:ring-amber-400" : "bg-stone-900 hover:bg-stone-800 text-white focus-visible:ring-stone-400"} shadow-xs" aria-label="${state === "running" ? "Pause" : "Resume"} timer">
+          ${state === "running" ? ICONS.pause : ICONS.play}
+        </button>
+        <button type="button" data-timer-action="start" data-step="${step}" class="${roundBtn} bg-white border border-stone-200 hover:bg-stone-100 text-stone-500 hover:text-stone-800 focus-visible:ring-stone-300" aria-label="Restart timer">
+          ${ICONS.reset}
+        </button>`;
+    }
+
+    panel.className = `rounded-2xl border ${theme.panel} p-4 sm:p-5 flex items-center gap-4 flex-wrap transition-colors`;
+    panel.innerHTML = `
+      <div class="relative w-14 h-14 flex-shrink-0">
+        <svg class="w-14 h-14 -rotate-90" viewBox="0 0 52 52" aria-hidden="true">
+          <circle cx="26" cy="26" r="22" fill="none" stroke="currentColor" stroke-width="4" class="${theme.ring}"></circle>
+          ${state === "running" || state === "paused" ? `
+            <circle data-timer-ring="${step}" cx="26" cy="26" r="22" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round"
+              class="${theme.bar} transition-[stroke-dashoffset] duration-300 ease-linear"
+              stroke-dasharray="${RING_CIRCUMFERENCE.toFixed(2)}" stroke-dashoffset="${ringOffset(t).toFixed(2)}"></circle>` : ""}
+        </svg>
+        <span class="absolute inset-0 flex items-center justify-center ${theme.icon}">
+          ${state === "done" ? ICONS.check : ICONS.clock}
+        </span>
+      </div>
+
+      <div class="flex-1 min-w-[150px]">
+        <p class="text-[11px] font-bold uppercase tracking-wider ${theme.eyebrow}">${eyebrow}</p>
+        <p data-timer-display="${step}" class="font-heading text-3xl font-bold leading-tight tabular-nums ${theme.time}">${formatTime(seconds)}</p>
+        <p class="text-xs text-stone-500 mt-0.5">${escapeHtml(caption)}</p>
+      </div>
+
+      <div class="flex items-center gap-2 ml-auto">${actions}</div>
+    `;
+  }
+
+  // One delegated handler for every timer control (bar and step card)
+  overlay.addEventListener("click", (e) => {
+    const btn = e.target.closest("[data-timer-action]");
+    if (!btn) return;
+    const stepIndex = Number(btn.dataset.step);
+    switch (btn.dataset.timerAction) {
+      case "start":
+        if (currentDetectedTimer) startTimer(stepIndex, currentDetectedTimer.seconds, currentDetectedTimer.label);
+        break;
+      case "toggle":
+        toggleTimer(stepIndex);
+        break;
+      case "remove":
+        removeTimer(stepIndex);
+        break;
+      case "goto":
+        goToStep(stepIndex);
+        break;
+    }
+  });
 
   // Populate Ingredients Checklist
   function renderIngredientsChecklist() {
@@ -375,24 +647,24 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
     ingredientsList.innerHTML = ings
       .map((ing, idx) => {
         const isChecked = checkedIngredients.has(idx);
-        const flaggedLabels = allergenResult.byIngredient?.[ing.name.toLowerCase()] || [];
+        const flaggedLabels = allergenResult.byIngredient?.[String(ing.name || "").toLowerCase()] || [];
         const isFlagged = flaggedLabels.length > 0;
         const flagHtml = isFlagged
-          ? `<span class="inline-block mt-0.5 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.2 rounded-full">Allergen: ${escapeHtml(flaggedLabels[0])}</span>`
+          ? `<span class="inline-block mt-0.5 text-[10px] font-semibold text-red-600 bg-red-50 border border-red-200 px-1.5 py-0.5 rounded-full">Allergen: ${escapeHtml(flaggedLabels.join(", "))}</span>`
           : "";
 
         return `
-          <li class="flex items-start gap-3 p-2.5 rounded-xl border ${isChecked ? "bg-stone-50 border-stone-200/60" : "bg-white border-stone-100 hover:bg-stone-50"} transition cursor-pointer select-none">
-            <input 
-              type="checkbox" 
-              id="cm-ing-item-${idx}" 
+          <li data-index="${idx}" class="cm-ing-row flex items-start gap-3 p-2.5 rounded-xl border transition select-none">
+            <input
+              type="checkbox"
+              id="cm-ing-item-${idx}"
               data-index="${idx}"
-              class="cm-ing-checkbox mt-1 w-4 h-4 rounded text-[#ca5c2e] focus:ring-[#ca5c2e] cursor-pointer"
+              class="cm-ing-checkbox mt-1 w-4 h-4 flex-shrink-0 rounded accent-[#ca5c2e] cursor-pointer"
               ${isChecked ? "checked" : ""}
             >
             <label for="cm-ing-item-${idx}" class="flex-1 cursor-pointer min-w-0">
               <div class="flex items-baseline justify-between gap-2">
-                <span class="font-medium text-sm text-stone-900 ${isChecked ? "line-through text-stone-400" : ""}">
+                <span class="cm-ing-name font-medium text-sm break-words">
                   ${escapeHtml(capitalizeIngredient(ing.name))}
                 </span>
                 <span class="text-xs text-stone-500 flex-shrink-0">
@@ -406,6 +678,26 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
       })
       .join("");
 
+    syncChecklistState();
+  }
+
+  // Updates the checked styling in place, so ticking a box keeps keyboard focus on it.
+  function syncChecklistState() {
+    ingredientsList.querySelectorAll(".cm-ing-row").forEach((row) => {
+      const idx = Number(row.dataset.index);
+      const checked = checkedIngredients.has(idx);
+      const box = row.querySelector(".cm-ing-checkbox");
+      if (box) box.checked = checked;
+      row.classList.toggle("bg-stone-50", checked);
+      row.classList.toggle("border-stone-200", checked);
+      row.classList.toggle("bg-white", !checked);
+      row.classList.toggle("border-stone-100", !checked);
+      row.classList.toggle("hover:bg-stone-50", !checked);
+      const name = row.querySelector(".cm-ing-name");
+      name?.classList.toggle("line-through", checked);
+      name?.classList.toggle("text-stone-400", checked);
+      name?.classList.toggle("text-stone-900", !checked);
+    });
     updateChecklistSummary();
   }
 
@@ -416,25 +708,33 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
     overlay.querySelector("#cm-ingredients-count-badge").textContent = `${count}/${ings.length}`;
   }
 
-  // Toggle drawer
+  // Toggle drawer. `inert` keeps the off-screen drawer out of the Tab order while closed.
+  const isDrawerOpen = () => !ingredientsDrawer.classList.contains("translate-x-full");
+
   function openIngredientsDrawer() {
     ingredientsDrawer.classList.remove("translate-x-full");
+    ingredientsDrawer.inert = false;
     drawerBackdrop.classList.remove("hidden");
+    ingredientsToggle.setAttribute("aria-expanded", "true");
+    drawerCloseBtn.focus({ preventScroll: true });
   }
 
   function closeIngredientsDrawer() {
+    const hadFocus = ingredientsDrawer.contains(document.activeElement);
     ingredientsDrawer.classList.add("translate-x-full");
+    ingredientsDrawer.inert = true;
     drawerBackdrop.classList.add("hidden");
+    ingredientsToggle.setAttribute("aria-expanded", "false");
+    if (hadFocus) ingredientsToggle.focus({ preventScroll: true });
   }
 
-  ingredientsToggle.addEventListener("click", () => {
-    const isOpen = !ingredientsDrawer.classList.contains("translate-x-full");
-    if (isOpen) {
-      closeIngredientsDrawer();
-    } else {
-      openIngredientsDrawer();
-    }
-  });
+  function toggleIngredientsDrawer() {
+    if (isDrawerOpen()) closeIngredientsDrawer();
+    else openIngredientsDrawer();
+  }
+
+  ingredientsToggle.setAttribute("aria-expanded", "false");
+  ingredientsToggle.addEventListener("click", toggleIngredientsDrawer);
   drawerCloseBtn.addEventListener("click", closeIngredientsDrawer);
   drawerBackdrop.addEventListener("click", closeIngredientsDrawer);
 
@@ -447,26 +747,27 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
       } else {
         checkedIngredients.delete(idx);
       }
-      renderIngredientsChecklist();
+      syncChecklistState();
     }
   });
 
   checkAllBtn.addEventListener("click", () => {
     (recipe.ingredients || []).forEach((_, idx) => checkedIngredients.add(idx));
-    renderIngredientsChecklist();
+    syncChecklistState();
   });
 
   resetChecksBtn.addEventListener("click", () => {
     checkedIngredients.clear();
-    renderIngredientsChecklist();
+    syncChecklistState();
   });
 
   // Render Step Navigation Pills
   function renderStepPills() {
     stepPillsNav.innerHTML = steps
       .map((_, idx) => {
-        const isCurrent = idx === currentStepIndex;
+        const isCurrent = !isComplete && idx === currentStepIndex;
         const isDone = completedSteps.has(idx);
+        const hasTimer = timers.has(idx);
 
         let pillClasses = "min-w-[28px] h-7 px-2 rounded-lg text-xs font-bold transition flex items-center justify-center focus:outline-none ";
         if (isCurrent) {
@@ -481,43 +782,49 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
           <button 
             type="button" 
             data-step="${idx}" 
-            class="cm-step-pill ${pillClasses}"
+            class="cm-step-pill relative ${pillClasses}"
             aria-current="${isCurrent ? "step" : "false"}"
-            aria-label="Go to Step ${idx + 1}"
+            aria-label="Go to Step ${idx + 1}${hasTimer ? " (has a timer)" : ""}"
           >
             ${isDone && !isCurrent ? `✓` : `${idx + 1}`}
+            ${hasTimer ? `<span class="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-amber-500 ring-2 ring-white" aria-hidden="true"></span>` : ""}
           </button>
         `;
       })
       .join("");
 
-    // Auto-scroll active pill into view
+    // Scroll only the pill row (scrollIntoView can also shift the page behind the overlay)
     const activePill = stepPillsNav.querySelector(`[data-step="${currentStepIndex}"]`);
-    if (activePill) {
-      activePill.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    if (activePill && stepPillsNav.scrollWidth > stepPillsNav.clientWidth) {
+      const left = activePill.offsetLeft - stepPillsNav.clientWidth / 2 + activePill.offsetWidth / 2;
+      stepPillsNav.scrollTo({ left: Math.max(0, left), behavior: "smooth" });
     }
+  }
+
+  function updateProgress(stepLabel) {
+    const done = isComplete ? totalSteps : completedSteps.size;
+    const percent = Math.round((done / totalSteps) * 100);
+    progressBar.style.width = `${percent}%`;
+    progressPercentage.textContent = `(${percent}% completed)`;
+    stepIndicator.textContent = stepLabel;
   }
 
   // Render Step Details
   function renderStep(index) {
-    stopActiveTimer();
     const step = steps[index];
     const isFirst = index === 0;
     const isLast = index === totalSteps - 1;
-    const isDone = completedSteps.has(index);
 
-    // Update Progress Indicator
-    const progressPercent = Math.round(((index + 1) / totalSteps) * 100);
-    progressBar.style.width = `${progressPercent}%`;
-    stepIndicator.textContent = `Step ${index + 1} of ${totalSteps}`;
-    progressPercentage.textContent = `(${progressPercent}% completed)`;
-    bottomStepIndicator.textContent = `Step ${index + 1} of ${totalSteps}`;
+    // Update Progress Indicator (based on steps actually completed, not the current position)
+    updateProgress(`Step ${index + 1} of ${totalSteps}`);
+    bottomStepIndicator.innerHTML = `Step <span class="text-stone-900 font-bold">${index + 1}</span> of ${totalSteps}`;
 
     // Update Navigation buttons
     prevBtn.disabled = isFirst;
+    nextBtn.disabled = false;
 
     if (isLast) {
-      nextBtnText.textContent = "Finish Cooking 🎉";
+      nextBtnText.textContent = "Finish 🎉";
       nextBtnIcon.innerHTML = `<polyline points="20 6 9 17 4 12"></polyline>`;
     } else {
       nextBtnText.textContent = "Next";
@@ -528,10 +835,11 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
 
     // Check timer in step text
     const detectedTimer = detectCookingTimer(step.text);
+    currentDetectedTimer = detectedTimer;
 
     // Render Step Card
     stepContainer.innerHTML = `
-      <div class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-6 sm:p-8 md:p-10 space-y-6">
+      <div class="bg-white rounded-3xl border border-[#efe6dc] shadow-sm p-5 sm:p-7 md:p-8 space-y-5">
         <!-- Step Top Row: Section label & remaining steps -->
         <div class="flex items-center justify-between gap-3 flex-wrap">
           ${step.section ? `
@@ -552,11 +860,11 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
         <!-- Step Number & Main Text -->
         <div class="space-y-4">
           <div class="flex items-start gap-4 sm:gap-5">
-            <span class="flex-shrink-0 w-11 h-11 sm:w-13 sm:h-13 rounded-2xl bg-[#fbece4] text-[#ca5c2e] font-extrabold text-lg sm:text-2xl flex items-center justify-center shadow-2xs mt-1">
+            <span class="flex-shrink-0 w-11 h-11 sm:w-14 sm:h-14 rounded-2xl bg-[#fbece4] text-[#ca5c2e] font-extrabold text-lg sm:text-2xl flex items-center justify-center shadow-2xs">
               ${index + 1}
             </span>
-            <div class="flex-1">
-              <p class="text-xl sm:text-2xl md:text-3xl font-medium text-stone-900 leading-relaxed sm:leading-loose">
+            <div class="flex-1 min-w-0">
+              <p id="cm-step-text" class="font-medium text-stone-900 break-words" style="line-height: 1.45;">
                 ${escapeHtml(step.text)}
               </p>
             </div>
@@ -564,138 +872,24 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
         </div>
 
         <!-- Timer Assistant Widget (if duration detected) -->
-        ${detectedTimer ? `
-          <div class="pt-5 border-t border-stone-100 flex items-center justify-between flex-wrap gap-3">
-            <div class="flex items-center gap-2.5">
-              <span class="w-8 h-8 rounded-full bg-amber-50 border border-amber-200 text-amber-600 flex items-center justify-center text-base">⏱️</span>
-              <div>
-                <span class="text-sm font-bold text-stone-800">Timer detected: ${detectedTimer.label}</span>
-                <p class="text-xs text-stone-500">Need a countdown timer for this step?</p>
-              </div>
-            </div>
-            <div id="cm-step-timer-wrapper">
-              <button 
-                id="cm-start-timer-btn" 
-                type="button" 
-                data-seconds="${detectedTimer.seconds}" 
-                data-label="${detectedTimer.label}"
-                class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-xs sm:text-sm font-semibold transition shadow-xs focus:outline-none"
-              >
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
-                <span>Start ${detectedTimer.label} Timer</span>
-              </button>
-            </div>
-          </div>
-        ` : ""}
-
-        <!-- Step Mark Done & Navigation Helper -->
-        <div class="pt-3 border-t border-stone-100 flex items-center justify-between flex-wrap gap-2 text-xs text-stone-400">
-          <label class="inline-flex items-center gap-2 cursor-pointer select-none">
-            <input 
-              type="checkbox" 
-              id="cm-step-done-check" 
-              class="w-4 h-4 rounded text-[#ca5c2e] focus:ring-[#ca5c2e] cursor-pointer"
-              ${isDone ? "checked" : ""}
-            >
-            <span class="text-stone-600 font-semibold text-xs sm:text-sm">Mark this step as completed</span>
-          </label>
-          <span class="hidden sm:inline text-stone-400">
-            Press <kbd class="px-1.5 py-0.5 rounded bg-stone-100 border border-stone-200 font-mono text-[10px]">Space</kbd> or <kbd class="px-1.5 py-0.5 rounded bg-stone-100 border border-stone-200 font-mono text-[10px]">&rarr;</kbd> for next step
-          </span>
-        </div>
+        ${detectedTimer ? `<div id="cm-step-timer"></div>` : ""}
       </div>
     `;
 
-    // Step Done Checkbox binding
-    const stepDoneCheck = stepContainer.querySelector("#cm-step-done-check");
-    stepDoneCheck?.addEventListener("change", (e) => {
-      if (e.target.checked) {
-        completedSteps.add(index);
-      } else {
-        completedSteps.delete(index);
-      }
-      renderStepPills();
-    });
-
-    // Step Timer Button binding
-    const startTimerBtn = stepContainer.querySelector("#cm-start-timer-btn");
-    const timerWrapper = stepContainer.querySelector("#cm-step-timer-wrapper");
-
-    if (startTimerBtn && timerWrapper) {
-      startTimerBtn.addEventListener("click", () => {
-        timerTotalSeconds = parseInt(startTimerBtn.dataset.seconds, 10);
-        timerSecondsLeft = timerTotalSeconds;
-        isTimerRunning = true;
-
-        const updateTimerUI = () => {
-          timerWrapper.innerHTML = `
-            <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-amber-300 bg-amber-50 shadow-2xs">
-              <span id="cm-timer-display" class="font-mono text-base font-bold text-amber-900 min-w-[54px] text-center">
-                ${formatTime(timerSecondsLeft)}
-              </span>
-              <button id="cm-timer-toggle-btn" type="button" class="p-1 rounded-lg hover:bg-amber-100 text-amber-800 transition focus:outline-none" aria-label="${isTimerRunning ? "Pause timer" : "Resume timer"}">
-                ${isTimerRunning ? `
-                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
-                ` : `
-                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                `}
-              </button>
-              <button id="cm-timer-reset-btn" type="button" class="p-1 rounded-lg hover:bg-amber-100 text-stone-500 hover:text-stone-800 transition focus:outline-none" aria-label="Reset timer">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
-              </button>
-            </div>
-          `;
-
-          const toggleBtn = timerWrapper.querySelector("#cm-timer-toggle-btn");
-          const resetBtn = timerWrapper.querySelector("#cm-timer-reset-btn");
-
-          toggleBtn?.addEventListener("click", () => {
-            isTimerRunning = !isTimerRunning;
-            updateTimerUI();
-          });
-
-          resetBtn?.addEventListener("click", () => {
-            stopActiveTimer();
-            renderStep(index);
-          });
-        };
-
-        updateTimerUI();
-
-        timerInterval = setInterval(() => {
-          if (!isTimerRunning) return;
-          if (timerSecondsLeft > 0) {
-            timerSecondsLeft--;
-            const display = timerWrapper.querySelector("#cm-timer-display");
-            if (display) display.textContent = formatTime(timerSecondsLeft);
-          } else {
-            stopActiveTimer();
-            playTimerChime();
-            timerWrapper.innerHTML = `
-              <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-100 text-emerald-800 font-bold text-xs animate-bounce">
-                <span>⏱️ Time's up!</span>
-                <button id="cm-timer-dismiss-btn" type="button" class="underline ml-1">Dismiss</button>
-              </div>
-            `;
-            timerWrapper.querySelector("#cm-timer-dismiss-btn")?.addEventListener("click", () => {
-              renderStep(index);
-            });
-          }
-        }, 1000);
-      });
-    }
+    // Timer widget for this step (start button, or the live countdown if one is running)
+    renderStepTimerWidget();
   }
 
   // Render Celebratory Completion Screen
   function renderCompletionScreen() {
-    stopActiveTimer();
-    progressBar.style.width = "100%";
-    stepIndicator.textContent = `Completed! (${totalSteps} of ${totalSteps})`;
-    progressPercentage.textContent = "(100% completed)";
-    bottomStepIndicator.textContent = "Cooking Completed 🎉";
+    isComplete = true;
+    currentDetectedTimer = null;
+    updateProgress("Completed!");
+    bottomStepIndicator.innerHTML = `<span class="text-emerald-700 font-bold">All done 🎉</span>`;
+    renderStepPills();
 
     prevBtn.disabled = false;
-    nextBtnText.textContent = "Finished 🎉";
+    nextBtnText.textContent = "Done";
     nextBtn.disabled = true;
 
     stepContainer.innerHTML = `
@@ -738,8 +932,8 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
       </div>
     `;
 
-    overlay.querySelector("#cm-finish-review-btn")?.addEventListener("click", () => {
-      closeCookingMode();
+    overlay.querySelector("#cm-finish-review-btn")?.addEventListener("click", async () => {
+      if (!(await requestExit())) return;
       if (typeof onSwitchTab === "function") {
         onSwitchTab("reviews");
       }
@@ -749,12 +943,14 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
       }, 150);
     });
 
-    overlay.querySelector("#cm-finish-exit-btn")?.addEventListener("click", closeCookingMode);
+    overlay.querySelector("#cm-finish-exit-btn")?.addEventListener("click", requestExit);
 
     overlay.querySelector("#cm-finish-restart-btn")?.addEventListener("click", () => {
-      nextBtn.disabled = false;
+      completedSteps.clear();
       goToStep(0);
     });
+
+    overlay.querySelector("#cm-finish-review-btn")?.focus({ preventScroll: true });
   }
 
   // Navigation logic
@@ -764,76 +960,150 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
       renderCompletionScreen();
       return;
     }
+    isComplete = false;
     currentStepIndex = index;
     renderStep(currentStepIndex);
+    fitStepCard();
+    mainArea.scrollTop = 0;
   }
 
-  // Button clicks
-  prevBtn.addEventListener("click", () => {
-    if (currentStepIndex > 0) {
-      goToStep(currentStepIndex - 1);
-    }
-  });
-
-  nextBtn.addEventListener("click", () => {
+  function goNext() {
+    if (isComplete) return;
     completedSteps.add(currentStepIndex);
     goToStep(currentStepIndex + 1);
-  });
+  }
+
+  function goBack() {
+    // From the completion screen, Back returns to the last step rather than skipping it
+    if (isComplete) goToStep(currentStepIndex);
+    else if (currentStepIndex > 0) goToStep(currentStepIndex - 1);
+  }
+
+  const mainArea = overlay.querySelector("#cm-main");
+
+  // Shrinks the step text until the whole card fits in the space between the header and
+  // footer, so the cook never has to scroll mid-recipe. Starts from the largest size for
+  // the screen width and stops at a readable minimum (very long steps on small screens
+  // can still scroll).
+  const MIN_STEP_FONT = 16;
+  function fitStepCard() {
+    const text = stepContainer.querySelector("#cm-step-text");
+    if (!text) return;
+    const vw = window.innerWidth;
+    const maxFont = vw >= 768 ? 30 : vw >= 640 ? 24 : 20;
+    const styles = getComputedStyle(mainArea);
+    const available = mainArea.clientHeight - parseFloat(styles.paddingTop) - parseFloat(styles.paddingBottom);
+
+    let size = maxFont;
+    text.style.fontSize = `${size}px`;
+    while (size > MIN_STEP_FONT && stepContainer.scrollHeight > available) {
+      size -= 1;
+      text.style.fontSize = `${size}px`;
+    }
+  }
+
+  // Refit when the window changes size (rotating a tablet, resizing the browser)
+  let fitFrame = 0;
+  function onResize() {
+    cancelAnimationFrame(fitFrame);
+    fitFrame = requestAnimationFrame(() => {
+      if (!isComplete) fitStepCard();
+    });
+  }
+  window.addEventListener("resize", onResize);
+  // Inter may finish loading after the first fit and change the text's height
+  document.fonts?.ready.then(onResize).catch(() => {});
+
+  // Button clicks
+  prevBtn.addEventListener("click", goBack);
+  nextBtn.addEventListener("click", goNext);
 
   // Jump to step pill click
   stepPillsNav.addEventListener("click", (e) => {
     const pill = e.target.closest(".cm-step-pill");
     if (pill && pill.dataset.step !== undefined) {
-      nextBtn.disabled = false;
-      const targetStep = parseInt(pill.dataset.step, 10);
-      goToStep(targetStep);
+      goToStep(parseInt(pill.dataset.step, 10));
     }
   });
 
-  // Exit cleanup
-  function closeCookingMode() {
-    stopActiveTimer();
-    releaseScreenWakeLock();
-    window.removeEventListener("keydown", onKeyDown);
-    document.body.style.overflow = prevOverflow;
-    overlay.remove();
+  // Asks before leaving while a timer is still counting. Resolves to true if Cooking Mode closed.
+  let exitPromptOpen = false;
+  async function requestExit() {
+    if (exitPromptOpen) return false;
+    if (hasActiveTimers()) {
+      exitPromptOpen = true;
+      const running = [...timers.values()].filter((t) => !t.done).length;
+      const confirmPromise = showConfirmModal({
+        title: running === 1 ? "Your timer is still running" : `${running} timers are still running`,
+        message: "Leaving Cooking Mode will stop your kitchen timers. Do you want to leave anyway?",
+        confirmText: "Stop & leave",
+        cancelText: "Keep cooking",
+        confirmColor: "danger",
+        icon: "alert",
+      });
+      // The modal is added synchronously; start on the safe choice so Enter doesn't leave
+      document.querySelector("#custom-confirm-modal #confirm-modal-cancel")?.focus({ preventScroll: true });
+      const leave = await confirmPromise;
+      exitPromptOpen = false;
+      if (!leave) {
+        overlay.querySelector("#cm-exit-btn")?.focus({ preventScroll: true });
+        return false;
+      }
+    }
+    closeCookingMode();
+    return true;
   }
 
-  overlay.querySelector("#cm-exit-btn")?.addEventListener("click", closeCookingMode);
+  // Exit cleanup
+  function closeCookingMode() {
+    clearAllTimers();
+    releaseScreenWakeLock();
+    window.removeEventListener("keydown", onKeyDown);
+    window.removeEventListener("resize", onResize);
+    cancelAnimationFrame(fitFrame);
+    document.removeEventListener("visibilitychange", reacquireWakeLockOnVisible);
+    document.body.style.overflow = prevOverflow;
+    overlay.remove();
+    if (prevFocus && document.contains(prevFocus)) prevFocus.focus({ preventScroll: true });
+  }
+
+  overlay.querySelector("#cm-exit-btn")?.addEventListener("click", requestExit);
 
   // Keyboard navigation
   function onKeyDown(e) {
-    // If user is focused on an input or textarea, don't hijack keys
-    if (["INPUT", "TEXTAREA"].includes(document.activeElement?.tagName)) return;
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    // The leave-confirmation dialog handles its own keys (Esc = keep cooking)
+    if (exitPromptOpen || document.getElementById("custom-confirm-modal")) return;
+    const el = document.activeElement;
+    const tag = el?.tagName;
+    const isTextField =
+      tag === "TEXTAREA" || tag === "SELECT" || el?.isContentEditable ||
+      (tag === "INPUT" && !["checkbox", "radio", "button"].includes(el.type));
+    // Never hijack typing in a text field
+    if (isTextField) return;
 
     if (e.key === "Escape") {
       e.preventDefault();
-      const isOpen = !ingredientsDrawer.classList.contains("translate-x-full");
-      if (isOpen) {
-        closeIngredientsDrawer();
-      } else {
-        closeCookingMode();
-      }
-    } else if (e.key === "ArrowRight" || e.key === " " || e.key === "n" || e.key === "N") {
+      if (isDrawerOpen()) closeIngredientsDrawer();
+      else requestExit();
+      return;
+    }
+
+    // Space/Enter on a focused button or checkbox should press that control, not change step
+    if (e.key === " " && (tag === "BUTTON" || tag === "INPUT")) return;
+
+    // Steps shouldn't change behind the open ingredients drawer
+    if (isDrawerOpen() && e.key !== "i" && e.key !== "I") return;
+
+    if (e.key === "ArrowRight" || e.key === " " || e.key === "n" || e.key === "N") {
       e.preventDefault();
-      if (!nextBtn.disabled) {
-        completedSteps.add(currentStepIndex);
-        goToStep(currentStepIndex + 1);
-      }
+      goNext();
     } else if (e.key === "ArrowLeft" || e.key === "p" || e.key === "P") {
       e.preventDefault();
-      if (currentStepIndex > 0) {
-        nextBtn.disabled = false;
-        goToStep(currentStepIndex - 1);
-      }
+      goBack();
     } else if (e.key === "i" || e.key === "I") {
       e.preventDefault();
-      const isOpen = !ingredientsDrawer.classList.contains("translate-x-full");
-      if (isOpen) {
-        closeIngredientsDrawer();
-      } else {
-        openIngredientsDrawer();
-      }
+      toggleIngredientsDrawer();
     }
   }
 
@@ -842,4 +1112,5 @@ export function openCookingMode({ recipe, parsedItems, allergenResult = {}, onSw
   // Initialize
   renderIngredientsChecklist();
   goToStep(0);
+  nextBtn.focus({ preventScroll: true });
 }

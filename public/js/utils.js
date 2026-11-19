@@ -695,7 +695,11 @@ export function cleanInstructionText(text) {
     .replace(/\bseperated\b/gi, "separated")
     .replace(/\bminuts\b/gi, "minutes")
     .replace(/\bpeices\b/gi, "pieces")
-    .replace(/\bpeice\b/gi, "piece");
+    .replace(/\bpeice\b/gi, "piece")
+    // Accidentally doubled small words, e.g. "Boiling the the noodles" -> "Boiling the noodles".
+    // Limited to articles/prepositions so intentional repeats are left alone; keeps the first
+    // word's capitalisation and only matches within one line.
+    .replace(/\b(the|a|an|and|to|of|in|on|with|for|into|onto|it|is)[ \t]+\1\b/gi, "$1");
 }
 
 // Unit definitions for parsing and combining recipe ingredient measurements
