@@ -1282,8 +1282,8 @@ const PLAN_SLOT_DIALOG_CSS = `
   .psd-backdrop{align-items:center;padding:16px}
   .psd-panel{max-width:28rem;border-radius:24px;padding:24px;transform:scale(.95)}
 }
-.psd-close{position:absolute;top:16px;right:16px;display:inline-flex;padding:8px;border:0;border-radius:9999px;background:none;color:#a8a29e;cursor:pointer;transition:color .15s,background-color .15s}
-.psd-close:hover{color:#44403c;background:#f5f5f4}
+.psd-close{position:absolute;top:16px;right:16px;display:inline-flex;padding:8px;border:0;border-radius:9999px;background:none;color:#a8a29e;cursor:pointer;transition:color .15s,background-color .15s,transform .2s}
+.psd-close:hover{color:#ca5c2e;background:#fbf2ec;transform:rotate(90deg)}
 .psd-head{display:flex;align-items:center;gap:12px;padding-right:40px}
 .psd-head-text{min-width:0}
 .psd-thumb{width:48px;height:48px;flex-shrink:0;border-radius:12px;object-fit:cover;background:#f5f5f4}
@@ -1296,9 +1296,11 @@ const PLAN_SLOT_DIALOG_CSS = `
 .psd-meals{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .psd-option{position:relative;display:block}
 .psd-option input{position:absolute;width:1px;height:1px;margin:0;opacity:0;pointer-events:none}
-.psd-chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border:1px solid #efe6dc;border-radius:12px;background:#fff;color:#57534e;cursor:pointer;user-select:none;transition:background-color .15s,border-color .15s,color .15s}
-.psd-chip:hover{border-color:rgba(202,92,46,.5)}
-.psd-option input:checked+.psd-chip{background:#ca5c2e;border-color:#ca5c2e;color:#fff}
+.psd-chip{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 0;border:1px solid #efe6dc;border-radius:12px;background:#fff;color:#57534e;cursor:pointer;user-select:none;transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s,transform .15s}
+.psd-chip:hover{border-color:rgba(202,92,46,.55);background:#fdf8f4;color:#ca5c2e;transform:translateY(-1px);box-shadow:0 4px 10px -4px rgba(202,92,46,.3)}
+.psd-chip:active{transform:scale(.96);box-shadow:none}
+.psd-option input:checked+.psd-chip{background:#ca5c2e;border-color:#ca5c2e;color:#fff;box-shadow:0 4px 12px -4px rgba(202,92,46,.55)}
+.psd-option input:checked+.psd-chip:hover{background:#b34d23;border-color:#b34d23;color:#fff}
 .psd-option input:focus-visible+.psd-chip{box-shadow:0 0 0 2px rgba(202,92,46,.45)}
 .psd-chip-day{font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.03em}
 .psd-chip-date{font-size:14px;font-weight:700;line-height:1}
@@ -1308,17 +1310,36 @@ const PLAN_SLOT_DIALOG_CSS = `
 .psd-dot.is-filled{background:#ca5c2e}
 .psd-option input:checked+.psd-chip .psd-dot.is-filled{background:#fff}
 .psd-meal-chip{padding:8px 0;font-size:14px;font-weight:600}
-.psd-status{margin:0;padding:8px 12px;border:1px solid #f5f5f4;border-radius:12px;background:#fafaf9;color:#78716c;font-size:12px}
-.psd-status.is-replace{border-color:#fde68a;background:#fffbeb;color:#92400e}
+.psd-status{display:flex;align-items:center;gap:12px;min-height:58px;box-sizing:border-box;margin:0;padding:8px 14px 8px 8px;border:1px solid #f1e8de;border-radius:16px;background:#fdf8f4}
+.psd-status-thumb{width:40px;height:40px;flex-shrink:0;border-radius:10px;object-fit:cover;background:#f5f5f4}
+.psd-status-icon{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;flex-shrink:0;border-radius:10px}
+.psd-status-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.psd-status-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.05em}
+.psd-status-name{font-size:14px;font-weight:600;color:#1c1917;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.psd-status-swap{flex-shrink:0;color:#ca5c2e;opacity:.8}
+.psd-status.is-replace .psd-status-label{color:#b45309}
+.psd-status.is-free{border-color:#d1fae5;background:#f0fdf4}
+.psd-status.is-free .psd-status-icon{background:#dcfce7;color:#047857}
+.psd-status.is-free .psd-status-label{color:#047857}
+.psd-status.is-same .psd-status-label{color:#78716c}
+.psd-status.is-changing{animation:psd-status-in .18s ease}
+@keyframes psd-status-in{from{opacity:.4;transform:translateY(2px)}to{opacity:1;transform:none}}
 .psd-actions{display:flex;gap:12px;padding-top:4px}
-.psd-btn{flex:1;padding:10px 16px;border-radius:12px;font:600 14px/1.25 Inter,system-ui,sans-serif;cursor:pointer;transition:background-color .15s,border-color .15s}
+.psd-btn{flex:1;padding:10px 16px;border-radius:12px;font:600 14px/1.25 Inter,system-ui,sans-serif;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s,box-shadow .15s,transform .15s}
+.psd-btn:active{transform:scale(.98)}
 .psd-btn-secondary{border:1px solid #e7e5e4;background:#fff;color:#44403c}
-.psd-btn-secondary:hover{background:#fafaf9}
+.psd-btn-secondary:hover{border-color:rgba(202,92,46,.45);background:#fdf8f4;color:#ca5c2e;transform:translateY(-1px);box-shadow:0 6px 14px -6px rgba(202,92,46,.35)}
+.psd-btn-secondary:active{transform:scale(.98);box-shadow:none}
 .psd-btn-primary{border:1px solid #ca5c2e;background:#ca5c2e;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
-.psd-btn-primary:hover{background:#b34d23;border-color:#b34d23}
-.psd-btn:disabled{opacity:.6;cursor:default}
+.psd-btn-primary:hover{background:#b34d23;border-color:#b34d23;transform:translateY(-1px);box-shadow:0 6px 14px -4px rgba(202,92,46,.5)}
+.psd-btn-primary:active{transform:scale(.98);box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.psd-btn:disabled{opacity:.6;cursor:default;transform:none;box-shadow:none}
 .psd-btn:focus-visible,.psd-close:focus-visible{outline:none;box-shadow:0 0 0 2px #fff,0 0 0 4px rgba(202,92,46,.5)}
-@media (prefers-reduced-motion:reduce){.psd-backdrop,.psd-panel{transition:none}}
+@media (prefers-reduced-motion:reduce){
+  .psd-backdrop,.psd-panel,.psd-chip,.psd-btn,.psd-close{transition:none}
+  .psd-chip:hover,.psd-chip:active,.psd-btn:hover,.psd-btn:active,.psd-close:hover{transform:none}
+  .psd-status.is-changing{animation:none}
+}
 `;
 
 function ensurePlanSlotDialogStyles() {
@@ -1373,7 +1394,7 @@ export async function openAddToPlanDialog(recipe, options = {}) {
       <div class="psd-head">
         <img src="${escapeHtml(recipe.image || FALLBACK_MEAL_IMG)}" alt="" class="psd-thumb">
         <div class="psd-head-text">
-          <h2 id="plan-slot-title" class="psd-title">Add to meal plan</h2>
+          <h2 id="plan-slot-title" class="psd-title">Add to Meal Plan</h2>
           <p class="psd-sub">${escapeHtml(recipeName)}</p>
         </div>
       </div>
@@ -1388,7 +1409,7 @@ export async function openAddToPlanDialog(recipe, options = {}) {
           <div class="psd-meals">${mealChips}</div>
         </fieldset>
 
-        <p class="psd-status" aria-live="polite"></p>
+        <div class="psd-status" aria-live="polite"></div>
 
         <div class="psd-actions">
           <button type="button" class="psd-btn psd-btn-secondary plan-slot-cancel">Cancel</button>
@@ -1406,18 +1427,40 @@ export async function openAddToPlanDialog(recipe, options = {}) {
   // Shows what is in the chosen slot and marks the days that already have this meal.
   function refresh() {
     const existing = plan[day]?.[meal];
+    const slot = `${day} ${meal}`;
+    let state;
     if (existing && existing.name) {
       const sameRecipe = String(existing.id) === String(recipe.id);
-      statusEl.classList.add("is-replace");
-      statusEl.textContent = sameRecipe
-        ? `${recipeName} is already planned for ${day} ${meal}.`
-        : `Replaces "${toTitleCase(existing.name)}" on ${day} ${meal}.`;
-      submitBtn.textContent = sameRecipe ? "Keep it" : `Replace ${day} ${meal}`;
+      state = sameRecipe ? "is-same" : "is-replace";
+      const thumb = `<img src="${escapeHtml(existing.image || FALLBACK_MEAL_IMG)}" alt="" class="psd-status-thumb">`;
+      statusEl.innerHTML = sameRecipe
+        ? `${thumb}
+           <span class="psd-status-text">
+             <span class="psd-status-label">Already planned · ${escapeHtml(slot)}</span>
+             <span class="psd-status-name">${escapeHtml(recipeName)}</span>
+           </span>`
+        : `${thumb}
+           <span class="psd-status-text">
+             <span class="psd-status-label">Will be replaced · ${escapeHtml(slot)}</span>
+             <span class="psd-status-name">${escapeHtml(toTitleCase(existing.name))}</span>
+           </span>
+           <svg class="psd-status-swap" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M7 16V4m0 0L3 8m4-4l4 4M17 8v12m0 0l4-4m-4 4l-4-4"></path></svg>`;
+      submitBtn.textContent = sameRecipe ? "Keep it" : `Replace ${slot}`;
     } else {
-      statusEl.classList.remove("is-replace");
-      statusEl.textContent = `${day} ${meal} is free.`;
-      submitBtn.textContent = `Add to ${day} ${meal}`;
+      state = "is-free";
+      statusEl.innerHTML = `
+        <span class="psd-status-icon" aria-hidden="true">
+          <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+        </span>
+        <span class="psd-status-text">
+          <span class="psd-status-label">Free slot</span>
+          <span class="psd-status-name">Nothing planned for ${escapeHtml(slot)} yet</span>
+        </span>`;
+      submitBtn.textContent = `Add to ${slot}`;
     }
+    statusEl.classList.remove("is-free", "is-replace", "is-same", "is-changing");
+    void statusEl.offsetWidth; // restart the small fade when the slot changes
+    statusEl.classList.add(state, "is-changing");
     backdrop.querySelectorAll(".psd-dot").forEach((dot) => {
       dot.classList.toggle("is-filled", Boolean(plan[dot.dataset.day]?.[meal]));
     });

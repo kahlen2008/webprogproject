@@ -5,6 +5,7 @@ import { searchRecipes, searchRecipesWide, listAllRecipes, getRecipeById, filter
 import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
 import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect } from "./utils.js";
+import { openCookingMode } from "./cooking-mode.js";
 import {
   getPreferences,
   savePreferences,
@@ -379,7 +380,7 @@ function syncPageToUrl() {
     if (currentPage > 1) url.searchParams.set("page", String(currentPage));
     else url.searchParams.delete("page");
     window.history.replaceState(null, "", url.pathname + url.search + url.hash);
-  } catch (e) {}
+  } catch (e) { }
 }
 
 // Page numbers to show: first, last, and the pages around the current one, with gaps.
@@ -616,7 +617,7 @@ async function findSimilarRecipes(query) {
             entry.score += 2;
           }
         });
-      } catch (e) {}
+      } catch (e) { }
     })
   );
 
@@ -1069,6 +1070,30 @@ async function showRecipe(id) {
       const items = [];
       let currentSection = null;
 
+      // Short ALL-CAPS lines like "MARINATING THE CHICKEN." or "BOILING THE WHITE RICE" are
+      // section titles, not steps. Skipped when the recipe itself is written in capitals (a
+      // long all-caps line, or most lines in caps), since then capitals don't mark anything out.
+      // "STEP 1"-style marker lines are left out of the count, as they're dropped anyway.
+      const isAllCapsLine = (str) => {
+        const letters = str.replace(/[^\p{L}]/gu, "");
+        return letters.length >= 3 && letters === letters.toUpperCase() && letters !== letters.toLowerCase();
+      };
+      const contentLines = lines.filter((l) => !standaloneHeaderRegex.test(l));
+      const capsLines = contentLines.filter(isAllCapsLine);
+      const capsHeadersEnabled =
+        !capsLines.some((l) => l.length > 60) && capsLines.length <= contentLines.length * 0.6;
+
+      function isAllCapsHeader(str) {
+        if (!capsHeadersEnabled) return false;
+        const body = str.replace(prefixRegex, "").trim();
+        if (!body || standaloneHeaderRegex.test(body)) return false; // "STEP 3" etc. are dropped later
+        if (body.length > 50 || body.split(/\s+/).length > 7) return false;
+        if (/[!?]$/.test(body)) return false;
+        // Timed or measured lines are real instructions, e.g. "BAKE FOR 20 MINUTES"
+        if (/\d+\s*(?:minutes?|mins?|hours?|hrs?|seconds?|secs?|cups?|tbsp|tsp|g|kg|ml|l|oz|lbs?|degrees?|°)/i.test(body)) return false;
+        return isAllCapsLine(body);
+      }
+
       function ensureFullStop(str) {
         if (!str) return "";
         const trimmed = str.trim();
@@ -1111,9 +1136,9 @@ async function showRecipe(id) {
           return true;
         }
 
-        if (isComponentHeader(line)) {
+        if (isComponentHeader(line) || isAllCapsHeader(line)) {
           currentSection = null; // Reset bullet section so subsequent items are numbered cooking steps
-          const cleanHeader = line.replace(/[:.-]+$/, "").trim();
+          const cleanHeader = line.replace(prefixRegex, "").replace(/[:.\s-]+$/, "").trim();
           items.push({
             type: "header",
             header: {
@@ -1322,12 +1347,15 @@ async function showRecipe(id) {
       <div class="space-y-10">
         ${warningBannerHtml}
         <!-- Top Hero Section: Photo + Meta Details -->
-        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
-          
-          <!-- Image Column -->
-          <div class="md:col-span-5">
-            <div class="overflow-hidden rounded-2xl border border-[#efe6dc] shadow-sm bg-stone-100 aspect-[4/3]">
-              <img id="main-recipe-image" class="w-full h-full aspect-[4/3] object-cover" src="${safeImage}" width="480" height="360" fetchpriority="high" decoding="async" alt="${safeName}">
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-8 items-start md:items-stretch">
+
+          <!-- Image Column: 4:3 on phones; on wider screens it takes exactly the height of the
+               details column, so the photo lines up with the title at the top and the description
+               at the bottom whether the title is one line or two. The image is absolutely
+               positioned so it never makes the row taller than the details. -->
+          <div class="md:col-span-5 flex">
+            <div class="relative w-full overflow-hidden rounded-2xl border border-[#efe6dc] shadow-sm bg-stone-100 aspect-[4/3] md:aspect-auto">
+              <img id="main-recipe-image" class="absolute inset-0 w-full h-full object-cover" src="${safeImage}" width="480" height="360" fetchpriority="high" decoding="async" alt="${safeName}">
             </div>
           </div>
 
@@ -1365,7 +1393,7 @@ async function showRecipe(id) {
               </span>
             </div>
 
-            <!-- Buttons Row: Save to Favourites & Add to Meal Plan -->
+            <!-- Buttons Row: Save to Favourites, Add to Meal Plan & Cooking Mode -->
             <div class="flex flex-wrap items-center gap-3 pt-2">
               <button id="save-fav-btn" type="button" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl border border-[#ca5c2e] text-[#ca5c2e] hover:bg-[#ca5c2e]/10 text-sm font-semibold transition focus:outline-none">
                 <svg id="fav-icon" class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -1380,6 +1408,13 @@ async function showRecipe(id) {
                   <line x1="5" y1="12" x2="19" y2="12"></line>
                 </svg>
                 Add to Meal Plan
+              </button>
+
+              <button id="start-cooking-mode-btn" type="button" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-white text-sm font-semibold shadow-sm transition focus:outline-none">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span>Cooking Mode</span>
               </button>
             </div>
 
@@ -1418,7 +1453,16 @@ async function showRecipe(id) {
 
           <!-- Instructions Column -->
           <div class="md:col-span-7 space-y-4">
-            <h2 class="text-xl font-bold text-stone-900">Instructions</h2>
+            <div class="flex items-center justify-between gap-3">
+              <h2 class="text-xl font-bold text-stone-900">Instructions</h2>
+              <button id="instructions-cooking-mode-btn" type="button" class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] hover:text-[#b34d23] px-3 py-1.5 rounded-lg bg-[#fbece4] hover:bg-[#f6decb] transition focus:outline-none">
+                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
+                  <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Cooking Mode</span>
+              </button>
+            </div>
             <ol class="space-y-5 list-none p-0 m-0">
               ${stepsHtml}
             </ol>
@@ -1470,7 +1514,7 @@ async function showRecipe(id) {
       try {
         const stored = JSON.parse(localStorage.getItem("recipeplan_favourites") || "[]");
         isFaved = stored.some((f) => String(f.id) === String(recipe.id));
-      } catch (e) {}
+      } catch (e) { }
     }
 
     const updateFavDisplay = (faved) => {
@@ -1492,7 +1536,7 @@ async function showRecipe(id) {
         .then((serverFaved) => {
           if (serverFaved !== isFaved) updateFavDisplay(serverFaved);
         })
-        .catch(() => {});
+        .catch(() => { });
     }
 
     // Instant optimistic toggle on click (0ms delay)
@@ -1563,6 +1607,25 @@ async function showRecipe(id) {
           showToast("Couldn't add this recipe to your plan. Please try again.");
         }
       });
+    }
+
+    // Launch Cooking Mode (Dedicated step-by-step view with progress, timers, and checklist)
+    const launchCookingMode = () => {
+      openCookingMode({
+        recipe,
+        parsedItems,
+        allergenResult: result,
+        onSwitchTab: switchRecipeTab,
+      });
+    };
+
+    document.getElementById("start-cooking-mode-btn")?.addEventListener("click", launchCookingMode);
+    document.getElementById("instructions-cooking-mode-btn")?.addEventListener("click", launchCookingMode);
+
+    // Auto-launch if URL has ?cook=1 or #cook
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get("cook") === "1" || window.location.hash === "#cook") {
+      launchCookingMode();
     }
 
     // Mount Ratings & Reviews system (Person 3)
