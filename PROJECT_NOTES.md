@@ -61,7 +61,7 @@ Both deploy on every push to `main`. The GitHub Pages link (<https://kahlen2008.
 | Person   | Area                                                                    | Files                                                                                                                                                                                                                                                              |
 | -------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 1 (Lead) | Accounts, onboarding, profile, diet and allergy checker, languages (i18n), Firestore schema helpers, security rules. Also helps with integration and small fixes in other areas (agreed with the file owner first) | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/i18n.js`, `js/schema.js`, `js/firebase-config.js`, `css/auth.css`, `css/onboarding.css`, `firestore.rules` |
-| 2        | Recipe discovery, API, shared look                                      | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css`                                                                                           |
+| 2        | Recipe discovery, API, shared look, cooking mode                        | `index.html`, `recipes.html`, `recipe.html`, `js/api.js`, `js/recipes.js`, `js/cooking-mode.js`, `js/search-cta.js`, `css/base.css`, `css/components.css`, `css/recipes.css`                                                                     |
 | 3        | Favourites, ratings and comments, QA                                    | `favourites.html`, `js/favourites.js`, `css/favourites.css`, `js/ratings.js`                                                                                                                                                        |
 | 4        | Meal planner, shopping list, deployment, README                         | `planner.html`, `js/planner.js`, `css/planner.css`, `firebase.json`, `.github/workflows/`, `README.md`                                                                                                                                                 |
 | Anyone   | Small shared helpers                                                    | `js/utils.js` (add, do not change existing functions)                                                                                                                                                                                                            |
@@ -96,6 +96,9 @@ Recipe object used everywhere:
 { id, name, image, category, area, instructions, ingredients: [{ name, measure }], youtube }
 ```
 
+**`js/cooking-mode.js` (Person 2)**
+`openCookingMode({ recipe, parsedItems, allergenResult, onSwitchTab })` opens the full-screen cooking view. `parsedItems` is the output of the recipe page's instruction parser (steps, bullets and section headers), `allergenResult` is the `checkRecipe` result (used to mark flagged ingredients in the checklist) and `onSwitchTab("reviews")` is called by "Leave a Review" on the finished screen. Helpers: `prepareCookingSteps(parsedItems, rawInstructions)`, `detectCookingTimer(text)` (returns `{ seconds, label }` for e.g. "35 minutes", "1-2 mins" (uses the upper number), "1.5 hours", or `null`). The recipe page opens it from its two Cooking Mode buttons, or straight away when the URL has `?cook=1` or `#cook`.
+
 **`js/favourites.js` (Person 3)**
 `getFavourites()`, `addFavourite(recipe)` (also saves `ingredientNames`), `removeFavourite(recipeId)`, `isFavourite(recipeId)`, `watchFavourites(cb)`.
 `watchFavourites` listens live with Firestore `onSnapshot` while signed in (localStorage when signed out or offline), calls `cb(favs, { pending })`, and returns a function that stops watching. `pending` is true while a signed-in session is still being restored.
@@ -106,7 +109,7 @@ Recipe object used everywhere:
 `openAddToPlanDialog(recipe, { skipAllergenCheck, day, meal })` is the shared day and meal dialog: it shows this week's days and the three meals, says what is already in the chosen slot, saves through `addToPlan`, and resolves `{ day, meal }` (plus `unchanged: true` if that recipe was already there) or `null` if cancelled.
 
 **`js/utils.js` (shared)**
-`escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText`, `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
+`escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText` (fixes TheMealDB scraping typos such as missing first letters, common misspellings and doubled small words like "the the"), `showConfirmModal({ title, message, confirmText, cancelText, confirmColor, icon })` (resolves `true` or `false`), `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
 
 **`js/firebase-config.js`** exports `app`, `auth`, `db`. Import these, never call `initializeApp` again.
 
@@ -142,6 +145,9 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 - The navbar loads the favourites list once per session after login, so card hearts are right on a new device. Favourite cards show a "You ★4" badge when the user has rated that recipe.
 - The shopping list on `planner.html` is built from the shown week's plan with `combineIngredients` (a recipe planned twice counts twice). Slots added through `addToPlan` keep the recipe's `ingredients`, so the list only calls the API for older slots. Ticks are saved to `users/{uid}/shoppingList/{weekId}` (plus a localStorage copy). Items are grouped by aisle (keyword rules in `planner.js`: Produce, Meat & fish, Dairy & eggs, Bakery, Pantry, Herbs & spices, Frozen, Other) as compact checklist rows. Staples like salt, oil and water fold into "Probably in your cupboard". Checked items are struck through and move to a folded "In the basket" group at the bottom. Items that match the user's allergies or diet get a warning mark. On phones the list has its own tab (Meals / Shopping list). Copy list copies what is still to buy; Print shows only the list, in one column, with no navbar or buttons.
 - Ratings and comments are built (`ratings.js`).
+- Cooking mode is built (`cooking-mode.js`, opened from `recipe.html`). One step at a time with Next/Back and arrow keys, step pills, progress based on finished steps, an ingredient checklist drawer and a finished screen linking to reviews. The step text shrinks to fit the screen (down to 16px). Times found in a step ("cook for 35 minutes") offer a timer. Timers keep running across steps in a bar above Back/Next, several can run at once, and leaving with one running asks first. The screen wake lock keeps the display on (secure pages only; it fails silently elsewhere).
+- Instructions: short ALL-CAPS lines (e.g. "MARINATING THE CHICKEN.") are shown as section headings, not numbered steps. This is switched off for recipes written mostly in capitals. It changes 8 TheMealDB recipes (Beef Lo Mein, Chicken Congee, General Tsos Chicken, Hot and Sour Soup, Pouding chomeur, Shrimp Chow Fun, Smoky Lentil Chili with Squash, Szechuan Beef).
+- Recipe page: on tablet and desktop the photo takes the height of the details column, so it lines up with the description for one and two line titles.
 - The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).
 - "Fill from favourites" (in the planner's ⋯ menu, next to Clear week) is an extra we added.
 - Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
@@ -156,7 +162,7 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 ## Out of scope (only if everything else is done)
 
-"Fill my week" smart auto-planner, substitution suggestions, search by ingredients on hand, cooking mode, dark mode. (Multi-language support was moved into scope and is built.)
+"Fill my week" smart auto-planner, substitution suggestions, search by ingredients on hand, dark mode. (Multi-language support and cooking mode were moved into scope and are built.)
 
 ## Timeline
 

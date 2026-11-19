@@ -119,9 +119,12 @@ Deciding what to cook every day is time-consuming and often fragmented across bo
 | ------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | 🔍 **Recipe Search & Filtering**      | Instant keyword search, categorized exploration (Chicken, Seafood, Vegetarian, Pasta, etc.), and international cuisine filters.      |
 | 📖 **Dynamic Recipe Details**         | Full instructions, ingredient quantities, YouTube video tutorials, and interactive serving-size scaling.                             |
+| 👩‍🍳 **Cooking Mode**                  | Full-screen, one step at a time, sized to fit the screen, with Next/Back (or arrow keys), progress, an ingredient checklist and section headings. Kitchen timers start from times found in a step and keep running across steps, several at once. The screen stays awake while cooking. |
 | 🛡️ **Dietary & Allergen Detection** | Real-time keyword scanning on recipe cards and detail views alerting users of matching allergen risks.                               |
 | 📅 **Weekly Meal Planner**            | 7-day schedule (Breakfast, Lunch, Dinner) saved per week to your account. Drag meals between slots, switch weeks, clear a week with Undo, and use day tabs on phones. |
 | 🛒 **Smart Shopping List**            | Combines the ingredients from every planned recipe into one list (same units added up), with ticks saved to your account, checked items moved to the bottom, a print view and a Copy list button. |
+| ⭐ **Ratings & Reviews**              | Star ratings and written reviews on every recipe, with the average and review count shown at the top of the recipe page.            |
+| 🌐 **Language Switcher**              | Use the site in 130+ languages; searches typed in another language are translated to English before they query TheMealDB.          |
 | ❤️ **Personal Favourites**          | One-click saving to your account, live sync across devices, filter by category and sort by date or name, with an offline fallback. |
 | 👤 **User Accounts & Onboarding**     | Secure Firebase email/password & Google OAuth, 2-step onboarding wizard, password safety validation, and account profile management. |
 | 📜 **Legal & Compliance**             | Transparent British English Terms of Service and Privacy Policy pages.                                                               |
@@ -135,16 +138,16 @@ RecipePlan was developed collaboratively by a 4-person team. Each member holds e
 | Member                       | Role & Module                              | Responsibilities                                                                                                                                                   | Key Files                                                                                                            |
 | ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | **Kahlen Ong - 202699471** | **Accounts, Profile & Security**     | User authentication (Email/Password, Google OAuth), 2-step onboarding questionnaire, profile and settings page, diet and allergy checker, password security rules, language switcher, and the Firestore schema and security rules. Also gave some help with integration and small fixes across the other modules. | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/i18n.js`, `js/schema.js`, `js/firebase-config.js`, `firestore.rules` |
-| **Shrestha Puja - 202537250** | **Recipe Discovery & Design System** | Homepage search, category/cuisine filtering, recipe detail views, serving-size scaler, TheMealDB API integration, and core Tailwind/CSS design system.             | `index.htmlrecipe.html``css/base.csscss/components.css``css/recipes.cssjs/api.js``js/recipes.js`                   |
-| **Sunar Roshani - 202537197** | **Favourites & Quality Assurance**   | Favourites collection view, heart toggles, star ratings/feedback, cross-device Firestore data sync, and responsive layout testing.                                 | `favourites.htmlcss/favourites.css``js/favourites.jsjs/ratings.js`                                                 |
-| **Aale Aaditi - 202537195** | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, deployment (GitHub Pages and Firebase Hosting), and documentation.            | `planner.htmlcss/planner.css``js/planner.jsfirebase.json``README.md`                                               |
+| **Shrestha Puja - 202537250** | **Recipe Discovery & Design System** | Homepage search, category/cuisine filtering, recipe detail views, serving-size scaler, cooking mode, TheMealDB API integration, and core Tailwind/CSS design system. | `index.html`, `recipes.html`, `recipe.html`, `css/base.css`, `css/components.css`, `css/recipes.css`, `js/api.js`, `js/recipes.js`, `js/cooking-mode.js`, `js/search-cta.js` |
+| **Sunar Roshani - 202537197** | **Favourites & Quality Assurance**   | Favourites collection view, heart toggles, star ratings/feedback, cross-device Firestore data sync, and responsive layout testing.                                 | `favourites.html`, `css/favourites.css`, `js/favourites.js`, `js/ratings.js` |
+| **Aale Aaditi - 202537195** | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, deployment (GitHub Pages and Firebase Hosting), and documentation.            | `planner.html`, `css/planner.css`, `js/planner.js`, `firebase.json`, `.github/workflows/`, `README.md` |
 
 ---
 
 ## 🛠️ Technology Stack
 
 - **Frontend Core:** Plain HTML5, Modern Vanilla JavaScript (ES6 Modules)
-- **Styling:** Vanilla CSS design tokens (`base.css`) + Tailwind CSS (via CDN)
+- **Styling:** Vanilla CSS design tokens (`base.css`) + Tailwind CSS (via CDN; the home and recipe pages use a prebuilt `css/tailwind.css`, see `tailwind.config.js` to rebuild it)
 - **Authentication:** Google Firebase Authentication (Email/Password & Google Identity Services)
 - **Database:** Google Cloud Firestore (NoSQL cloud database)
 - **Recipe Data API:** [TheMealDB REST API](https://www.themealdb.com/api.php)
@@ -189,7 +192,7 @@ webprogproject/
     │   ├── components.css      # Shared buttons, cards and modals
     │   ├── auth.css            # Login and sign-up pages
     │   ├── onboarding.css      # Onboarding steps and chips
-    │   ├── recipes.css         # Recipe grids and category chips
+    │   ├── recipes.css         # Recipe grids, category chips and cooking mode helpers
     │   ├── favourites.css      # Favourites page menus
     │   └── planner.css         # Planner page
     ├── js/
@@ -203,6 +206,7 @@ webprogproject/
     │   ├── i18n.js             # Language switcher (130+ languages) and search translation
     │   ├── api.js              # TheMealDB client with sessionStorage caching
     │   ├── recipes.js          # Search, filters and the recipe detail page
+    │   ├── cooking-mode.js     # Full-screen cooking mode: steps, timers, ingredient checklist, wake lock
     │   ├── search-cta.js       # Home page: rotating search placeholder and featured recipe cards
     │   ├── nutrition.js        # Rough calorie and servings estimates from ingredients
     │   ├── ratings.js          # Star ratings and reviews
