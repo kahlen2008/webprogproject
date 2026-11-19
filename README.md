@@ -69,7 +69,7 @@ People who cook at home, such as students, busy workers and households with diet
 | Language switcher | Use the site in 130+ languages, and non-English searches are translated to English before they query TheMealDB | Bonus |
 | Ratings and comments | Star ratings and comments on each recipe | Bonus |
 | Serving size scaler | Change the number of servings and the ingredient amounts update | Bonus |
-| More filters | Filter by cuisine, diet and cooking time | Bonus |
+| More filters | Filter by cuisine and diet | Bonus |
 
 ### Technology stack
 
