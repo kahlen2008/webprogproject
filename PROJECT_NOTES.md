@@ -80,6 +80,7 @@ Use these functions instead of rewriting them. If you change a signature, tell t
 `savePreferences(partial)`, `syncPreferencesFromCloud()`, `needsOnboarding()`, `hasPreferences()`.
 Checking: `checkRecipe(recipe, prefs)`, `checkRecipes(recipes)`, `checkIngredients(...)`, `getIngredientNames(recipe)`, `decorateCard(...)`, `describeResult(...)`, `openFlaggedRecipeModal(...)`, `confirmIfFlagged(recipe)` (asks the user before adding a flagged recipe, resolves `true` to continue).
 Options: `DIET_OPTIONS`, `ALLERGEN_OPTIONS`, `dietLabel(value)`.
+Swaps: `getSwapSuggestions(result, prefs)` takes a `checkRecipe` result and returns `[{ ingredient, options: [...] }]`, up to 3 ideas per flagged ingredient. Options that contain something else the user avoids are left out (each option in the `SWAPS` table lists what it contains in `has`). Low Carb and Keto get no swaps. The recipe page shows them as "Try instead" in the warning banner.
 
 **`js/i18n.js` (Person 1)**
 `LANGUAGES`, `getCurrentLanguage()`, `setLanguage(code)`, `translateQueryToEnglish(query)` (used by `searchRecipes`), `translatePlaceholders()`, `createLanguageSwitcherHtml()`, `bindLanguageSwitcher()`, `ensureStandaloneLanguageSwitcher()`. Wrap text that must not be translated (recipe search terms, the brand name) in `translate="no" class="notranslate"`.
@@ -153,6 +154,7 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 - Recipe page: on tablet and desktop the photo takes the height of the details column, so it lines up with the description for one and two line titles.
 - The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).
 - "Fill from favourites" (in the planner's ⋯ menu, next to Clear week) is an extra we added.
+- Nutrition estimates are an extra we added (`nutrition.js`): rough calories, protein, carbs and fat per serving on the recipe page, and a daily calorie total on the planner. TheMealDB has no nutrition data, so they come from a small per-100 g table and the ingredient amounts, and the UI calls them a rough guide.
 - Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
 
 ## Shared UI/UX rules
@@ -165,7 +167,7 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 
 ## Out of scope (only if everything else is done)
 
-"Fill my week" smart auto-planner, substitution suggestions, search by ingredients on hand, dark mode. (Multi-language support and cooking mode were moved into scope and are built.)
+"Fill my week" smart auto-planner, search by ingredients on hand, dark mode. (Multi-language support, cooking mode and substitution suggestions were moved into scope and are built.)
 
 ## Timeline
 
