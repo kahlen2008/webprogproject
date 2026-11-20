@@ -267,59 +267,78 @@
         <span class="h-px bg-[#ede4da] flex-1"></span>
       </div>
 
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <!-- Pillar 1: Explore Recipes -->
-        <a href="recipes.html" class="p-5 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-3">
-          <div class="space-y-2.5">
-            <div class="w-10 h-10 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
-              </svg>
+      <div id="feature-pillars" class="rp-pillars grid grid-cols-1 md:grid-cols-3 gap-5">
+        <!-- Pillar 1: Explore Recipes. The demo types a search and shows a matching recipe. -->
+        <a href="recipes.html" class="rp-pillar group">
+          <div class="rp-demo rp-demo-search" aria-hidden="true">
+            <div class="rp-demo-searchbar">
+              <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+              <span class="rp-demo-typed" data-demo-typed>chicken</span><span class="rp-demo-caret"></span>
             </div>
+            <div class="rp-demo-result" data-demo-result>
+              <img src="images/cat-chicken.webp" alt="" width="44" height="44" decoding="async" loading="lazy" data-demo-img>
+              <div class="rp-demo-result-text">
+                <span class="rp-demo-result-name" data-demo-name>Teriyaki Chicken Casserole</span>
+                <span class="rp-demo-result-meta"><span class="rp-demo-tag" data-demo-tag>Chicken</span><span data-demo-count>Japanese</span></span>
+              </div>
+              <svg class="rp-demo-heart" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z"></path></svg>
+            </div>
+          </div>
+          <div class="rp-pillar-body">
             <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Explore Recipes</h2>
             <p class="text-sm text-stone-600 leading-relaxed">
               Browse hundreds of curated meals categorised by cuisine and dietary suitability with step-by-step instructions.
             </p>
           </div>
-          <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] group-hover:translate-x-1 transition">
-            Browse catalogue &rarr;
-          </span>
+          <span class="rp-pillar-link">Browse catalogue <span aria-hidden="true">&rarr;</span></span>
         </a>
 
-        <!-- Pillar 2: Meal Planner -->
-        <a href="planner.html" class="p-5 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-3">
-          <div class="space-y-2.5">
-            <div class="w-10 h-10 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-              </svg>
+        <!-- Pillar 2: Meal Planner. The demo fills a week, then the shopping list is ready. -->
+        <a href="planner.html" class="rp-pillar group">
+          <div class="rp-demo rp-demo-week" aria-hidden="true">
+            <div class="rp-demo-days"><span>M</span><span>T</span><span>W</span><span>T</span><span>F</span><span>S</span><span>S</span></div>
+            <div class="rp-demo-grid" data-demo-grid></div>
+            <div class="rp-demo-list">
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+              Shopping list ready · 24 items
             </div>
+          </div>
+          <div class="rp-pillar-body">
             <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Weekly Planner</h2>
             <p class="text-sm text-stone-600 leading-relaxed">
               Plan your week effortlessly across breakfast, lunch, and dinner with automatic nutrition totals and smart grocery lists.
             </p>
           </div>
-          <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] group-hover:translate-x-1 transition">
-            Open planner &rarr;
-          </span>
+          <span class="rp-pillar-link">Open planner <span aria-hidden="true">&rarr;</span></span>
         </a>
 
-        <!-- Pillar 3: Dietary Safeguards -->
-        <a href="profile.html" class="p-5 bg-white/75 hover:bg-white rounded-2xl border border-[#ede3d7] hover:border-[#ca5c2e]/40 shadow-xs hover:shadow-md transition-all duration-300 group flex flex-col justify-between space-y-3">
-          <div class="space-y-2.5">
-            <div class="w-10 h-10 rounded-xl bg-[#fbf2ec] border border-[#ede4da] flex items-center justify-center text-[#ca5c2e] group-hover:scale-105 transition">
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"></path>
-              </svg>
+        <!-- Pillar 3: Allergy Safeguards. The demo switches on "Avoid peanuts" and flags a dish. -->
+        <a href="profile.html" class="rp-pillar group">
+          <div class="rp-demo rp-demo-allergy" aria-hidden="true" data-demo-allergy>
+            <div class="rp-demo-avoid">
+              <span>Avoid peanuts</span>
+              <span class="rp-demo-switch"><span></span></span>
             </div>
+            <ul class="rp-demo-rows">
+              <li class="rp-demo-row is-risky">
+                <span class="rp-demo-dot"></span>
+                <span class="rp-demo-row-name">Pad Thai</span>
+                <span class="rp-demo-flag">Contains peanuts</span>
+              </li>
+              <li class="rp-demo-row">
+                <span class="rp-demo-dot"></span>
+                <span class="rp-demo-row-name">Greek Salad</span>
+                <span class="rp-demo-ok">Safe</span>
+              </li>
+            </ul>
+          </div>
+          <div class="rp-pillar-body">
             <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Allergy Safeguards</h2>
             <p class="text-sm text-stone-600 leading-relaxed">
               Set your dietary preferences once to automatically flag and filter out meals containing allergens like peanuts, gluten, or dairy.
             </p>
           </div>
-          <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[#ca5c2e] group-hover:translate-x-1 transition">
-            Customise profile &rarr;
-          </span>
+          <span class="rp-pillar-link">Customise profile <span aria-hidden="true">&rarr;</span></span>
         </a>
       </div>
     </section>
@@ -330,5 +349,6 @@
 
   <script type="module" src="js/navbar.js"></script>
   <script type="module" src="js/search-cta.js"></script>
+  <script type="module" src="js/home-demos.js"></script>
 </body>
 </html>

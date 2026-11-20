@@ -193,28 +193,30 @@
             <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
             Log in to personalise recipes
           </a>
-          <!-- Cuisine Filter Dropdown -->
-          <div class="relative inline-flex items-center">
-            <label for="cuisine-select" class="visually-hidden">Filter by cuisine</label>
-            <div class="relative flex items-center">
-              <span class="absolute left-3 pointer-events-none text-stone-400">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <!-- Cuisine filter (Person 4): a custom dropdown, since a native <select> list can't be styled -->
+          <div id="cuisine-picker" class="rp-cuisine">
+            <button id="cuisine-trigger" type="button" class="rp-pill rp-cuisine-trigger" aria-haspopup="listbox" aria-expanded="false" aria-controls="cuisine-panel">
+              <span class="rp-pill-icon">
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24" aria-hidden="true">
                   <circle cx="12" cy="12" r="10"></circle>
                   <line x1="2" y1="12" x2="22" y2="12"></line>
                   <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
                 </svg>
               </span>
-              <select
-                id="cuisine-select"
-                class="appearance-none h-9 pl-9 pr-8 bg-white border border-[#ede4da] hover:border-[#ca5c2e]/40 rounded-full text-xs sm:text-sm font-semibold text-stone-700 shadow-2xs focus:outline-none focus:ring-2 focus:ring-[#ca5c2e]/30 cursor-pointer transition"
-              >
-                <option value="">All Cuisines</option>
-              </select>
-              <span class="absolute right-3 pointer-events-none text-stone-400">
-                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-                  <polyline points="6 9 12 15 18 9"></polyline>
-                </svg>
-              </span>
+              <span class="visually-hidden">Cuisine: </span>
+              <span id="cuisine-trigger-label" class="rp-cuisine-label">All cuisines</span>
+              <svg class="rp-cuisine-chevron" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </button>
+            <button id="cuisine-clear" type="button" class="rp-cuisine-clear" aria-label="Remove cuisine filter" title="Remove cuisine filter" hidden>
+              <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            </button>
+            <div id="cuisine-panel" class="rp-cuisine-panel" hidden>
+              <div class="rp-cuisine-search">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                <input id="cuisine-search" type="text" placeholder="Search cuisines" autocomplete="off" spellcheck="false"
+                  role="combobox" aria-expanded="true" aria-controls="cuisine-list" aria-autocomplete="list" aria-label="Search cuisines">
+              </div>
+              <ul id="cuisine-list" class="rp-cuisine-list" role="listbox" aria-label="Cuisines"></ul>
             </div>
           </div>
 
@@ -222,21 +224,23 @@
           <button
             id="clear-filters-btn"
             type="button"
-            class="hidden items-center gap-1.5 h-9 px-3.5 rounded-full bg-stone-100 hover:bg-stone-200 text-stone-700 text-xs sm:text-sm font-semibold transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 shadow-2xs cursor-pointer"
+            class="rp-pill rp-clear-filters hidden"
           >
-            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+            <span class="rp-pill-icon">
+              <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 12a9 9 0 1 0 3-6.7"></path><polyline points="3 3 3 9 9 9"></polyline></svg>
+            </span>
             <span>Clear filters</span>
           </button>
 
           <div id="hide-flagged-wrap" class="hidden items-center">
-            <label class="allergen-pill group rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e]/40 shadow-2xs transition-all duration-200 cursor-pointer select-none">
+            <label class="allergen-pill rp-pill-hover group rounded-full bg-white border border-[#ede4da] hover:border-[#ca5c2e]/40 shadow-2xs transition-all duration-200 cursor-pointer select-none">
               <span class="w-6 h-6 rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center shrink-0">
                 <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/>
                 </svg>
               </span>
               <span class="text-xs sm:text-sm font-semibold text-stone-700 group-hover:text-stone-900 transition-colors leading-none">Hide allergen recipes</span>
-              <span class="relative inline-flex items-center shrink-0 ml-1.5 sm:ml-2">
+              <span class="relative inline-flex items-center shrink-0">
                 <input id="hide-flagged-toggle" type="checkbox" class="switch-input">
                 <span class="switch-track" aria-hidden="true">
                   <span class="switch-thumb"></span>

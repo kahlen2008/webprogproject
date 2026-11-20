@@ -113,3 +113,780 @@
   -webkit-backdrop-filter: blur(2px);
 }
 
+
+/* ---------- Cuisine filter dropdown (recipes.html, Person 4) ---------- */
+/* A custom listbox instead of a native <select>, whose open list can't be styled. */
+.rp-cuisine {
+  position: relative;
+  display: inline-flex;
+}
+
+/* Filter row pills: the cuisine menu, "Clear filters" and the "Hide allergen recipes"
+   switch all share one look (white, 36px, light border, icon in a 24px circle), so the
+   row reads as one set. Matches .allergen-pill in recipes.html. */
+.rp-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 36px;
+  padding: 0 14px 0 6px;
+  border: 1px solid #ede4da;
+  border-radius: 9999px;
+  background: #fff;
+  color: #44403c;
+  font: 600 14px/1 Inter, system-ui, sans-serif;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s, box-shadow 0.2s;
+}
+.rp-pill:hover,
+.rp-pill-hover:hover {
+  border-color: rgba(202, 92, 46, 0.4);
+}
+.rp-pill:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(202, 92, 46, 0.45);
+}
+.rp-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: #fbf2ec;
+  color: #ca5c2e;
+  transition: background-color 0.2s, color 0.2s;
+}
+
+/* Cuisine pill */
+.rp-cuisine-trigger {
+  max-width: 220px;
+  padding-right: 12px;
+}
+.rp-cuisine-trigger[aria-expanded="true"] {
+  border-color: rgba(202, 92, 46, 0.55);
+}
+.rp-cuisine-label {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rp-cuisine-chevron {
+  flex-shrink: 0;
+  color: #a8a29e;
+  transition: transform 0.2s ease;
+}
+.rp-cuisine-trigger[aria-expanded="true"] .rp-cuisine-chevron {
+  transform: rotate(180deg);
+}
+/* A cuisine is picked: the icon fills in (like the allergen switch turning on), and a
+   × takes the chevron's place to remove it. */
+.rp-cuisine-trigger.is-active {
+  padding-right: 36px;
+  border-color: rgba(202, 92, 46, 0.4);
+  color: #292524;
+}
+.rp-cuisine-trigger.is-active .rp-pill-icon {
+  background: #ca5c2e;
+  color: #fff;
+}
+.rp-cuisine-trigger.is-active .rp-cuisine-chevron {
+  display: none;
+}
+.rp-cuisine-clear {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  margin-top: -11px;
+  padding: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: #f5f0ea;
+  color: #78716c;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.rp-cuisine-clear[hidden] {
+  display: none;
+}
+.rp-cuisine-clear:hover {
+  background: #ca5c2e;
+  color: #fff;
+}
+.rp-cuisine-clear:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(202, 92, 46, 0.45);
+}
+
+/* Clear filters: same pill, quieter (grey icon and text). */
+.rp-clear-filters {
+  color: #57534e;
+}
+.rp-clear-filters .rp-pill-icon {
+  background: #f5f0ea;
+  color: #78716c;
+}
+.rp-clear-filters:hover .rp-pill-icon {
+  background: #fbf2ec;
+  color: #ca5c2e;
+}
+.rp-clear-filters.hidden {
+  display: none;
+}
+
+@media (max-width: 639px) {
+  .rp-pill { font-size: 13px; }
+}
+
+.rp-cuisine-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  z-index: 40;
+  width: 264px;
+  max-width: calc(100vw - 32px);
+  overflow: hidden;
+  border: 1px solid #ede4da;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 12px 32px -8px rgba(41, 37, 36, 0.18), 0 2px 6px rgba(41, 37, 36, 0.06);
+  transform-origin: top left; /* left is set in JS to keep the panel on screen */
+  animation: rpCuisineIn 0.16s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rp-cuisine-panel[hidden] {
+  display: none;
+}
+/* Set by JS when there is more room above the button than below. */
+.rp-cuisine-panel.open-up {
+  top: auto;
+  bottom: calc(100% + 8px);
+  transform-origin: bottom left;
+}
+@keyframes rpCuisineIn {
+  from { opacity: 0; transform: translateY(-4px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-cuisine-panel { animation: none; }
+  .rp-cuisine-chevron { transition: none; }
+}
+
+.rp-cuisine-search {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px;
+  padding: 0 12px;
+  height: 38px;
+  border: 1px solid #ede4da;
+  border-radius: 10px;
+  background: #fcf9f5;
+  color: #a8a29e;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.rp-cuisine-search:focus-within {
+  border-color: rgba(202, 92, 46, 0.5);
+  box-shadow: 0 0 0 3px rgba(202, 92, 46, 0.12);
+}
+.rp-cuisine-search input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #292524;
+  font: 500 14px/1.2 Inter, system-ui, sans-serif;
+}
+.rp-cuisine-search input::placeholder {
+  color: #a8a29e;
+}
+
+.rp-cuisine-list {
+  max-height: 296px;
+  margin: 0;
+  padding: 0 6px 6px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  list-style: none;
+  scrollbar-width: thin;
+  scrollbar-color: #e2d6c9 transparent;
+}
+.rp-cuisine-list::-webkit-scrollbar { width: 8px; }
+.rp-cuisine-list::-webkit-scrollbar-thumb {
+  border: 2px solid #fff;
+  border-radius: 9999px;
+  background: #e2d6c9;
+}
+
+.rp-cuisine-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 10px;
+  border-radius: 10px;
+  color: #44403c;
+  font: 500 14px/1.2 Inter, system-ui, sans-serif;
+  cursor: pointer;
+  user-select: none;
+}
+.rp-cuisine-option.is-focused {
+  background: #f6efe7;
+  color: #1c1917;
+}
+.rp-cuisine-option[aria-selected="true"] {
+  color: #ca5c2e;
+  font-weight: 600;
+}
+.rp-cuisine-option .rp-cuisine-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rp-cuisine-check {
+  flex-shrink: 0;
+  width: 16px;
+  color: #ca5c2e;
+  visibility: hidden;
+}
+.rp-cuisine-option[aria-selected="true"] .rp-cuisine-check {
+  visibility: visible;
+}
+/* Thin line between "All cuisines" and the list of cuisines. */
+.rp-cuisine-option.is-all {
+  margin-bottom: 4px;
+  position: relative;
+}
+.rp-cuisine-option.is-all::after {
+  content: "";
+  position: absolute;
+  left: 10px;
+  right: 10px;
+  bottom: -3px;
+  height: 1px;
+  background: #f0e8df;
+}
+.rp-cuisine-status {
+  padding: 14px 10px 16px;
+  color: #a8a29e;
+  font: 500 13px/1.4 Inter, system-ui, sans-serif;
+  text-align: center;
+}
+
+/* ---------- Serving size scaler (recipe.html) ---------- */
+.rp-ing-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #ede4da;
+}
+.rp-ing-title {
+  min-width: 0;
+}
+.rp-servings-note {
+  margin: 2px 0 0;
+  color: #78716c;
+  font: 500 13px/1.4 Inter, system-ui, sans-serif;
+}
+.rp-servings-reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: #ca5c2e;
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: rgba(202, 92, 46, 0.35);
+  text-underline-offset: 3px;
+  cursor: pointer;
+  transition: color 0.15s, text-decoration-color 0.15s;
+}
+.rp-servings-reset:hover {
+  color: #a04e28;
+  text-decoration-color: currentColor;
+}
+.rp-servings-reset:focus-visible {
+  outline: 2px solid rgba(202, 92, 46, 0.5);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* One white pill: ( −  4 servings  + ) */
+.rp-servings {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 44px;
+  padding: 4px;
+  border: 1px solid #ede4da;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: border-color 0.2s, background-color 0.2s;
+}
+.rp-servings.is-scaled {
+  border-color: rgba(202, 92, 46, 0.4);
+  background: #fffaf6;
+}
+.rp-servings-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border: 0;
+  border-radius: 9999px;
+  background: #fbf2ec;
+  color: #ca5c2e;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, transform 0.1s;
+}
+.rp-servings-btn:hover {
+  background: #ca5c2e;
+  color: #fff;
+}
+.rp-servings-btn:active {
+  transform: scale(0.92);
+}
+.rp-servings-btn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(202, 92, 46, 0.45);
+}
+.rp-servings-btn:disabled {
+  background: #f5f5f4;
+  color: #d6d3d1;
+  cursor: not-allowed;
+  transform: none;
+}
+.rp-servings-value {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  min-width: 96px;
+  padding: 0 6px;
+  user-select: none;
+}
+.rp-servings-num {
+  color: #1c1917;
+  font: 700 17px/1 Outfit, Inter, system-ui, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+.rp-servings-unit {
+  color: #78716c;
+  font: 500 13px/1 Inter, system-ui, sans-serif;
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-servings-btn { transition: none; }
+  .rp-servings-btn:active { transform: none; }
+}
+
+/* ---------- Loading cards (recipes grid) ---------- */
+/* Same shape as .recipe-card: 4:3 photo, title, category chip and heart. */
+.rp-skeleton {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #efe6dc;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  animation: rpSkeletonIn 0.25s ease-out both;
+}
+.rp-skeleton:nth-child(3) { animation-delay: 40ms; }
+.rp-skeleton:nth-child(4) { animation-delay: 80ms; }
+.rp-skeleton:nth-child(5) { animation-delay: 120ms; }
+.rp-skeleton:nth-child(n + 6) { animation-delay: 160ms; }
+.rp-skeleton-img,
+.rp-skeleton-line,
+.rp-skeleton-chip,
+.rp-skeleton-dot {
+  background: linear-gradient(90deg, #f3ece4 0%, #f3ece4 35%, #fbf7f2 50%, #f3ece4 65%, #f3ece4 100%);
+  background-size: 300% 100%;
+  animation: rpShimmer 1.4s ease-in-out infinite;
+}
+.rp-skeleton-img {
+  aspect-ratio: 4 / 3;
+}
+.rp-skeleton-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px;
+}
+.rp-skeleton-line {
+  height: 14px;
+  border-radius: 9999px;
+}
+.rp-skeleton-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.rp-skeleton-chip {
+  width: 64px;
+  height: 24px;
+  border-radius: 9999px;
+}
+.rp-skeleton-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 9999px;
+}
+@keyframes rpShimmer {
+  from { background-position: 100% 0; }
+  to { background-position: 0 0; }
+}
+@keyframes rpSkeletonIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .rp-skeleton { animation: none; }
+  .rp-skeleton-img,
+  .rp-skeleton-line,
+  .rp-skeleton-chip,
+  .rp-skeleton-dot { animation: none; }
+}
+
+/* ---------- Home page: "How RecipePlan works" cards with live demos ---------- */
+/* Driven by js/home-demos.js. Without JS (or with reduced motion) they show a still frame. */
+.rp-pillar {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 14px 18px;
+  border: 1px solid #ede3d7;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s, transform 0.3s;
+}
+.rp-pillar:hover {
+  border-color: rgba(202, 92, 46, 0.4);
+  background: #fff;
+  box-shadow: 0 12px 28px -12px rgba(41, 37, 36, 0.18);
+  transform: translateY(-3px);
+}
+.rp-pillar:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(202, 92, 46, 0.45);
+}
+.rp-pillar-body {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 6px;
+}
+.rp-pillar-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 6px;
+  color: #ca5c2e;
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  transition: transform 0.2s;
+}
+.rp-pillar:hover .rp-pillar-link {
+  transform: translateX(4px);
+}
+
+/* Slide in one after another (only when JS has set this up). */
+.rp-pillars.is-animated .rp-pillar:not(.is-in) {
+  opacity: 0;
+  transform: translateY(16px);
+}
+.rp-pillars.is-animated .rp-pillar.is-in {
+  transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
+    transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) var(--d, 0ms),
+    background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+/* The demo stage at the top of each card */
+.rp-demo {
+  position: relative;
+  height: 128px;
+  overflow: hidden;
+  padding: 14px;
+  border: 1px solid #f0e8df;
+  border-radius: 12px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(202, 92, 46, 0.07), transparent 55%),
+    #fbf7f2;
+}
+
+/* 1. Search */
+.rp-demo-searchbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 12px;
+  border: 1px solid #ede4da;
+  border-radius: 9999px;
+  background: #fff;
+  color: #a8a29e;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+.rp-demo-typed {
+  color: #292524;
+  font: 500 13px/1 Inter, system-ui, sans-serif;
+  white-space: pre;
+}
+.rp-demo-caret {
+  width: 1.5px;
+  height: 15px;
+  margin-left: -6px;
+  background: #ca5c2e;
+  animation: rpCaret 1s steps(1) infinite;
+}
+@keyframes rpCaret { 50% { opacity: 0; } }
+.rp-demo-result {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 7px;
+  border: 1px solid #efe6dc;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 6px 16px -10px rgba(41, 37, 36, 0.25);
+  opacity: 0;
+  transform: translateY(10px) scale(0.98);
+  transition: opacity 0.35s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rp-demo-result.is-shown {
+  opacity: 1;
+  transform: none;
+}
+.rp-demo-result img {
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  object-fit: cover;
+  background: #f3ece4;
+}
+.rp-demo-result-text {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 6px;
+}
+.rp-demo-result-name {
+  overflow: hidden;
+  color: #1c1917;
+  font: 700 13px/1.1 Outfit, Inter, system-ui, sans-serif;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.rp-demo-result-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #78716c;
+  font: 500 11px/1 Inter, system-ui, sans-serif;
+}
+.rp-demo-tag {
+  padding: 3px 7px;
+  border-radius: 9999px;
+  background: #fbf2ec;
+  color: #a04e28;
+  font-weight: 600;
+}
+.rp-demo-heart {
+  flex-shrink: 0;
+  margin-right: 4px;
+  color: #d6d3d1;
+}
+
+/* 2. Week grid */
+.rp-demo-days,
+.rp-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 5px;
+}
+.rp-demo-days {
+  margin-bottom: 6px;
+  color: #a8a29e;
+  font: 600 10px/1 Inter, system-ui, sans-serif;
+  text-align: center;
+}
+.rp-demo-cell {
+  height: 18px;
+  border: 1px dashed #e7dccf;
+  border-radius: 5px;
+  background: #fff;
+  animation: rpCellFill 7s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  animation-delay: calc(var(--o) * 130ms);
+}
+.rp-demo-cell.meal-0 { --fill: #f7dcc9; }
+.rp-demo-cell.meal-1 { --fill: #eeb08c; }
+.rp-demo-cell.meal-2 { --fill: #d9774c; }
+@keyframes rpCellFill {
+  0%, 2% { background: #fff; border-color: #e7dccf; border-style: dashed; transform: scale(0.85); }
+  6% { background: var(--fill); border-color: transparent; border-style: solid; transform: scale(1.08); }
+  9%, 72% { background: var(--fill); border-color: transparent; border-style: solid; transform: none; }
+  80%, 100% { background: #fff; border-color: #e7dccf; border-style: dashed; transform: none; }
+}
+.rp-demo-list {
+  position: absolute;
+  left: 50%;
+  bottom: 12px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 11px;
+  border-radius: 9999px;
+  background: #292524;
+  color: #fff;
+  font: 600 11px/1 Inter, system-ui, sans-serif;
+  white-space: nowrap;
+  box-shadow: 0 8px 18px -8px rgba(41, 37, 36, 0.5);
+  transform: translateX(-50%);
+  animation: rpListPop 7s ease infinite;
+  animation-delay: 3.1s;
+  opacity: 0;
+}
+.rp-demo-list svg { color: #f3b38f; }
+@keyframes rpListPop {
+  0% { opacity: 0; transform: translate(-50%, 8px) scale(0.95); }
+  4%, 30% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+  36%, 100% { opacity: 0; transform: translate(-50%, 8px) scale(0.95); }
+}
+
+/* 3. Allergy */
+.rp-demo-avoid {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 32px;
+  padding: 0 8px 0 12px;
+  border: 1px solid #ede4da;
+  border-radius: 9999px;
+  background: #fff;
+  color: #44403c;
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+}
+.rp-demo-switch {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 9999px;
+  background: #e7e5e4;
+  transition: background-color 0.3s;
+}
+.rp-demo-switch span {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 9999px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.rp-demo-allergy.is-on .rp-demo-switch { background: #ca5c2e; }
+.rp-demo-allergy.is-on .rp-demo-switch span { transform: translateX(12px); }
+.rp-demo-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.rp-demo-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 28px;
+  padding: 0 8px 0 10px;
+  border: 1px solid #efe6dc;
+  border-radius: 9px;
+  background: #fff;
+  color: #292524;
+  font: 600 12px/1 Inter, system-ui, sans-serif;
+  transition: background-color 0.35s, border-color 0.35s, color 0.35s;
+}
+.rp-demo-dot {
+  width: 7px;
+  height: 7px;
+  flex-shrink: 0;
+  border-radius: 9999px;
+  background: rgba(202, 92, 46, 0.45);
+  transition: background-color 0.35s;
+}
+.rp-demo-row-name { flex: 1; }
+.rp-demo-flag,
+.rp-demo-ok {
+  padding: 3px 7px;
+  border-radius: 9999px;
+  font-size: 10px;
+  opacity: 0;
+  transform: scale(0.85);
+  transition: opacity 0.3s, transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.rp-demo-flag { background: #fee2e2; color: #b91c1c; }
+.rp-demo-ok { background: #ecfdf3; color: #15803d; }
+.rp-demo-allergy.is-on .rp-demo-row.is-risky {
+  border-color: #fecaca;
+  background: #fef6f6;
+  color: #991b1b;
+}
+.rp-demo-allergy.is-on .rp-demo-row.is-risky .rp-demo-dot { background: #ef4444; }
+.rp-demo-allergy.is-on .rp-demo-flag,
+.rp-demo-allergy.is-on .rp-demo-ok {
+  opacity: 1;
+  transform: none;
+}
+.rp-demo-allergy.is-on .rp-demo-ok { transition-delay: 0.15s; }
+
+/* Off screen or background tab: stop the CSS loops too. */
+.rp-pillars.is-paused .rp-demo-cell,
+.rp-pillars.is-paused .rp-demo-list,
+.rp-pillars.is-paused .rp-demo-caret {
+  animation-play-state: paused;
+}
+
+/* Still frame: reduced motion (set by JS), or JS didn't run at all. */
+.rp-pillars.is-static .rp-demo-cell,
+.rp-pillars:not(.is-animated) .rp-demo-cell {
+  animation: none;
+  background: var(--fill);
+  border-color: transparent;
+  border-style: solid;
+}
+.rp-pillars.is-static .rp-demo-list,
+.rp-pillars:not(.is-animated) .rp-demo-list {
+  animation: none;
+  opacity: 1;
+}
+.rp-pillars:not(.is-animated) .rp-demo-result { opacity: 1; transform: none; }
+.rp-pillars.is-static .rp-demo-caret { animation: none; }
+@media (prefers-reduced-motion: reduce) {
+  .rp-pillar,
+  .rp-pillar:hover,
+  .rp-pillar:hover .rp-pillar-link { transform: none; }
+  .rp-demo-result,
+  .rp-demo-flag,
+  .rp-demo-ok { transition: none; }
+}

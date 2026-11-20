@@ -278,7 +278,7 @@ Person 2 owns how users find recipes, from the search bar to the data fetched fr
 **Requirements**
 
 - **Must:** Search by name. Filter by category. Cards show image, name and category. Detail page lists ingredients (combine TheMealDB's `strIngredient1` to `strIngredient20` fields into one array) and numbered instructions. Loading, empty ("No recipes found") and error states. Responsive grid.
-- **Should:** Cuisine filter, serving size scaler (scale only amounts that start with a number, and leave values like "a pinch" unchanged), and `sessionStorage` caching of API responses.
+- **Should:** Serving size scaler (scale only amounts that start with a number, and leave values like "a pinch" unchanged), and `sessionStorage` caching of API responses.
 - **Nice to have:** A "Surprise me" random recipe button, and a space on the recipe page where Person 3's ratings and comments appear.
 - **Hand-off:** Agree the recipe object shape in week 1 (id, name, image, category, area, ingredients, instructions) and document it at the top of `api.js`.
 
@@ -335,7 +335,7 @@ Person 4 owns turning saved recipes into a weekly plan and a combined shopping l
 
 - **Frontend:** A weekly planner grid with drag-and-drop or "add to day" buttons, a shopping list view with checkboxes, and print-friendly styling.
 - **Backend:** Firestore storage at `users/{uid}/mealPlan/{day}`, and logic that merges ingredients across the week's recipes and combines duplicates.
-- **Extra:** Owns Firebase Hosting deployment, the README, and the final demo script.
+- **Extra:** Owns Firebase Hosting deployment, the README, and the final demo script. Also owns the cuisine filter on the recipes page: a cuisine dropdown that combines with the search box and category chips, plus a "Clear filters" button (built in Person 2's `recipes.html`, `api.js` and `recipes.js`).
 
 **Happy path**
 
