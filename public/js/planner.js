@@ -696,7 +696,7 @@ export async function renderPlannerTable() {
     root.querySelectorAll(".add-slot-btn").forEach((btn) => {
       btn.addEventListener("click", () => {
         const { day, meal } = btn.dataset;
-        openMealDrawer(day, meal);
+        openMealDrawer(day, meal, { fromSlot: true });
       });
     });
   });
@@ -1638,22 +1638,42 @@ function initDragAndDrop() {
 // Slide-over Side Panel / Drawer Logic
 // -------------------------------------------------------------
 
-export async function openMealDrawer(day = "Mon", meal = "Breakfast") {
+const DRAWER_DAY_NAMES = { Mon: "Monday", Tue: "Tuesday", Wed: "Wednesday", Thu: "Thursday", Fri: "Friday", Sat: "Saturday", Sun: "Sunday" };
+
+// Ticks the day and meal pills and updates the "Adding to Monday · Breakfast" line.
+function setDrawerTarget(day, meal) {
   currentDrawerDay = day;
   currentDrawerMeal = meal;
+  document.querySelectorAll('input[name="drawer-day"]').forEach((input) => { input.checked = input.value === day; });
+  document.querySelectorAll('input[name="drawer-meal"]').forEach((input) => { input.checked = input.value === meal; });
+  const label = document.getElementById("drawer-target-label");
+  if (label) label.textContent = `${DRAWER_DAY_NAMES[day] || day} · ${meal}`;
+}
 
+// Shows or hides the day and meal pills under the summary line.
+function setDrawerPickerOpen(open) {
+  const picker = document.getElementById("drawer-target-picker");
+  const toggle = document.getElementById("drawer-target-toggle");
+  if (picker) picker.classList.toggle("hidden", !open);
+  if (toggle) {
+    toggle.textContent = open ? "Done" : "Change";
+    toggle.setAttribute("aria-expanded", String(open));
+  }
+}
+
+// fromSlot: opened from an empty slot's "+ Add" button, so the day and meal are already
+// chosen and only the summary line shows. From the toolbar, the pills show straight away.
+export async function openMealDrawer(day = "Mon", meal = "Breakfast", { fromSlot = false } = {}) {
   const drawer = document.getElementById("meal-picker-drawer");
   const backdrop = document.getElementById("drawer-backdrop");
   const panel = document.getElementById("drawer-panel");
-  const daySelect = document.getElementById("drawer-day-select");
-  const mealSelect = document.getElementById("drawer-meal-select");
   const searchInput = document.getElementById("drawer-search-input");
   const clearSearchBtn = document.getElementById("drawer-search-clear");
 
   if (!drawer || !backdrop || !panel) return;
 
-  if (daySelect) daySelect.value = day;
-  if (mealSelect) mealSelect.value = meal;
+  setDrawerTarget(day, meal);
+  setDrawerPickerOpen(!fromSlot);
   if (searchInput) searchInput.value = "";
   if (clearSearchBtn) clearSearchBtn.classList.add("hidden");
 
@@ -1876,10 +1896,8 @@ function createDrawerRecipeRow(recipe) {
 
   const addBtn = item.querySelector(".drawer-add-recipe-btn");
   addBtn.addEventListener("click", async () => {
-    const daySelect = document.getElementById("drawer-day-select");
-    const mealSelect = document.getElementById("drawer-meal-select");
-    const targetDay = daySelect ? daySelect.value : currentDrawerDay;
-    const targetMeal = mealSelect ? mealSelect.value : currentDrawerMeal;
+    const targetDay = currentDrawerDay;
+    const targetMeal = currentDrawerMeal;
 
     addBtn.disabled = true;
     addBtn.innerHTML = `
@@ -2091,18 +2109,19 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Drawer day/meal selects
-  const daySelect = document.getElementById("drawer-day-select");
-  if (daySelect) {
-    daySelect.addEventListener("change", (e) => {
-      currentDrawerDay = e.target.value;
+  // Drawer day and meal pills, and the Change / Done button
+  const targetPicker = document.getElementById("drawer-target-picker");
+  if (targetPicker) {
+    targetPicker.addEventListener("change", (e) => {
+      if (e.target.name === "drawer-day") setDrawerTarget(e.target.value, currentDrawerMeal);
+      if (e.target.name === "drawer-meal") setDrawerTarget(currentDrawerDay, e.target.value);
     });
   }
 
-  const mealSelect = document.getElementById("drawer-meal-select");
-  if (mealSelect) {
-    mealSelect.addEventListener("change", (e) => {
-      currentDrawerMeal = e.target.value;
+  const targetToggle = document.getElementById("drawer-target-toggle");
+  if (targetToggle) {
+    targetToggle.addEventListener("click", () => {
+      setDrawerPickerOpen(targetToggle.getAttribute("aria-expanded") !== "true");
     });
   }
 

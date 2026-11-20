@@ -14,6 +14,7 @@ import {
   decorateCard,
   describeResult,
   confirmIfFlagged,
+  getSwapSuggestions,
 } from "./preferences.js";
 
 function getCurrentUser() {
@@ -927,7 +928,7 @@ function loadCuisines() {
     .finally(() => {
       if (cuisinePanel && !cuisinePanel.hidden) {
         renderCuisineOptions();
-        placeCuisinePanel(); // "Loading cuisines…" was shorter than the list
+        placeCuisinePanel({ makeRoom: true }); // "Loading cuisines…" was shorter than the list
         renderCuisineOptions();
       }
     });
@@ -994,12 +995,13 @@ function renderCuisineOptions() {
 }
 
 // Keeps the open panel inside the screen (the pill can sit anywhere in a wrapping row).
-// It never runs past the bottom of the screen: the list gets shorter to fit, and if there
-// is more room above the button than below, the panel opens upwards (below the navbar).
-const CUISINE_LIST_MAX = 296; // matches .rp-cuisine-list max-height in recipes.css
-const CUISINE_LIST_MIN = 120;
+// It always opens downwards, and the list gets shorter to fit the room below the button.
+// Only when even the shortest list would not fit does the page scroll up (makeRoom, on open),
+// and only by the difference, so in most cases the page does not move at all.
+const CUISINE_LIST_MAX = 232; // about 6 rows (shorter than the 296px max-height in recipes.css)
+const CUISINE_LIST_MIN = 114; // about 3 rows
 
-function placeCuisinePanel() {
+function placeCuisinePanel({ makeRoom = false } = {}) {
   if (!cuisinePanel || !cuisineTrigger || !cuisineList || cuisinePanel.hidden) return;
   const gutter = 16;
   const gap = 8;
@@ -1012,17 +1014,23 @@ function placeCuisinePanel() {
   if (rect.left + shift < gutter) shift = gutter - rect.left;
   cuisinePanel.style.left = `${shift}px`;
 
-  // Up or down, and how tall the list can be.
-  const trigger = cuisineTrigger.getBoundingClientRect();
-  const navBottom = document.getElementById("navbar")?.getBoundingClientRect().bottom || 0;
-  const roomBelow = window.innerHeight - trigger.bottom - gap - gutter;
-  const roomAbove = trigger.top - gap - Math.max(gutter, navBottom + gap);
+  // How tall the list can be below the button.
   const chrome = cuisinePanel.offsetHeight - cuisineList.offsetHeight; // search box, padding, border
-  const fitsBelow = roomBelow - chrome >= Math.min(CUISINE_LIST_MAX, cuisineList.scrollHeight);
-  const openUp = !fitsBelow && roomAbove > roomBelow;
-  const room = openUp ? roomAbove : roomBelow;
-  cuisinePanel.classList.toggle("open-up", openUp);
-  cuisineList.style.maxHeight = `${Math.max(CUISINE_LIST_MIN, Math.min(CUISINE_LIST_MAX, room - chrome))}px`;
+  const wanted = chrome + Math.min(CUISINE_LIST_MIN, cuisineList.scrollHeight);
+  let trigger = cuisineTrigger.getBoundingClientRect();
+  let roomBelow = window.innerHeight - trigger.bottom - gap - gutter;
+
+  if (makeRoom && roomBelow < wanted) {
+    // Scroll up, but never so far that the button hides under the sticky navbar.
+    const navBottom = document.getElementById("navbar")?.getBoundingClientRect().bottom || 0;
+    const maxScroll = Math.max(0, trigger.top - navBottom - gap);
+    window.scrollBy({ top: Math.min(wanted - roomBelow, maxScroll), behavior: "instant" });
+    trigger = cuisineTrigger.getBoundingClientRect();
+    roomBelow = window.innerHeight - trigger.bottom - gap - gutter;
+  }
+
+  cuisinePanel.classList.remove("open-up");
+  cuisineList.style.maxHeight = `${Math.max(CUISINE_LIST_MIN, Math.min(CUISINE_LIST_MAX, roomBelow - chrome))}px`;
 }
 
 function openCuisinePanel() {
@@ -1031,7 +1039,7 @@ function openCuisinePanel() {
   cuisineTrigger?.setAttribute("aria-expanded", "true");
   if (cuisineSearch) cuisineSearch.value = "";
   renderCuisineOptions(); // fill first, so placement measures the real list height
-  placeCuisinePanel();
+  placeCuisinePanel({ makeRoom: true });
   renderCuisineOptions(); // again, so the current cuisine is scrolled into view at the new height
   if (!cuisineAreas) loadCuisines();
   // On touch screens, focusing the search box would pop the keyboard over the list.
@@ -1727,12 +1735,15 @@ async function showRecipe(id) {
         .map((ing) => {
           const flaggedLabels = result.byIngredient?.[ing.name.toLowerCase()] || [];
           const isFlagged = flaggedLabels.length > 0;
-          const chipsHtml = isFlagged
-            ? `<div class="mt-1.5 flex flex-wrap gap-1.5">
-                ${flaggedLabels
-              .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
-              .join("")}
-              </div>`
+          // Allergen tags sit on the same line as the ingredient name.
+          const chipsHtml = flaggedLabels
+            .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
+            .join("");
+          const swapOptions = swapsByIngredient.get(ing.name.toLowerCase()) || [];
+          const swapHtml = swapOptions.length
+            ? `<p class="mt-1.5 text-xs text-stone-600 leading-snug">
+                <span class="font-semibold text-emerald-700">Try instead:</span> ${escapeHtml(swapOptions.join(", or "))}
+              </p>`
             : "";
 
           const scaledMeasure = scaleMeasure(ing.measure || "", scale);
@@ -1742,10 +1753,13 @@ async function showRecipe(id) {
               <span class="mt-[6px] sm:mt-[8px] w-2 h-2 rounded-full flex-shrink-0 ${isFlagged ? "bg-red-500" : "bg-[#ca5c2e]/50"}" aria-hidden="true"></span>
               <div class="flex-1 min-w-0">
                 <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                  <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
+                  <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                    <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
+                    ${chipsHtml}
+                  </div>
                   <span class="text-sm font-medium text-stone-600 ingredient-measure">${escapeHtml(scaledMeasure)}</span>
                 </div>
-                ${chipsHtml}
+                ${swapHtml}
               </div>
             </li>
           `;
@@ -1788,6 +1802,11 @@ async function showRecipe(id) {
     const ingredientText = `${ingredientCount} ingredient${ingredientCount === 1 ? "" : "s"}`;
     const stepText = `${stepCount} step${stepCount === 1 ? "" : "s"}`;
 
+    // "Try instead" ideas for the flagged ingredients (from preferences.js).
+    const swaps = getSwapSuggestions(result, prefs);
+    // Shown under each flagged ingredient in the ingredients list (lowercase name -> options).
+    const swapsByIngredient = new Map(swaps.map((s) => [s.ingredient.toLowerCase(), s.options]));
+
     const warningBannerHtml = (result.hasAllergen || result.hasDietConflict) ? `
       <div class="rounded-2xl p-4 sm:p-5 ${result.hasAllergen ? 'bg-red-50 border border-red-200 text-red-900' : 'bg-amber-50 border border-amber-200 text-amber-900'} flex items-start gap-3.5 mb-8 shadow-xs">
         <div class="p-2 rounded-xl ${result.hasAllergen ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'} flex-shrink-0 mt-0.5">
@@ -1798,7 +1817,9 @@ async function showRecipe(id) {
         <div class="space-y-1">
           <h4 class="font-bold text-sm sm:text-base">${result.hasAllergen ? `Allergen Warning: Contains ${result.allergens.map(a => escapeHtml(a.name)).join(', ')}` : 'Diet Preference Conflict'}</h4>
           <p class="text-xs sm:text-sm ${result.hasAllergen ? 'text-red-700' : 'text-amber-800'} leading-relaxed">
-            ${escapeHtml(describeResult(result))}. We've highlighted the relevant ingredients below so you can substitute or take caution.
+            ${escapeHtml(describeResult(result))}. ${swaps.length
+              ? "We've highlighted the relevant ingredients below, with swap ideas. Swaps can change the taste and texture, so always check the labels."
+              : "We've highlighted the relevant ingredients below so you can substitute or take caution."}
           </p>
         </div>
       </div>

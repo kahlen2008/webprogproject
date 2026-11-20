@@ -149,3 +149,33 @@
     print-color-adjust: exact;
   }
 }
+
+/* Add to Meal Plan drawer: day and meal pills (radio buttons styled as buttons) */
+.drawer-pill {
+  display: block;
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 10px;
+  border: 1px solid #e7e5e4;
+  background: #fafaf9;
+  color: #44403c;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.2;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  user-select: none;
+}
+label:hover > .drawer-pill {
+  border-color: #ca5c2e80;
+  background: #fdf8f4;
+}
+input:checked + .drawer-pill {
+  background: #ca5c2e;
+  border-color: #ca5c2e;
+  color: #ffffff;
+  box-shadow: 0 1px 2px rgb(202 92 46 / 0.3);
+}
+input:focus-visible + .drawer-pill {
+  outline: 2px solid #ca5c2e;
+  outline-offset: 2px;
+}
