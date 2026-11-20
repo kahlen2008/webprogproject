@@ -122,6 +122,24 @@ export async function filterByCategory(category) {
   }));
 }
 
+export async function listAreas() {
+  const data = await fetchJson("list.php?a=list");
+  return (data.meals || [])
+    .map((item) => item.strArea)
+    .filter((a) => a && a !== "Unknown")
+    .sort();
+}
+
+export async function filterByArea(area) {
+  const data = await fetchJson(`filter.php?a=${encodeURIComponent(area)}`);
+  return (data.meals || []).map((meal) => ({
+    id: String(meal.idMeal),
+    name: toTitleCase(meal.strMeal),
+    image: meal.strMealThumb,
+    area: area,
+  }));
+}
+
 // ---------- Beyond the 25-result cap ----------
 // TheMealDB's free name search (search.php?s=) never returns more than 25 meals.
 // The category and ingredient filters return every match, so these two helpers use

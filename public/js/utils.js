@@ -945,6 +945,52 @@ function formatSinglePart(part) {
   return part.modifier ? `${base} ${part.modifier}` : base;
 }
 
+// Scales a measure string by a scale factor.
+// Only scales amounts that start with a number (integers, fractions, decimals, ranges),
+// leaving values like "a pinch", "to taste", "dash", etc. unchanged.
+export function scaleMeasure(measureStr, scaleFactor) {
+  if (!measureStr || typeof measureStr !== "string") return "";
+  const str = measureStr.trim();
+  if (!str) return "";
+  if (scaleFactor === 1 || isNaN(scaleFactor) || scaleFactor <= 0) return str;
+
+  const normalized = normalizeUnicodeFractions(str);
+
+  // Check if it starts with a number or fraction
+  if (!/^\d/.test(normalized)) {
+    return str; // Leaves "a pinch", "to taste", "dash", etc. unchanged
+  }
+
+  // Handle range like "1-2 tbsp" or "1 - 2 cups"
+  const rangeMatch = normalized.match(/^(\d+(?:\.\d+)?)\s*[-–]\s*(\d+(?:\.\d+)?)\s*(.*)$/);
+  if (rangeMatch) {
+    const min = Number(rangeMatch[1]);
+    const max = Number(rangeMatch[2]);
+    const rest = (rangeMatch[3] || "").trim();
+    const scaledMin = formatQuantity(min * scaleFactor);
+    const scaledMax = formatQuantity(max * scaleFactor);
+    return rest ? `${scaledMin}-${scaledMax} ${rest}` : `${scaledMin}-${scaledMax}`;
+  }
+
+  // Handle mixed fraction "1 1/2 cups", fraction "1/2 cup", or decimal/integer "2 cups", "200g"
+  const qtyMatch = normalized.match(/^(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)\s*(.*)$/);
+  if (!qtyMatch) return str;
+
+  const qty = parseQuantity(qtyMatch[1]);
+  if (qty == null || isNaN(qty)) return str;
+
+  const rest = qtyMatch[2] || "";
+  const scaledQty = formatQuantity(qty * scaleFactor);
+
+  // If there was no space originally between number and unit (e.g. "200g", "50ml")
+  const originalHadNoSpace = /^\d+[a-zA-Z]/.test(str);
+  if (originalHadNoSpace && rest) {
+    return `${scaledQty}${rest.trim()}`;
+  }
+
+  return rest ? `${scaledQty} ${rest.trim()}` : scaledQty;
+}
+
 export function combineMeasures(measureList) {
   const cleanList = (measureList || [])
     .map((m) => (typeof m === "string" ? m.trim() : ""))

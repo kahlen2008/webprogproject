@@ -1,10 +1,10 @@
 // Home page (search/categories) and recipe detail page.
 // Matches the design and interactions shown in RecipePlan mockup.
 
-import { searchRecipes, searchRecipesWide, listAllRecipes, getRecipeById, filterByCategory } from "./api.js";
+import { searchRecipes, searchRecipesWide, listAllRecipes, getRecipeById, filterByCategory, listAreas, filterByArea } from "./api.js";
 import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect, scaleMeasure } from "./utils.js";
 import { openCookingMode } from "./cooking-mode.js";
 import {
   getPreferences,
@@ -799,29 +799,245 @@ async function runCategoryFilter(category) {
 }
 
 let activeCategory = null;
+let activeCuisine = "";
+
+const cuisineSelect = document.getElementById("cuisine-select");
+const clearFiltersBtn = document.getElementById("clear-filters-btn");
+
+function syncFilterUI() {
+  const query = searchForm?.query?.value?.trim() || "";
+  const hasFilter = Boolean(activeCategory || activeCuisine || query);
+  if (clearFiltersBtn) {
+    clearFiltersBtn.classList.toggle("hidden", !hasFilter);
+    clearFiltersBtn.classList.toggle("inline-flex", hasFilter);
+  }
+  if (cuisineSelect && cuisineSelect.value !== activeCuisine) {
+    cuisineSelect.value = activeCuisine;
+  }
+}
+
+function updateUrlParams() {
+  const params = new URLSearchParams();
+  const query = searchForm?.query?.value?.trim();
+  if (query) params.set("search", query);
+  if (activeCategory) params.set("category", activeCategory);
+  if (activeCuisine) params.set("cuisine", activeCuisine);
+  const qs = params.toString();
+  window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+}
+
+function clearAllFilters() {
+  activeCategory = null;
+  activeCuisine = "";
+  if (searchForm?.query) {
+    searchForm.query.value = "";
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) {
+      clearBtn.classList.add("hidden");
+      clearBtn.classList.remove("inline-flex");
+    }
+  }
+  categoryChips.forEach((c) => c.classList.remove("active"));
+  if (cuisineSelect) cuisineSelect.value = "";
+  window.history.replaceState(null, "", window.location.pathname);
+  syncFilterUI();
+  runActiveFilter();
+}
+
+async function populateCuisineDropdown() {
+  if (!cuisineSelect) return;
+  try {
+    const areas = await listAreas();
+    cuisineSelect.innerHTML =
+      `<option value="">All Cuisines</option>` +
+      areas.map((a) => `<option value="${escapeHtml(a)}">${escapeHtml(a)}</option>`).join("");
+    if (activeCuisine) {
+      cuisineSelect.value = activeCuisine;
+    }
+  } catch (err) {
+    console.warn("Could not load cuisines:", err);
+  }
+}
+
+async function runActiveFilter() {
+  if (!results) return;
+  syncFilterUI();
+  const query = searchForm?.query?.value?.trim() || "";
+
+  // 1. Search Query with optional Cuisine and Category
+  if (query) {
+    let title = `Recipes matching "${query}"`;
+    if (activeCuisine && activeCategory) {
+      title = `"${query}" in ${activeCuisine} ${activeCategory}`;
+    } else if (activeCuisine) {
+      title = `"${query}" in ${activeCuisine}`;
+    } else if (activeCategory) {
+      title = `"${query}" in ${activeCategory}`;
+    }
+    lastSearchQuery = query;
+    lastSearchTitle = title;
+    if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(title)}</span>`;
+    renderRecipesLoading("Loading matching recipes...");
+
+    try {
+      const searchMatches = await searchRecipesWide(query);
+      let filtered = searchMatches;
+      if (activeCategory) {
+        filtered = filtered.filter((r) => r.category?.toLowerCase() === activeCategory.toLowerCase());
+      }
+      if (activeCuisine) {
+        const areaMatches = await filterByArea(activeCuisine);
+        const areaIds = new Set(areaMatches.map((r) => r.id));
+        filtered = filtered.filter((r) => areaIds.has(r.id) || r.area?.toLowerCase() === activeCuisine.toLowerCase());
+      }
+
+      if (filtered.length === 0) {
+        results.innerHTML = "";
+        clearResultsPaging();
+        if (message) {
+          message.className = "py-12 sm:py-16 text-center max-w-xl mx-auto";
+          message.innerHTML = `
+            <div class="w-16 h-16 mx-auto rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/15 shadow-2xs mb-4">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+              </svg>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">No recipes found</h3>
+            <p class="text-sm sm:text-base text-stone-500 mt-2 max-w-lg mx-auto leading-relaxed">
+              No recipes matched "${escapeHtml(query)}"${activeCuisine ? ` in ${escapeHtml(activeCuisine)} cuisine` : ""}${activeCategory ? ` (${escapeHtml(activeCategory)})` : ""}.
+            </p>
+            <div class="pt-6">
+              <button type="button" id="empty-clear-filter-btn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-sm font-semibold transition shadow-sm cursor-pointer">
+                Clear all filters
+              </button>
+            </div>
+          `;
+          document.getElementById("empty-clear-filter-btn")?.addEventListener("click", clearAllFilters);
+        }
+        return;
+      }
+      if (message) {
+        message.innerHTML = "";
+        message.className = "hidden";
+      }
+      await showResults(filtered);
+    } catch (err) {
+      console.warn("Search filter failed:", err);
+      await showResults(DEFAULT_FALLBACK_RECIPES);
+    }
+    return;
+  }
+
+  // 2. Category + Cuisine (Intersection)
+  if (activeCategory && activeCuisine) {
+    const title = `${activeCuisine} ${activeCategory} Recipes`;
+    if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(title)}</span>`;
+    renderRecipesLoading(`Loading ${title.toLowerCase()}...`);
+
+    try {
+      const [catRecipes, areaRecipes] = await Promise.all([
+        filterByCategory(activeCategory),
+        filterByArea(activeCuisine),
+      ]);
+      const areaIds = new Set(areaRecipes.map((r) => r.id));
+      const combined = catRecipes
+        .filter((r) => areaIds.has(r.id))
+        .map((r) => ({ ...r, area: activeCuisine }));
+
+      if (combined.length === 0) {
+        results.innerHTML = "";
+        clearResultsPaging();
+        if (message) {
+          message.className = "py-12 sm:py-16 text-center max-w-xl mx-auto";
+          message.innerHTML = `
+            <div class="w-16 h-16 mx-auto rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/15 shadow-2xs mb-4">
+              <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"></circle>
+                <line x1="2" y1="12" x2="22" y2="12"></line>
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path>
+              </svg>
+            </div>
+            <h3 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">No matching recipes</h3>
+            <p class="text-sm sm:text-base text-stone-500 mt-2 max-w-lg mx-auto leading-relaxed">
+              We couldn't find any ${escapeHtml(activeCuisine)} dishes in the ${escapeHtml(activeCategory)} category.
+            </p>
+            <div class="pt-6">
+              <button type="button" id="empty-clear-filter-btn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-sm font-semibold transition shadow-sm cursor-pointer">
+                Clear all filters
+              </button>
+            </div>
+          `;
+          document.getElementById("empty-clear-filter-btn")?.addEventListener("click", clearAllFilters);
+        }
+        return;
+      }
+      if (message) {
+        message.innerHTML = "";
+        message.className = "hidden";
+      }
+      await showResults(combined);
+    } catch (err) {
+      results.innerHTML = "";
+      clearResultsPaging();
+      if (message) {
+        message.className = "text-sm text-stone-500 py-12 text-center";
+        message.textContent = "Could not load recipes right now.";
+      }
+    }
+    return;
+  }
+
+  // 3. Category only
+  if (activeCategory) {
+    await runCategoryFilter(activeCategory);
+    return;
+  }
+
+  // 4. Cuisine only
+  if (activeCuisine) {
+    if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(activeCuisine)} Recipes</span>`;
+    renderRecipesLoading(`Loading ${activeCuisine} recipes...`);
+    try {
+      const recipes = await filterByArea(activeCuisine);
+      if (!recipes || recipes.length === 0) {
+        results.innerHTML = "";
+        clearResultsPaging();
+        if (message) {
+          message.className = "text-sm text-stone-500 py-12 text-center";
+          message.textContent = `No recipes found for ${activeCuisine} cuisine.`;
+        }
+        return;
+      }
+      if (message) {
+        message.innerHTML = "";
+        message.className = "hidden";
+      }
+      await showResults(recipes);
+    } catch (err) {
+      results.innerHTML = "";
+      clearResultsPaging();
+      if (message) {
+        message.className = "text-sm text-stone-500 py-12 text-center";
+        message.textContent = "Could not load recipes right now.";
+      }
+    }
+    return;
+  }
+
+  // 5. Default: Latest Recipes
+  if (sectionTitle) sectionTitle.innerHTML = `<span>Latest Recipes</span>`;
+  await runSearch("a", "Latest Recipes");
+}
 
 if (searchForm) {
   searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const query = searchForm.query.value.trim();
-    if (query) {
-      activeCategory = null;
-      categoryChips.forEach((c) => c.classList.remove("active"));
-      window.history.replaceState(null, "", `?search=${encodeURIComponent(query)}`);
-      runSearch(query, `Recipes matching "${query}"`);
-      const recipesSection = document.getElementById("recipes-section");
-      if (recipesSection) {
-        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    } else {
-      activeCategory = null;
-      categoryChips.forEach((c) => c.classList.remove("active"));
-      window.history.replaceState(null, "", window.location.pathname);
-      runSearch("a", "Latest Recipes");
-      const recipesSection = document.getElementById("recipes-section");
-      if (recipesSection) {
-        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+    updateUrlParams();
+    syncFilterUI();
+    runActiveFilter();
+    const recipesSection = document.getElementById("recipes-section");
+    if (recipesSection) {
+      recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   });
 
@@ -833,14 +1049,20 @@ if (searchForm) {
     clearBtn?.classList.toggle("hidden", !show);
     clearBtn?.classList.toggle("inline-flex", show);
   };
-  queryInput?.addEventListener("input", syncClearButton);
+  queryInput?.addEventListener("input", () => {
+    syncClearButton();
+    syncFilterUI();
+  });
   clearBtn?.addEventListener("click", () => {
     if (!queryInput) return;
     queryInput.value = "";
     syncClearButton();
+    updateUrlParams();
+    syncFilterUI();
+    runActiveFilter();
     queryInput.focus();
   });
-  window.addEventListener("pageshow", syncClearButton); // e.g. a value restored by Back
+  window.addEventListener("pageshow", syncClearButton);
 
   // Category buttons: toggle active selection, unclick, and scroll to recipes
   categoryChips.forEach((chip) => {
@@ -848,35 +1070,45 @@ if (searchForm) {
       const cat = chip.dataset.category;
       if (!cat) return;
 
-      // If user clicks the already active category, unclick and reset to Latest Recipes
       if (activeCategory === cat) {
         activeCategory = null;
         chip.classList.remove("active");
-        window.history.replaceState(null, "", window.location.pathname);
-        runSearch("", "Latest Recipes");
-        return;
+      } else {
+        activeCategory = cat;
+        categoryChips.forEach((c) => {
+          c.classList.toggle("active", c === chip);
+        });
       }
 
-      // Mark this category as active and unmark others
-      activeCategory = cat;
-      categoryChips.forEach((c) => {
-        if (c === chip) {
-          c.classList.add("active");
-        } else {
-          c.classList.remove("active");
-        }
-      });
+      updateUrlParams();
+      syncFilterUI();
+      runActiveFilter();
 
-      window.history.replaceState(null, "", `?category=${encodeURIComponent(cat)}`);
-      runCategoryFilter(cat);
-
-      // Scroll smoothly down to the recipes section
       const recipesSection = document.getElementById("recipes-section");
       if (recipesSection) {
         recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     });
   });
+
+  // Cuisine dropdown selection
+  if (cuisineSelect) {
+    cuisineSelect.addEventListener("change", () => {
+      activeCuisine = cuisineSelect.value;
+      updateUrlParams();
+      syncFilterUI();
+      runActiveFilter();
+      const recipesSection = document.getElementById("recipes-section");
+      if (recipesSection) {
+        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    });
+  }
+
+  // Clear filters button
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener("click", clearAllFilters);
+  }
 
   // Pagination buttons (‹ Prev, page numbers, Next ›)
   const pagination = document.getElementById("results-pagination");
@@ -891,7 +1123,6 @@ if (searchForm) {
 
   if (hideToggle) {
     hideToggle.addEventListener("change", async () => {
-      // savePreferences updates localStorage synchronously, so animate right away
       const saving = savePreferences({ hideFlagged: hideToggle.checked });
       if (applyHideFilterAnimated(hideToggle.checked)) {
         await saving;
@@ -899,11 +1130,7 @@ if (searchForm) {
       }
       await saving;
       pendingPage = currentPage; // stay on the same page after the re-run
-      if (activeCategory) {
-        runCategoryFilter(activeCategory);
-      } else {
-        runSearch(lastSearchQuery, lastSearchTitle);
-      }
+      runActiveFilter();
     });
   }
 
@@ -912,26 +1139,44 @@ if (searchForm) {
   });
   syncHideToggle();
 
-  // Handle URL query parameters (e.g. from index.html search bar)
+  // Handle URL query parameters (e.g. from index.html search bar or external links)
   const urlParams = new URLSearchParams(window.location.search);
-  pendingPage = parseInt(urlParams.get("page"), 10) || 0; // e.g. coming Back from a recipe
+  pendingPage = parseInt(urlParams.get("page"), 10) || 0;
   const searchParam = urlParams.get("search") || urlParams.get("query") || urlParams.get("q");
   const categoryParam = urlParams.get("category");
+  const cuisineParam = urlParams.get("cuisine") || urlParams.get("area");
 
   if (searchParam) {
     const queryInput = searchForm?.querySelector('input[name="query"]');
     if (queryInput) queryInput.value = searchParam;
-    runSearch(searchParam, `Search Results for "${searchParam}"`);
-  } else if (categoryParam) {
+    syncClearButton();
+  }
+
+  if (categoryParam) {
     const matchingChip = document.querySelector(`.category-chip[data-category="${categoryParam}"]`);
     if (matchingChip) {
       activeCategory = categoryParam;
       categoryChips.forEach((c) => c.classList.remove("active"));
       matchingChip.classList.add("active");
+    } else {
+      activeCategory = categoryParam;
     }
-    runCategoryFilter(categoryParam);
+  }
+
+  if (cuisineParam) {
+    activeCuisine = cuisineParam;
+  }
+
+  populateCuisineDropdown().then(() => {
+    if (activeCuisine && cuisineSelect) {
+      cuisineSelect.value = activeCuisine;
+    }
+  });
+
+  if (searchParam || categoryParam || cuisineParam) {
+    runActiveFilter();
   } else {
-    // Initial load: inspect preferences and pre-select matching diet category chip if present
+    // Initial load without params: check diet preferences for pre-selection
     const initialPrefs = getPreferences();
     let defaultCategory = null;
     if (initialPrefs.diets.includes("Vegetarian") || initialPrefs.diets.includes("Vegan")) {
@@ -946,14 +1191,10 @@ if (searchForm) {
         activeCategory = defaultCategory;
         categoryChips.forEach((c) => c.classList.remove("active"));
         matchingChip.classList.add("active");
-        runCategoryFilter(defaultCategory);
-      } else {
-        window.history.replaceState(null, "", window.location.pathname);
-        runSearch("", "Latest Recipes");
+        updateUrlParams();
       }
-    } else {
-      runSearch("", "Latest Recipes");
     }
+    runActiveFilter();
   }
 }
 
@@ -1262,35 +1503,42 @@ async function showRecipe(id) {
         : `${first} A short ingredient list that keeps things simple.`;
     }
 
-    const ingredientsHtml = (recipe.ingredients || [])
-      .map((ing) => {
-        const flaggedLabels = result.byIngredient?.[ing.name.toLowerCase()] || [];
-        const isFlagged = flaggedLabels.length > 0;
-        const chipsHtml = isFlagged
-          ? `<div class="mt-1.5 flex flex-wrap gap-1.5">
-              ${flaggedLabels
-            .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
-            .join("")}
-            </div>`
-          : "";
-
-        return `
-          <li class="flex items-start gap-3 rounded-xl px-3.5 py-2.5 ${isFlagged ? "bg-red-50/70 border border-red-200/80" : "border border-transparent hover:bg-white/70 transition"}">
-            <span class="mt-[6px] sm:mt-[8px] w-2 h-2 rounded-full flex-shrink-0 ${isFlagged ? "bg-red-500" : "bg-[#ca5c2e]/50"}" aria-hidden="true"></span>
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
-                <span class="text-sm text-stone-500">${escapeHtml(ing.measure)}</span>
-              </div>
-              ${chipsHtml}
-            </div>
-          </li>
-        `;
-      })
-      .join("");
-
     // Rough nutrition estimate (TheMealDB has no nutrition data; checks author-stated servings first, then estimates from ingredients).
     const nutrition = estimateNutrition(recipe.ingredients || [], null, recipe.instructions);
+    const baseServings = Math.max(1, Math.round(Number(nutrition.servings) || 4));
+    let currentServings = baseServings;
+
+    function renderIngredientsListHtml(servings) {
+      const scale = servings / baseServings;
+      return (recipe.ingredients || [])
+        .map((ing) => {
+          const flaggedLabels = result.byIngredient?.[ing.name.toLowerCase()] || [];
+          const isFlagged = flaggedLabels.length > 0;
+          const chipsHtml = isFlagged
+            ? `<div class="mt-1.5 flex flex-wrap gap-1.5">
+                ${flaggedLabels
+              .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
+              .join("")}
+              </div>`
+            : "";
+
+          const scaledMeasure = scaleMeasure(ing.measure || "", scale);
+
+          return `
+            <li class="flex items-start gap-3 rounded-xl px-3.5 py-2.5 ${isFlagged ? "bg-red-50/70 border border-red-200/80" : "border border-transparent hover:bg-white/70 transition"}">
+              <span class="mt-[6px] sm:mt-[8px] w-2 h-2 rounded-full flex-shrink-0 ${isFlagged ? "bg-red-500" : "bg-[#ca5c2e]/50"}" aria-hidden="true"></span>
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                  <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
+                  <span class="text-sm font-medium text-stone-600 ingredient-measure">${escapeHtml(scaledMeasure)}</span>
+                </div>
+                ${chipsHtml}
+              </div>
+            </li>
+          `;
+        })
+        .join("");
+    }
     const per = nutrition.perServing;
     const macroBox = (label, value) => `
       <div style="flex:1;min-width:0;text-align:center" class="rounded-xl bg-white border border-[#efe6dc] px-2 py-2.5">
@@ -1444,11 +1692,36 @@ async function showRecipe(id) {
           
           <!-- Ingredients Column -->
           <div class="md:col-span-5 space-y-4">
-            <h2 class="text-xl font-bold text-stone-900">Ingredients (about ${nutrition.servings} serving${nutrition.servings === 1 ? "" : "s"})</h2>
-            <ul class="space-y-2 list-none p-0 m-0">
-              ${ingredientsHtml}
-            </ul>            ${nutritionHtml}
+            <div class="flex flex-wrap items-center justify-between gap-3 pb-2 border-b border-stone-200/80">
+              <div>
+                <h2 class="text-xl font-bold text-stone-900">Ingredients</h2>
+                <p class="text-xs text-stone-500 mt-0.5">Original recipe serves <span class="font-medium text-stone-700">${baseServings}</span></p>
+              </div>
 
+              <!-- Servings Scaler Stepper -->
+              <div class="inline-flex items-center gap-2 bg-[#f6eee3] rounded-xl px-2 py-1.5 border border-[#e8dccc] shadow-2xs">
+                <span class="text-xs font-semibold text-stone-600 select-none">Servings:</span>
+                <div class="inline-flex items-center rounded-lg bg-white border border-[#decbb9] overflow-hidden shadow-2xs">
+                  <button id="serving-decrease-btn" type="button" class="w-7 h-7 flex items-center justify-center text-stone-700 hover:bg-stone-100 active:bg-stone-200 transition font-bold text-base focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Decrease servings" ${currentServings <= 1 ? "disabled" : ""}>
+                    −
+                  </button>
+                  <span id="current-servings-display" class="w-7 text-center text-xs sm:text-sm font-bold text-stone-800 select-none">
+                    ${currentServings}
+                  </span>
+                  <button id="serving-increase-btn" type="button" class="w-7 h-7 flex items-center justify-center text-stone-700 hover:bg-stone-100 active:bg-stone-200 transition font-bold text-base focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed" aria-label="Increase servings" ${currentServings >= 30 ? "disabled" : ""}>
+                    +
+                  </button>
+                </div>
+                <button id="serving-reset-btn" type="button" class="text-xs text-[#ca5c2e] hover:text-[#a0441e] font-semibold px-1.5 py-0.5 rounded hover:bg-[#ebdccc] transition ${currentServings === baseServings ? 'hidden' : ''}" title="Reset to original servings">
+                  Reset
+                </button>
+              </div>
+            </div>
+
+            <ul id="ingredients-list" class="space-y-2 list-none p-0 m-0">
+              ${renderIngredientsListHtml(currentServings)}
+            </ul>
+            ${nutritionHtml}
           </div>
 
           <!-- Instructions Column -->
@@ -1576,6 +1849,44 @@ async function showRecipe(id) {
       }
     });
 
+    // Serving Size Scaler handling
+    const servingDecreaseBtn = document.getElementById("serving-decrease-btn");
+    const servingIncreaseBtn = document.getElementById("serving-increase-btn");
+    const servingResetBtn = document.getElementById("serving-reset-btn");
+    const servingsDisplay = document.getElementById("current-servings-display");
+    const ingredientsListEl = document.getElementById("ingredients-list");
+
+    const updateServings = (newServings) => {
+      currentServings = Math.max(1, Math.min(30, Math.round(newServings)));
+      if (servingsDisplay) servingsDisplay.textContent = currentServings;
+      if (servingDecreaseBtn) servingDecreaseBtn.disabled = currentServings <= 1;
+      if (servingIncreaseBtn) servingIncreaseBtn.disabled = currentServings >= 30;
+      if (servingResetBtn) {
+        servingResetBtn.classList.toggle("hidden", currentServings === baseServings);
+      }
+      if (ingredientsListEl) {
+        ingredientsListEl.innerHTML = renderIngredientsListHtml(currentServings);
+      }
+    };
+
+    servingDecreaseBtn?.addEventListener("click", () => updateServings(currentServings - 1));
+    servingIncreaseBtn?.addEventListener("click", () => updateServings(currentServings + 1));
+    servingResetBtn?.addEventListener("click", () => updateServings(baseServings));
+
+    // Helper to get recipe ingredients scaled to currentServings
+    const getScaledRecipe = () => {
+      const scale = currentServings / baseServings;
+      const scaledIngredients = (recipe.ingredients || []).map((ing) => ({
+        ...ing,
+        measure: scaleMeasure(ing.measure || "", scale),
+      }));
+      return {
+        ...recipe,
+        ingredients: scaledIngredients,
+        servings: currentServings,
+      };
+    };
+
     // Add to meal plan quick action
     const addPlanBtn = document.getElementById("add-plan-btn");
     if (addPlanBtn) {
@@ -1596,7 +1907,8 @@ async function showRecipe(id) {
         // already there, and saves to this week's plan on the account (Firestore).
         try {
           const { openAddToPlanDialog } = await import("./planner.js");
-          const slot = await openAddToPlanDialog(recipe, { skipAllergenCheck: true });
+          const recipeToAdd = getScaledRecipe();
+          const slot = await openAddToPlanDialog(recipeToAdd, { skipAllergenCheck: true });
           if (slot && !slot.unchanged) {
             showToast(`Added "${toTitleCase(recipe.name)}" to ${slot.day} ${slot.meal}!`, {
               action: { label: "View plan", onClick: () => (window.location.href = "planner.html") }
@@ -1612,7 +1924,7 @@ async function showRecipe(id) {
     // Launch Cooking Mode (Dedicated step-by-step view with progress, timers, and checklist)
     const launchCookingMode = () => {
       openCookingMode({
-        recipe,
+        recipe: getScaledRecipe(),
         parsedItems,
         allergenResult: result,
         onSwitchTab: switchRecipeTab,
