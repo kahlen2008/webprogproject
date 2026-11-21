@@ -426,6 +426,144 @@ export function describeResult(result) {
   return parts.join("; ");
 }
 
+// ---------- Swap suggestions ----------
+// What to use instead of a flagged ingredient. Each keyword group has a list of rules:
+// the first rule whose `match` words appear in the ingredient name is used, and the
+// rule without `match` is the fallback. Each option lists the keyword groups it
+// contains in `has` (e.g. soy milk has "soy"), so we never suggest something the
+// user also has to avoid. These are ideas, not safety advice.
+const SWAPS = {
+  dairy: [
+    { match: ["buttermilk"], options: [{ text: "plant milk with a squeeze of lemon" }] },
+    { match: ["milk"], options: [{ text: "oat milk", has: ["gluten"] }, { text: "soy milk", has: ["soy"] }, { text: "rice milk" }] },
+    { match: ["butter", "ghee"], options: [{ text: "olive oil" }, { text: "dairy-free spread" }, { text: "coconut oil" }] },
+    { match: ["cream", "creme fraiche", "crème fraîche", "mascarpone"], options: [{ text: "coconut cream" }, { text: "oat cream", has: ["gluten"] }] },
+    { match: ["yogurt", "yoghurt"], options: [{ text: "coconut yogurt" }, { text: "soy yogurt", has: ["soy"] }] },
+    { options: [{ text: "nutritional yeast (for a cheesy taste)" }, { text: "dairy-free cheese" }] },
+  ],
+  eggs: [
+    { match: ["mayonnaise", "aioli"], options: [{ text: "egg-free (vegan) mayonnaise" }] },
+    { match: ["meringue", "egg white"], options: [{ text: "aquafaba (the water from a tin of chickpeas)" }] },
+    { options: [{ text: "1 tbsp ground flaxseed + 3 tbsp water for each one" }, { text: "mashed banana or apple sauce (in baking)" }] },
+  ],
+  gluten: [
+    { match: ["soy sauce"], options: [{ text: "tamari (gluten-free soy sauce)", has: ["soy"] }, { text: "coconut aminos" }] },
+    { match: ["breadcrumbs"], options: [{ text: "gluten-free breadcrumbs" }, { text: "ground almonds", has: ["treeNuts"] }] },
+    { match: ["flour"], options: [{ text: "a gluten-free flour blend" }, { text: "cornflour (for thickening)" }] },
+    { match: ["pasta", "spaghetti", "macaroni", "penne", "fettuccine", "tagliatelle", "linguine", "rigatoni", "lasagne", "lasagna"], options: [{ text: "gluten-free pasta" }, { text: "rice noodles" }] },
+    { match: ["noodle"], options: [{ text: "rice noodles" }, { text: "glass noodles" }] },
+    { match: ["couscous", "bulgur", "barley", "farro", "spelt"], options: [{ text: "quinoa" }, { text: "rice" }] },
+    { match: ["oats", "oat"], options: [{ text: "oats labelled gluten-free" }] },
+    { match: ["beer"], options: [{ text: "vegetable stock" }] },
+    { match: ["tortilla"], options: [{ text: "corn tortillas" }] },
+    { match: ["pastry", "filo"], options: [{ text: "gluten-free pastry" }] },
+    { options: [{ text: "a gluten-free version" }] },
+  ],
+  peanuts: [
+    { options: [{ text: "sunflower seed spread" }, { text: "toasted sunflower or pumpkin seeds" }] },
+  ],
+  treeNuts: [
+    { match: ["marzipan", "frangipane", "praline", "nutella"], options: [{ text: "leave it out, or use a nut-free spread" }] },
+    { options: [{ text: "toasted pumpkin or sunflower seeds" }, { text: "toasted oats", has: ["gluten"] }] },
+  ],
+  soy: [
+    { match: ["soy sauce", "tamari"], options: [{ text: "coconut aminos" }] },
+    { match: ["tofu", "tempeh"], options: [{ text: "chickpeas" }, { text: "paneer", has: ["dairy"] }] },
+    { match: ["edamame"], options: [{ text: "peas" }, { text: "broad beans" }] },
+    { options: [{ text: "a soy-free version" }] },
+  ],
+  sesame: [
+    { match: ["sesame oil"], options: [{ text: "olive oil" }, { text: "sunflower oil" }] },
+    { match: ["tahini"], options: [{ text: "sunflower seed spread" }] },
+    { match: ["hummus"], options: [{ text: "a sesame-free bean dip" }] },
+    { options: [{ text: "sunflower seeds" }, { text: "poppy seeds" }] },
+  ],
+  fish: [
+    { match: ["fish sauce", "anchovy", "anchovies"], options: [{ text: "soy sauce", has: ["soy", "gluten"] }, { text: "a pinch of salt and a squeeze of lime" }] },
+    { match: ["worcestershire sauce"], options: [{ text: "fish-free Worcestershire sauce" }, { text: "soy sauce", has: ["soy", "gluten"] }] },
+    { options: [{ text: "chicken", has: ["meat"] }, { text: "firm tofu", has: ["soy"] }, { text: "chickpeas" }] },
+  ],
+  shellfish: [
+    { options: [{ text: "chicken", has: ["meat"] }, { text: "firm tofu", has: ["soy"] }, { text: "mushrooms" }] },
+  ],
+  meat: [
+    { match: ["mince", "minced"], options: [{ text: "lentils" }, { text: "plant-based mince" }] },
+    { match: ["bacon", "pancetta"], options: [{ text: "smoked tofu", has: ["soy"] }, { text: "mushrooms with smoked paprika" }] },
+    { match: ["sausage", "chorizo"], options: [{ text: "vegetarian sausages" }] },
+    { match: ["gelatine", "gelatin"], options: [{ text: "agar agar" }] },
+    { match: ["lard", "suet"], options: [{ text: "vegetable shortening" }, { text: "vegetable suet" }] },
+    { match: ["bone broth"], options: [{ text: "vegetable stock" }] },
+    { options: [{ text: "mushrooms" }, { text: "chickpeas or lentils" }, { text: "firm tofu", has: ["soy"] }] },
+  ],
+  porkProducts: [
+    { match: ["bacon", "pancetta", "ham", "gammon", "prosciutto"], options: [{ text: "turkey or beef rashers", has: ["meat"] }, { text: "mushrooms with smoked paprika" }] },
+    { match: ["gelatine", "gelatin"], options: [{ text: "agar agar" }] },
+    { match: ["lard"], options: [{ text: "vegetable shortening" }] },
+    { options: [{ text: "chicken or beef", has: ["meat"] }] },
+  ],
+  alcohol: [
+    { match: ["mirin"], options: [{ text: "rice vinegar with a little sugar" }] },
+    { match: ["wine", "sherry", "marsala", "port", "vermouth"], options: [{ text: "vegetable stock with a splash of vinegar" }, { text: "grape juice (in sweet dishes)" }] },
+    { options: [{ text: "vegetable stock" }, { text: "a splash of vinegar or citrus juice" }] },
+  ],
+  honey: [
+    { options: [{ text: "maple syrup" }, { text: "agave syrup" }] },
+  ],
+};
+
+// Diets where a swap makes sense. Low Carb and Keto flag pasta and bread too, but
+// "gluten-free pasta" is no help there, so they get no swaps.
+const SWAP_DIETS = ["Vegetarian", "Vegan", "Pescatarian", "Gluten Free", "Dairy Free", "Halal", "Kosher"];
+
+function swapRuleFor(ingredientName, groupName) {
+  const rules = SWAPS[groupName] || [];
+  return rules.find((rule) => !rule.match || rule.match.some((kw) => keywordRegex(kw).test(ingredientName))) || null;
+}
+
+// Returns swap ideas for the flagged ingredients in a checkRecipe/checkIngredients result:
+// [{ ingredient: "butter", options: ["olive oil", "dairy-free spread"] }, ...]
+export function getSwapSuggestions(result, prefs = getPreferences()) {
+  if (!result) return [];
+
+  // Every keyword group the user avoids, so an option that contains one is dropped.
+  const avoided = new Set();
+  (prefs.allergies || []).forEach((a) => (ALLERGEN_RULES[a] || []).forEach((g) => avoided.add(g)));
+  (prefs.diets || []).forEach((d) => (DIET_RULES[d] || []).forEach((g) => avoided.add(g)));
+  const customAllergies = (prefs.allergies || []).filter((a) => !ALLERGEN_RULES[a]);
+
+  const isSafe = (option) =>
+    !(option.has || []).some((g) => avoided.has(g)) &&
+    !customAllergies.some((a) => matchesGroup(option.text, customGroup(a)));
+
+  // ingredient (lowercase) -> { ingredient, options[] }, in the order they were flagged
+  const byIngredient = new Map();
+  const addSwaps = (ingredientName, groupNames) => {
+    groupNames.forEach((groupName) => {
+      if (!GROUPS[groupName] || !matchesGroup(ingredientName, GROUPS[groupName])) return;
+      const rule = swapRuleFor(ingredientName, groupName);
+      if (!rule) return;
+      const key = ingredientName.toLowerCase();
+      if (!byIngredient.has(key)) byIngredient.set(key, { ingredient: ingredientName, options: [] });
+      const entry = byIngredient.get(key);
+      rule.options.filter(isSafe).forEach((o) => {
+        if (!entry.options.includes(o.text)) entry.options.push(o.text);
+      });
+    });
+  };
+
+  (result.allergens || []).forEach((a) => {
+    (a.matches || []).forEach((m) => addSwaps(m, ALLERGEN_RULES[a.name] || []));
+  });
+  (result.dietConflicts || []).forEach((d) => {
+    if (!SWAP_DIETS.includes(d.name)) return;
+    (d.matches || []).forEach((m) => addSwaps(m, DIET_RULES[d.name] || []));
+  });
+
+  return [...byIngredient.values()]
+    .filter((entry) => entry.options.length)
+    .map((entry) => ({ ingredient: entry.ingredient, options: entry.options.slice(0, 3) }));
+}
+
 function capitalizeWords(text) {
   return String(text || "").replace(/(^|[\s(-])([a-z])/g, (m, pre, ch) => pre + ch.toUpperCase());
 }

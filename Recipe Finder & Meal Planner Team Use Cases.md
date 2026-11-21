@@ -1,10 +1,12 @@
 # RecipePlan: Team Use Cases
 
-Oct 26, 2026 · @k
+Oct 26, 2026 · @k · Updated Nov 21, 2026 to match the finished site
+
+> **Note:** This was written as the plan at the start of the project. The scope, folder structure, Tailwind setup, shared UI and database sections have been updated to describe what was actually built. The per-person sections and the timeline are kept as the original plan. `PROJECT_NOTES.md` has the current contracts and status.
 
 ## Overview
 
-Each of the four team members owns one feature end to end, covering the HTML and Tailwind CSS interface, the JavaScript logic, and the Firebase or API side. RecipePlan is a recipe finder and meal planner built with HTML, Tailwind CSS and plain JavaScript, using Firebase Auth and Firestore, TheMealDB for recipe data, and Firebase Hosting for deployment.
+Each of the four team members owns one feature end to end, covering the HTML and Tailwind CSS interface, the JavaScript logic, and the Firebase or API side. RecipePlan is a recipe finder and meal planner built with HTML, Tailwind CSS and plain JavaScript, using Firebase Auth and Firestore, TheMealDB for recipe data, and GitHub Pages for deployment (the site is also deployed to Firebase Hosting).
 
 ## Purpose and the problem it solves
 
@@ -27,7 +29,7 @@ People who cook at home, such as students, busy workers and households with diet
 
 **What it demonstrates for the module**
 
-The project covers the skills the course asks for: a responsive HTML and Tailwind CSS interface, JavaScript interactivity, a public API (TheMealDB), user accounts and a database (Firebase Auth and Firestore), and a live deployment (Firebase Hosting).
+The project covers the skills the course asks for: a responsive HTML and Tailwind CSS interface, JavaScript interactivity, a public API (TheMealDB), user accounts and a database (Firebase Auth and Firestore), and a live deployment (GitHub Pages, with a copy on Firebase Hosting).
 
 ## Scope
 
@@ -42,12 +44,14 @@ This is what four people can finish in four weeks (Oct 26 to Nov 23, 2026). Item
 - **Favourites:** saved per user in Firestore and synced across devices, plus star ratings and comments on each recipe that every logged-in user can read.
 - **Meal planner and shopping list:** a weekly plan (seven days, breakfast, lunch and dinner) saved per user, plus one combined shopping list with checkboxes and a print view.
 - **Interface:** responsive Tailwind design for phone, tablet and desktop, with loading, empty and error states and basic accessibility. A language switcher (130+ languages, powered by Google Translate) is in the navbar, and non-English recipe searches are translated to English before they query TheMealDB.
-- **Deployment:** live on Firebase Hosting, with security rules that keep each user's data private.
+- **Cooking mode (moved into scope):** a full-screen, step-by-step view with Next and Back, an ingredient checklist and kitchen timers.
+- **Nutrition estimates (added):** a rough calories, protein, carbs and fat per serving on the recipe page, and a daily calorie total on the planner. TheMealDB has no nutrition data, so these are worked out from the ingredient amounts and labelled as a rough guide, not exact figures.
+- **Deployment:** live on GitHub Pages (the submission link) and Firebase Hosting, with security rules that keep each user's data private.
 
-**Out of scope (proposed)**
+**Out of scope**
 
 - Adding or uploading our own recipes. All recipes come from TheMealDB.
-- Nutrition, calorie or cost calculations.
+- Exact nutrition figures and cost calculations. Only the rough estimates above are shown.
 - Ordering groceries or connecting to shops.
 - Sharing plans or following other users, and moderation tools for comments.
 - Guaranteed allergen safety or medical advice. Warnings are keyword matches on ingredient names.
@@ -55,78 +59,109 @@ This is what four people can finish in four weeks (Oct 26 to Nov 23, 2026). Item
 - Photo uploads, so Firebase Storage is not used.
 
 * **Extra features for later:** a "Fill my week" button that auto-plans meals that are safe for the user, substitution suggestions for flagged ingredients, searching by the ingredients you already have, a step-by-step cooking mode, and dark mode.
+  * **Built:** cooking mode, a simpler "Fill from favourites" option in the planner's ⋯ menu, and substitution suggestions ("Try instead" in the recipe page's warning banner).
+  * **Not built:** a smart "Fill my week" auto-planner, searching by several ingredients you have, and dark mode.
 
 **Constraints**
 
-Four people, five weeks, plain JavaScript with Tailwind from the CDN (no frameworks or build step), the free Firebase plan, and TheMealDB's free API.
+Four people, five weeks, plain JavaScript with Tailwind (no frameworks), the free Firebase plan, and TheMealDB's free API. Most pages load Tailwind from the CDN with no build step. The home, recipes and recipe pages use a prebuilt CSS file so they load faster (see Tailwind CSS setup).
 
 ## Folder structure
 
-Every page gets its own HTML and JS file, with styling done by Tailwind classes in the HTML, so each person mostly works in their own files and rarely touches anyone else's. Everything the browser needs lives in `public/`, which is also the folder Firebase Hosting deploys.
+Every page gets its own HTML and JS file (plus a CSS file where it needs one), so each person mostly works in their own files and rarely touches anyone else's. Everything the browser needs lives in `public/`, which is the folder both GitHub Pages and Firebase Hosting deploy.
 
 ```
-recipeplan/
+webprogproject/
 ├── README.md               how to run and deploy (Person 4)
-├── firebase.json           hosting settings (Person 4)
+├── PROJECT_NOTES.md        team rules, contracts and current status
+├── firebase.json           Firebase Hosting settings (Person 4)
+├── .firebaserc             Firebase project id (Person 4)
+├── .github/workflows/      GitHub Pages and Firebase Hosting deploys (Person 4)
 ├── firestore.rules         security rules (Person 1)
+├── tailwind.config.js      theme for the prebuilt Tailwind file (not deployed)
+├── tailwind.input.css      input for the prebuilt Tailwind file (not deployed)
 └── public/
-    ├── index.html          home, search and results (Person 2)
-    ├── recipe.html         recipe detail (Person 2)
+    ├── index.html          home page and search (Person 2)
+    ├── recipes.html        recipe search, category and cuisine filters (Person 2, cuisine filter Person 4)
+    ├── recipe.html         recipe detail and cooking mode (Person 2)
     ├── login.html          log in (Person 1)
     ├── signup.html         sign up (Person 1)
     ├── onboarding.html     diet then allergies, 2 steps (Person 1)
-    ├── profile.html        profile and diet preferences (Person 1)
+    ├── profile.html        profile, diet and allergy settings (Person 1)
     ├── favourites.html     saved recipes (Person 3)
     ├── planner.html        weekly plan and shopping list (Person 4)
+    ├── privacy.html        privacy policy (Person 1)
+    ├── terms.html          terms of service (Person 1)
+    ├── 404.html            page not found
+    ├── proposal/           proposal page with the video and slides
+    ├── css/
+    │   ├── base.css, components.css   shared design tokens and components (Person 2)
+    │   ├── tailwind.css    prebuilt Tailwind for index, recipes and recipe (Person 2)
+    │   └── auth.css, onboarding.css, recipes.css, favourites.css, planner.css   page styles
     ├── js/
     │   ├── firebase-config.js  Firebase setup, imported by all (Person 1)
-    │   ├── auth.js             login, signup, logout (Person 1)
+    │   ├── auth.js             login, signup, logout, Google sign-in (Person 1)
     │   ├── navbar.js           navbar that reacts to login state (Person 1)
     │   ├── onboarding.js       two-step preferences flow (Person 1)
+    │   ├── profile.js          profile page (Person 1)
     │   ├── preferences.js      allergen and diet checker used by every page (Person 1)
+    │   ├── i18n.js             language switcher and search translation (Person 1)
+    │   ├── schema.js           Firestore paths and read/write helpers (Person 1)
     │   ├── api.js              TheMealDB requests (Person 2)
     │   ├── recipes.js          search, filters, detail page (Person 2)
-    │   ├── ui.js               shared Tailwind class sets and components (Person 2)
+    │   ├── cooking-mode.js     step-by-step cooking view (Person 2)
+    │   ├── search-cta.js       home page search and featured cards (Person 2)
+    │   ├── home-demos.js       home page feature demos (Person 2)
+    │   ├── nutrition.js        rough nutrition estimates from ingredients
     │   ├── favourites.js       (Person 3)
     │   ├── ratings.js          star ratings and comments (Person 3)
-    │   ├── planner.js          (Person 4)
-    │   └── utils.js            small shared helpers (anyone, tell the team)
-    └── images/             logo, icons, empty-state pictures
+    │   ├── planner.js          planner and shopping list (Person 4)
+    │   └── utils.js            shared helpers and components (anyone, add but do not change)
+    └── images/             hero and category pictures
 ```
 
 Three rules keep this beginner-friendly:
 
-- **Edit only your own files.** If you need a change in a shared file (`ui.js`, `firebase-config.js`), message the owner instead of editing it yourself.
-- **Link files with relative paths.** Pages and folders sit side by side, so `js/ui.js` and `js/auth.js` work from every HTML file.
+- **Edit only your own files.** If you need a change in a shared file (`utils.js`, `firebase-config.js`), message the owner instead of editing it yourself.
+- **Link files with relative paths.** Pages and folders sit side by side, so `js/utils.js` and `js/auth.js` work from every HTML file.
 - **Load scripts with `type="module"`.** That lets each JS file `import` from the others, for example `import { getCurrentUser } from './auth.js'`.
 
 ## Tailwind CSS setup
 
-The site is styled with Tailwind CSS, a set of ready-made utility classes you write directly in the HTML, for example `class="bg-orange-600 text-white rounded-lg px-4 py-2"`. It loads from Tailwind's Play CDN, so there is nothing to install and no build step.
+The site is styled with Tailwind CSS v3, a set of ready-made utility classes you write directly in the HTML, for example `class="bg-brand-600 text-white rounded-lg px-4 py-2"`, alongside a few shared CSS files.
 
-Add this one line inside the `<head>` of every HTML page:
+Most pages load Tailwind from its CDN, so there is nothing to install:
 
 ```html
-<script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+```
+
+Each of those pages has the same `tailwind.config` block after it, which adds the `brand` colours (main `#ca5c2e`). Copy it from an existing page.
+
+**Exception:** `index.html`, `recipes.html` and `recipe.html` load a prebuilt `css/tailwind.css` instead, so they load faster. It only holds the classes that existed when it was built, and it also bundles `base.css`, `components.css` and `recipes.css`. After adding new Tailwind classes to those pages, or editing those CSS files, rebuild it from the repo root:
+
+```
+npx tailwindcss@3.4.17 -c tailwind.config.js -i tailwind.input.css -o public/css/tailwind.css --minify
 ```
 
 The team agrees on these conventions:
 
-- **Default palette only.** Primary `orange-600` (hover `orange-700`), page background `amber-50`, text `stone-800`, muted text `stone-500`, borders `stone-200`, errors `red-700`, success `green-700`. No custom colours, so the site stays consistent.
+- **Brand colours.** Use the `brand` colours from the shared config for buttons and links, with a cream page background, white rounded cards and stone text. Errors are red and success is green.
+- **Fonts.** Inter for body text and Outfit for headings.
 - **Mobile first.** Classes with no prefix apply to phones. Add `sm:` (640px and up), `md:` (768px) or `lg:` (1024px) to change the layout on bigger screens, for example `grid-cols-1 sm:grid-cols-2 lg:grid-cols-3`.
-- **Shared components live in `js/ui.js`.** Person 2 writes the button classes, recipe card, form field and toast once, and everyone imports them instead of retyping long lists of classes.
-- **Little or no custom CSS.** Loading skeletons (`animate-pulse`) and print styles (`print:hidden`) are built in, so use utilities first.
+- **Shared components live in `js/utils.js`.** The recipe card (`createRecipeCard`), toast (`showToast`) and confirm dialog (`showConfirmModal`) are written once and everyone imports them. Shared styles are in `css/base.css` and `css/components.css`.
+- **Utilities first.** Loading skeletons (`animate-pulse`) and print styles (`print:hidden`) are built into Tailwind, so use them before writing custom CSS.
 
-Tailwind describes the Play CDN as meant for development, so it suits a course project but is not what you would use for a production site. See Tailwind's [Play CDN guide](https://tailwindcss.com/docs/installation/play-cdn).
+Tailwind describes the CDN as meant for development, so it suits a course project but is not what you would use for a production site. That is also why the busiest pages use the prebuilt file.
 
 ## Shared UI/UX rules
 
-The site should feel like one product, so Person 2 sets up the shared components in `js/ui.js` in week 1, and everyone reuses them with the Tailwind conventions above.
+The site should feel like one product, so the shared components live in `js/utils.js` and the shared styles in `css/base.css` and `css/components.css` (Person 2), and everyone reuses them with the Tailwind conventions above.
 
-- **Look and feel:** Warm, food-friendly colours from Tailwind's default palette (orange-600 for buttons and links, amber-50 for the page background, stone-800 for text), the default sans-serif font, lots of white space, and large food photos as the main visual.
+- **Look and feel:** Warm, food-friendly brand colours (the orange `brand` colour for buttons and links, a cream page background, stone text), Inter and Outfit fonts, lots of white space, and large food photos as the main visual.
 - **Layout:** Mobile-first. One column on phones, two on tablets (Tailwind's sm: prefix, 640px and up), three on desktops (the lg: prefix, 1024px and up). Content sits in a centred container with a maximum width.
 - **Navbar on every page:** Logo on the left, links for Recipes, Favourites and Planner in the middle, and Login / Sign up on the right (or the user's name and Log out when logged in). On phones it collapses into a menu button.
-- **Shared components:** Primary and secondary buttons, recipe card, form field with label and error text, toast message, dialog, and a loading skeleton. Build each once in js/ui.js as a function or a shared set of Tailwind classes, and reuse it.
+- **Shared components:** Primary and secondary buttons, recipe card, form field with label and error text, toast message, dialog, and a loading skeleton. Each is built once (in `js/utils.js` or the shared CSS) and reused.
 - **Every screen has four states:** Loading (skeleton or spinner), empty (friendly message with a next action), error (what went wrong and a retry button), and success (a short toast).
 - **Accessibility basics:** Alt text on images, labels on every input, visible keyboard focus, sufficient colour contrast, and never use colour alone to show an error.
 
@@ -138,29 +173,26 @@ All personal data lives in subcollections under `users/{uid}`, so each user's da
 users/{uid}                          (Person 1)
   displayName   string               "Sam Lee"
   email         string               "sam@example.com"
-  onboardingDone boolean              false until the preferences step is saved or skipped
-  diets         array of string      ["vegetarian"]
-  allergies     array of string      ["peanuts"]
+  diets         array of string      ["Vegetarian", "Halal"]
+  allergies     array of string      ["Peanuts", "Shellfish"]
+  hideFlagged   boolean              hide recipes that clash with the user's preferences
+  onboardingComplete boolean         false until onboarding is finished or skipped
+  onboardingStep number              1 (diet) or 2 (allergies), so a refresh resumes the right step
   createdAt     timestamp
 
 users/{uid}/favourites/{recipeId}    (Person 3)
-  recipeId      string               "52772"  (TheMealDB idMeal, same as doc id)
-  name          string               "Teriyaki Chicken Casserole"
-  image         string               image URL
-  category      string               "Chicken"
+  id, name, image, category, area    the recipe snapshot (id = TheMealDB idMeal, same as doc id)
   ingredientNames array of string    ["chicken", "soy sauce"]  used for allergen checks
-  addedAt       timestamp
+  savedAt       timestamp
 
-users/{uid}/mealPlan/{day}           (Person 4)   day = monday ... sunday
-  breakfast     map or null          { recipeId, name, image, ingredients }
-  lunch         map or null          same shape
-  dinner        map or null          same shape
-  updatedAt     timestamp
+users/{uid}/mealPlan/{weekId}        (Person 4)   weekId = ISO week, e.g. "2026-W47"
+  Mon ... Sun   map                  { Breakfast, Lunch, Dinner }
+    each slot   map or null          { id, name, image, ingredients }
     ingredients = array of { name: "chicken", measure: "2 cups" }
 
-users/{uid}/shoppingList/current     (Person 4)
-  checked       array of string      ["chicken", "soy sauce"]  ingredient names ticked off
-  updatedAt     timestamp
+users/{uid}/shoppingList/{weekId}    (Person 4)
+  items         array of map         [{ name, measure, checked }]
+  checked       array of string      names of the items ticked off
 
 recipes/{recipeId}/ratings/{uid}     (Person 3)
   stars         number               1 to 5
@@ -169,15 +201,17 @@ recipes/{recipeId}/ratings/{uid}     (Person 3)
   createdAt     timestamp
 ```
 
+The paths and the functions that read and write them are in `js/schema.js`, so the other pages call those helpers instead of writing Firestore code themselves.
+
 The main design choices:
 
 - **Recipe id as the favourite's document id.** It prevents duplicates and turns "is this recipe a favourite?" into a single read. Always store it as a string.
 - **Store a small snapshot, not the whole recipe.** Name, image and category are enough to draw a card, so the favourites page needs no extra API calls.
-- **One document per weekday.** Seven small documents are easy to read, update and clear. Each slot keeps its `ingredients`, so the shopping list can be built without calling the API again.
+- **One document per week.** Each week's plan and shopping list is its own document, so users can switch between weeks and each week keeps its own plan and ticks. Each slot keeps its `ingredients`, so the shopping list can be built without calling the API again.
 - **Rating document id = user id.** Each user can have only one rating per recipe, and they can edit it instead of adding another.
-- **Use `serverTimestamp()` for `createdAt`, `addedAt` and `updatedAt`**, so times do not depend on a user's device clock.
+- **Use `serverTimestamp()` for `createdAt` and `savedAt`**, so times do not depend on a user's device clock.
 
-One rule to add for ratings and comments, next to the existing `users/{userId}` rule in `firestore.rules`. Ratings are readable by anyone, but writable only by their own author:
+The rule for ratings and comments sits next to the `users/{userId}` rule in `firestore.rules`. Ratings are readable by anyone, but writable only by their own author:
 
 ```
 match /recipes/{recipeId}/ratings/{uid} {
@@ -192,18 +226,18 @@ Person 1 keeps `firestore.rules`, so the others should send any schema change to
 
 Sign-up is three screens: create the account, choose diets, then choose allergies. One question per screen keeps each form short and easy to use on a phone. Person 1 builds a dedicated `onboarding.html` page for the last two screens, and the Profile page reuses the same chips so users can edit their choices later.
 
-1. **Create the account.** The user enters name, email and password on `signup.html` (or continues with Google). Firebase Auth creates the account and a `users/{uid}` document is saved with `onboardingDone: false`.
+1. **Create the account.** The user enters name, email and password on `signup.html` (or continues with Google). Firebase Auth creates the account and a `users/{uid}` document is saved with `onboardingComplete: false`.
 2. **Step 1 of 2: diet.** They are sent to `onboarding.html`. A progress bar shows "Step 1 of 2" above the heading "How do you eat?". Selectable chips: Vegetarian, Vegan, Pescatarian, Gluten-free, Dairy-free, Halal, and "No preference". More than one can be chosen. Buttons: Next and Skip.
 3. **Step 2 of 2: allergies.** The same page swaps to the heading "Any food allergies?". Chips: Peanuts, Tree nuts, Milk, Eggs, Gluten/wheat, Soy, Fish, Shellfish, Sesame, and "None", plus an "Other" text box. One line under the heading explains that this is used to warn them about recipes. Buttons: Back, Skip and Finish.
-4. **Saving.** Next saves `diets` straight away, so progress survives a page refresh. Finish saves `allergies` and sets `onboardingDone: true`. Skip moves on without saving that screen. Back keeps what was already selected.
+4. **Saving.** Next saves `diets` (and `onboardingStep: 2`) straight away, so progress survives a page refresh. Finish saves `allergies` and sets `onboardingComplete: true`. Skip moves on without saving that screen. Back keeps what was already selected.
 5. **Land on the home page** with a toast ("Preferences saved"). Their diets are already applied to the recipe filters, and they can change both lists later on `profile.html`.
 
 Two cases to handle:
 
-- **Google sign-in:** a first-time Google user has no `users/{uid}` document yet. Create it with `onboardingDone: false` and send them to `onboarding.html` like everyone else.
-- **Returning user who never finished:** after login, if `onboardingDone` is false, redirect to `onboarding.html` instead of the home page. If `onboardingDone` is already true and someone opens `onboarding.html` directly, redirect them to the home page.
+- **Google sign-in:** a first-time Google user has no `users/{uid}` document yet. Create it with `onboardingComplete: false` and send them to `onboarding.html` like everyone else.
+- **Returning user who never finished:** after login, if `onboardingComplete` is false, redirect to `onboarding.html` instead of the home page. If `onboardingComplete` is already true and someone opens `onboarding.html` directly, redirect them to the home page.
 
-The schema needs one new field on `users/{uid}`: `onboardingDone` (boolean). `diets` and `allergies` are already in it. The new files are `onboarding.html` and `js/onboarding.js`, both owned by Person 1.
+The schema needs two fields on `users/{uid}`: `onboardingComplete` (boolean) and `onboardingStep` (1 or 2). `diets` and `allergies` are already in it. The new files are `onboarding.html` and `js/onboarding.js`, both owned by Person 1.
 
 ## How preferences affect the website
 
@@ -265,7 +299,7 @@ Person 2 owns how users find recipes, from the search bar to the data fetched fr
 
 - **Frontend:** Homepage, search bar, filters (category, ingredient, diet), recipe cards, recipe detail page, and the serving size scaler.
 - **Backend:** The API layer that fetches from TheMealDB, with error handling and caching in `sessionStorage`.
-- **Extra:** Owns the shared design system (the Tailwind class choices and the components in js/ui.js: buttons, cards, forms) so the whole site looks consistent.
+- **Extra:** Owns the shared design system (the Tailwind class choices, `css/base.css` and `css/components.css`, and the shared recipe card in `js/utils.js`) so the whole site looks consistent.
 
 **Happy path**
 
@@ -278,7 +312,7 @@ Person 2 owns how users find recipes, from the search bar to the data fetched fr
 **Requirements**
 
 - **Must:** Search by name. Filter by category. Cards show image, name and category. Detail page lists ingredients (combine TheMealDB's `strIngredient1` to `strIngredient20` fields into one array) and numbered instructions. Loading, empty ("No recipes found") and error states. Responsive grid.
-- **Should:** Cuisine filter, serving size scaler (scale only amounts that start with a number, and leave values like "a pinch" unchanged), and `sessionStorage` caching of API responses.
+- **Should:** Serving size scaler (scale only amounts that start with a number, and leave values like "a pinch" unchanged), and `sessionStorage` caching of API responses.
 - **Nice to have:** A "Surprise me" random recipe button, and a space on the recipe page where Person 3's ratings and comments appear.
 - **Hand-off:** Agree the recipe object shape in week 1 (id, name, image, category, area, ingredients, instructions) and document it at the top of `api.js`.
 
@@ -335,7 +369,7 @@ Person 4 owns turning saved recipes into a weekly plan and a combined shopping l
 
 - **Frontend:** A weekly planner grid with drag-and-drop or "add to day" buttons, a shopping list view with checkboxes, and print-friendly styling.
 - **Backend:** Firestore storage at `users/{uid}/mealPlan/{day}`, and logic that merges ingredients across the week's recipes and combines duplicates.
-- **Extra:** Owns Firebase Hosting deployment, the README, and the final demo script.
+- **Extra:** Owns Firebase Hosting deployment, the README, and the final demo script. Also owns the cuisine filter on the recipes page: a cuisine dropdown that combines with the search box and category chips, plus a "Clear filters" button (built in Person 2's `recipes.html`, `api.js` and `recipes.js`).
 
 **Happy path**
 
@@ -388,4 +422,4 @@ The plan runs from Monday Oct 26 to Monday Nov 23, 2026, which is the submission
 | **Week 4**, Nov 16 to Nov 21: finish features, then freeze | Help Person 4 with the shopping list if it is behind. Tune the allergen keyword lists in preferences.js. Merge any rule changes into firestore.rules. | Day and meal dialog for Add to meal plan (agree it with Person 4). Cooking mode on recipe.html (step by step with Next and Back, Step X of Y, ingredient checklist) as a bonus after the dialog. | Switch the card heart buttons in utils.js and search-cta.js to addFavourite and removeFavourite. Optional favourites count badge and "your rating" badge. Get the manual test checklist ready. | Shopping list built from the plan with combineIngredients, checkboxes saved to shoppingList/{weekId}, checked items struck through and moved to the bottom, its own tab on phones. Print view (print:hidden on the navbar and buttons) and a Copy list button. | **Feature freeze on Nov 21.** Every Must item is on main. After this date only fixes are allowed, no new features. |
 | **Final days**, Nov 22 to Nov 23: test, fix, deploy and submit | Review firestore.rules and test that one user cannot read another user's data. Fix redirect and onboarding bugs. Keyboard-only check of the forms. Create demo accounts (one with allergies set, one empty). Write up accounts and security. | Make styles consistent. Check loading, empty and error states, including when TheMealDB is unreachable. Fix responsive problems. Final accessibility check: alt text, colour contrast and visible focus. Write up recipes and design. | Run the full manual test checklist with two accounts (including ratings: one review per user, editing, logged-out users cannot post) on a phone and in Chrome, Firefox and Safari. Retest fixes and sign off. Write up favourites, ratings and testing. | Redeploy after the fixes, with the final deployment on Nov 22 and no code changes after it. Finish the README and the demo script. Record a backup screen recording of the demo. | The final site is live, the demo has been rehearsed at least once, and everything is submitted by **Nov 23**. |
 
-Persons 1 and 2 start first because Persons 3 and 4 depend on auth and the recipe data shape. Deploy to Firebase Hosting before the freeze so there is time to fix anything that only breaks in production.
+Persons 1 and 2 start first because Persons 3 and 4 depend on auth and the recipe data shape. Deploy before the freeze so there is time to fix anything that only breaks in production.

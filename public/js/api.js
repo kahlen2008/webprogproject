@@ -122,6 +122,51 @@ export async function filterByCategory(category) {
   }));
 }
 
+// Cuisines that have recipes on TheMealDB (checked Nov 2026 by reading every recipe's
+// strArea: 37 cuisines, 791 recipes, 190 of them with no cuisine set).
+// TheMealDB's own cuisine list (list.php?a=list) is no help: it has ~195 names, most with
+// no recipes, and it misses 8 that do have recipes because those recipes use a country
+// name ("France", "India", "United States"). The menu shows a cuisine name ("French"),
+// and filterByArea sends TheMealDB the name its recipes actually use.
+// Checking every cuisine from the browser isn't an option: TheMealDB starts refusing
+// requests after about 100 in a row. A cuisine added later just needs adding here.
+const AREA_API_NAMES = {
+  American: "United States",
+  Argentinian: "Argentina",
+  Dutch: "Netherlands",
+  French: "France",
+  Indian: "India",
+  Norwegian: "Norway",
+  Slovak: "Slovakia",
+  Venezuelan: "Venezuela",
+};
+
+const AREAS_WITH_RECIPES = [
+  "Algerian", "American", "Argentinian", "Australian", "British", "Canadian", "Chinese",
+  "Croatian", "Dutch", "Egyptian", "Filipino", "French", "Greek", "Indian", "Irish",
+  "Italian", "Jamaican", "Japanese", "Kenyan", "Malaysian", "Mexican", "Moroccan",
+  "Norwegian", "Polish", "Portuguese", "Russian", "Saudi Arabian", "Slovak", "Spanish",
+  "Syrian", "Thai", "Tunisian", "Turkish", "Ukrainian", "Uruguayan", "Venezuelan",
+  "Vietnamese",
+];
+
+// Cuisine names for the cuisine menu, sorted.
+export async function listAreas() {
+  return [...AREAS_WITH_RECIPES].sort((x, y) => x.localeCompare(y));
+}
+
+// Recipes for a cuisine name from the menu ("French"), or TheMealDB's own name ("France").
+export async function filterByArea(area) {
+  const apiName = AREA_API_NAMES[area] || area;
+  const data = await fetchJson(`filter.php?a=${encodeURIComponent(apiName)}`);
+  return (data.meals || []).map((meal) => ({
+    id: String(meal.idMeal),
+    name: toTitleCase(meal.strMeal),
+    image: meal.strMealThumb,
+    area: area,
+  }));
+}
+
 // ---------- Beyond the 25-result cap ----------
 // TheMealDB's free name search (search.php?s=) never returns more than 25 meals.
 // The category and ingredient filters return every match, so these two helpers use

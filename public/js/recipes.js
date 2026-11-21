@@ -1,10 +1,10 @@
 // Home page (search/categories) and recipe detail page.
 // Matches the design and interactions shown in RecipePlan mockup.
 
-import { searchRecipes, searchRecipesWide, listAllRecipes, getRecipeById, filterByCategory } from "./api.js";
+import { searchRecipes, searchRecipesWide, listAllRecipes, getRecipeById, filterByCategory, listAreas, filterByArea } from "./api.js";
 import { translateQueryToEnglish } from "./i18n.js";
 import { estimateNutrition } from "./nutrition.js";
-import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect } from "./utils.js";
+import { createRecipeCard, escapeHtml, showToast, toTitleCase, cleanInstructionText, combineIngredients, capitalizeIngredient, showAuthPromptModal, showConfirmModal, playHeartEffect, scaleMeasure } from "./utils.js";
 import { openCookingMode } from "./cooking-mode.js";
 import {
   getPreferences,
@@ -14,6 +14,7 @@ import {
   decorateCard,
   describeResult,
   confirmIfFlagged,
+  getSwapSuggestions,
 } from "./preferences.js";
 
 function getCurrentUser() {
@@ -322,12 +323,19 @@ function applyHideFilterAnimated(hide) {
   return true;
 }
 
+let cardRenderId = 0;
+
 async function renderRecipeCards(recipesList, { isSuggested = false, paged = false } = {}) {
   if (!results) return;
   if (finishFilterAnimation) finishFilterAnimation();
-  results.innerHTML = "";
+  const renderId = ++cardRenderId;
+  // The allergen check below fetches each recipe's details, which can take a moment, so
+  // the loading cards stay up until the real cards are ready (no blank grid in between).
+  if (!results.querySelector(".rp-skeleton")) showGridSkeleton();
   const prefs = getPreferences();
   const checked = await checkRecipes(recipesList, prefs);
+  if (renderId !== cardRenderId) return; // a newer render (page or filter change) took over
+  results.innerHTML = "";
   currentChecked = checked;
   cardCache.clear();
   const visible = prefs.hideFlagged
@@ -628,25 +636,44 @@ async function findSimilarRecipes(query) {
   return sorted.slice(0, 12);
 }
 
+// Placeholder cards shaped like the real ones, with a shimmer, while recipes load.
+// The text is for screen readers (role="status" announces it).
+function showGridSkeleton(text = "Loading recipes...") {
+  if (!results) return;
+  const count = window.matchMedia?.("(min-width: 1024px)").matches ? 8 : 4;
+  const card = `
+    <li class="rp-skeleton" aria-hidden="true">
+      <div class="rp-skeleton-img"></div>
+      <div class="rp-skeleton-body">
+        <div class="rp-skeleton-line" style="width:78%"></div>
+        <div class="rp-skeleton-row">
+          <div class="rp-skeleton-chip"></div>
+          <div class="rp-skeleton-dot"></div>
+        </div>
+      </div>
+    </li>`;
+  results.innerHTML =
+    `<li class="visually-hidden" role="status">${escapeHtml(text)}</li>` + card.repeat(count);
+}
+
 function renderRecipesLoading(text = "Loading delicious recipes...") {
   if (!results) return;
-  results.innerHTML = `
-    <li class="col-span-full py-20 text-center text-stone-500 flex flex-col items-center justify-center gap-3">
-      <svg class="animate-spin w-8 h-8 text-[#ca5c2e]" fill="none" viewBox="0 0 24 24">
-        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-      </svg>
-      <span class="text-sm font-medium text-stone-600">${escapeHtml(text)}</span>
-    </li>
-  `;
+  showGridSkeleton(text);
+  // Hide the previous results' page numbers until the new results arrive.
+  document.getElementById("results-pagination")?.classList.add("hidden");
   if (message) {
     message.innerHTML = "";
     message.className = "hidden";
   }
 }
 
+// Every search/filter run takes a new token. A run whose token is no longer the latest
+// drops its results, so a slow older request can't overwrite a newer filter.
+let renderToken = 0;
+
 async function runSearch(query, title = "Search Results") {
   if (!results) return;
+  const token = ++renderToken;
   lastSearchQuery = query;
   lastSearchTitle = title;
   if (sectionTitle) {
@@ -671,6 +698,7 @@ async function runSearch(query, title = "Search Results") {
         isSuggested = true;
       }
     }
+    if (token !== renderToken) return;
 
     if (!recipes || recipes.length === 0) {
       results.innerHTML = "";
@@ -723,12 +751,17 @@ async function runSearch(query, title = "Search Results") {
           btn.addEventListener("click", () => {
             const cat = btn.dataset.category;
             if (!cat) return;
+            // Swap the failed search for the category (the cuisine stays selected).
             activeCategory = cat;
             categoryChips.forEach((c) => {
               c.classList.toggle("active", c.dataset.category === cat);
             });
-            window.history.replaceState(null, "", `?category=${encodeURIComponent(cat)}`);
-            runCategoryFilter(cat);
+            if (searchForm?.query) {
+              searchForm.query.value = "";
+              searchForm.query.dispatchEvent(new Event("input"));
+            }
+            updateUrlParams();
+            runActiveFilter();
           });
         });
       }
@@ -766,6 +799,7 @@ async function runSearch(query, title = "Search Results") {
 
     await showResults(recipes, { isSuggested });
   } catch (error) {
+    if (token !== renderToken) return;
     console.warn("Recipe fetch failed, displaying curated recipes:", error);
     await showResults(DEFAULT_FALLBACK_RECIPES);
   }
@@ -773,11 +807,13 @@ async function runSearch(query, title = "Search Results") {
 
 async function runCategoryFilter(category) {
   if (!results) return;
+  const token = ++renderToken;
   if (sectionTitle) sectionTitle.innerHTML = `<span>${escapeHtml(category)} Recipes</span>`;
   renderRecipesLoading(`Loading ${category} recipes...`);
 
   try {
     const recipes = await filterByCategory(category);
+    if (token !== renderToken) return;
     if (!recipes || recipes.length === 0) {
       results.innerHTML = "";
       clearResultsPaging();
@@ -789,39 +825,449 @@ async function runCategoryFilter(category) {
     }
     await showResults(recipes);
   } catch (error) {
-    results.innerHTML = "";
-    clearResultsPaging();
-    if (message) {
-      message.className = "text-sm text-stone-500 py-12 text-center";
-      message.textContent = "Could not load recipes right now.";
-    }
+    if (token !== renderToken) return;
+    showLoadError();
+  }
+}
+
+function showLoadError() {
+  if (!results) return;
+  results.innerHTML = "";
+  clearResultsPaging();
+  if (message) {
+    message.className = "text-sm text-stone-500 py-12 text-center";
+    message.textContent = "Could not load recipes right now.";
   }
 }
 
 let activeCategory = null;
+let activeCuisine = "";
+
+const clearFiltersBtn = document.getElementById("clear-filters-btn");
+
+function syncFilterUI() {
+  const query = searchForm?.query?.value?.trim() || "";
+  const hasFilter = Boolean(activeCategory || activeCuisine || query);
+  if (clearFiltersBtn) {
+    clearFiltersBtn.classList.toggle("hidden", !hasFilter);
+  }
+  syncCuisineTrigger();
+}
+
+function updateUrlParams() {
+  const params = new URLSearchParams();
+  const query = searchForm?.query?.value?.trim();
+  if (query) params.set("search", query);
+  if (activeCategory) params.set("category", activeCategory);
+  if (activeCuisine) params.set("cuisine", activeCuisine);
+  const qs = params.toString();
+  window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+}
+
+function clearAllFilters() {
+  activeCategory = null;
+  activeCuisine = "";
+  if (searchForm?.query) {
+    searchForm.query.value = "";
+    const clearBtn = document.getElementById("search-clear");
+    if (clearBtn) {
+      clearBtn.classList.add("hidden");
+      clearBtn.classList.remove("inline-flex");
+    }
+  }
+  categoryChips.forEach((c) => c.classList.remove("active"));
+  window.history.replaceState(null, "", window.location.pathname);
+  syncFilterUI();
+  runActiveFilter();
+}
+
+// ---------- Cuisine dropdown (Person 4) ----------
+// A custom listbox (search box, check on the picked cuisine) instead of a
+// native <select>, whose open list is drawn by the browser and can't be styled.
+const cuisinePicker = document.getElementById("cuisine-picker");
+const cuisineTrigger = document.getElementById("cuisine-trigger");
+const cuisineTriggerLabel = document.getElementById("cuisine-trigger-label");
+const cuisinePanel = document.getElementById("cuisine-panel");
+const cuisineSearch = document.getElementById("cuisine-search");
+const cuisineList = document.getElementById("cuisine-list");
+
+let cuisineAreas = null; // cuisine names once loaded
+let cuisineLoading = null;
+let cuisineLoadFailed = false;
+let cuisineFocusIndex = -1;
+
+const CUISINE_CHECK_SVG = `<svg class="rp-cuisine-check" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24" aria-hidden="true"><polyline points="20 6 9 17 4 12"></polyline></svg>`;
+
+function syncCuisineTrigger() {
+  if (!cuisineTrigger) return;
+  if (cuisineTriggerLabel) cuisineTriggerLabel.textContent = activeCuisine || "All cuisines";
+  cuisineTrigger.classList.toggle("is-active", Boolean(activeCuisine));
+  const clearBtn = document.getElementById("cuisine-clear");
+  if (clearBtn) clearBtn.hidden = !activeCuisine;
+}
+
+function loadCuisines() {
+  if (cuisineLoading) return cuisineLoading;
+  cuisineLoadFailed = false;
+  cuisineLoading = listAreas()
+    .then((areas) => {
+      cuisineAreas = areas.slice();
+      if (activeCuisine) {
+        // Links may use any case (?cuisine=italian), so match it to the API's spelling.
+        const match = areas.find((a) => a.toLowerCase() === activeCuisine.toLowerCase());
+        if (match) activeCuisine = match;
+        else cuisineAreas.push(activeCuisine); // keep an unknown one selectable
+      }
+      syncCuisineTrigger();
+    })
+    .catch((err) => {
+      console.warn("Could not load cuisines:", err);
+      cuisineLoadFailed = true;
+      cuisineLoading = null; // try again next time the menu opens
+    })
+    .finally(() => {
+      if (cuisinePanel && !cuisinePanel.hidden) {
+        renderCuisineOptions();
+        placeCuisinePanel({ makeRoom: true }); // "Loading cuisines…" was shorter than the list
+        renderCuisineOptions();
+      }
+    });
+  return cuisineLoading;
+}
+
+function cuisineOptions() {
+  return cuisineList ? [...cuisineList.querySelectorAll(".rp-cuisine-option")] : [];
+}
+
+function setCuisineFocus(index, { scroll = true } = {}) {
+  const options = cuisineOptions();
+  if (!options.length) {
+    cuisineFocusIndex = -1;
+    cuisineSearch?.removeAttribute("aria-activedescendant");
+    return;
+  }
+  cuisineFocusIndex = Math.min(Math.max(0, index), options.length - 1);
+  options.forEach((el, i) => el.classList.toggle("is-focused", i === cuisineFocusIndex));
+  const focused = options[cuisineFocusIndex];
+  cuisineSearch?.setAttribute("aria-activedescendant", focused.id);
+  // Scroll only the list (scrollIntoView would also scroll the page).
+  if (scroll) {
+    const top = focused.offsetTop;
+    const bottom = top + focused.offsetHeight;
+    if (top < cuisineList.scrollTop) cuisineList.scrollTop = top - 6;
+    else if (bottom > cuisineList.scrollTop + cuisineList.clientHeight) {
+      cuisineList.scrollTop = bottom - cuisineList.clientHeight + 6;
+    }
+  }
+}
+
+function renderCuisineOptions() {
+  if (!cuisineList) return;
+  const status = (text) => {
+    cuisineList.innerHTML = `<li class="rp-cuisine-status" role="presentation">${text}</li>`;
+    setCuisineFocus(-1);
+  };
+  if (!cuisineAreas) {
+    status(cuisineLoadFailed ? "Couldn't load cuisines. Close and try again." : "Loading cuisines…");
+    return;
+  }
+
+  const query = (cuisineSearch?.value || "").trim().toLowerCase();
+  const items = query ? [] : [{ value: "", label: "All cuisines" }];
+  cuisineAreas
+    .filter((name) => name.toLowerCase().includes(query))
+    .forEach((name) => items.push({ value: name, label: name }));
+
+  if (!items.length) {
+    status(`No cuisines match “${escapeHtml(cuisineSearch.value.trim())}”`);
+    return;
+  }
+
+  cuisineList.innerHTML = items
+    .map((item, i) => {
+      return `<li id="cuisine-opt-${i}" class="rp-cuisine-option${item.value ? "" : " is-all"}" role="option" aria-selected="${item.value === activeCuisine}" data-value="${escapeHtml(item.value)}">${CUISINE_CHECK_SVG}<span class="rp-cuisine-name">${escapeHtml(item.label)}</span></li>`;
+    })
+    .join("");
+
+  // While searching, the first match is ready for Enter; otherwise start on the current choice.
+  const selected = items.findIndex((item) => item.value === activeCuisine);
+  setCuisineFocus(query ? 0 : Math.max(0, selected));
+}
+
+// Keeps the open panel inside the screen (the pill can sit anywhere in a wrapping row).
+// It always opens downwards, and the list gets shorter to fit the room below the button.
+// Only when even the shortest list would not fit does the page scroll up (makeRoom, on open),
+// and only by the difference, so in most cases the page does not move at all.
+const CUISINE_LIST_MAX = 232; // about 6 rows (shorter than the 296px max-height in recipes.css)
+const CUISINE_LIST_MIN = 114; // about 3 rows
+
+function placeCuisinePanel({ makeRoom = false } = {}) {
+  if (!cuisinePanel || !cuisineTrigger || !cuisineList || cuisinePanel.hidden) return;
+  const gutter = 16;
+  const gap = 8;
+
+  // Sideways: keep a 16px gutter on both edges.
+  cuisinePanel.style.left = "0px";
+  const rect = cuisinePanel.getBoundingClientRect();
+  let shift = 0;
+  if (rect.right > window.innerWidth - gutter) shift = window.innerWidth - gutter - rect.right;
+  if (rect.left + shift < gutter) shift = gutter - rect.left;
+  cuisinePanel.style.left = `${shift}px`;
+
+  // How tall the list can be below the button.
+  const chrome = cuisinePanel.offsetHeight - cuisineList.offsetHeight; // search box, padding, border
+  const wanted = chrome + Math.min(CUISINE_LIST_MIN, cuisineList.scrollHeight);
+  let trigger = cuisineTrigger.getBoundingClientRect();
+  let roomBelow = window.innerHeight - trigger.bottom - gap - gutter;
+
+  if (makeRoom && roomBelow < wanted) {
+    // Scroll up, but never so far that the button hides under the sticky navbar.
+    const navBottom = document.getElementById("navbar")?.getBoundingClientRect().bottom || 0;
+    const maxScroll = Math.max(0, trigger.top - navBottom - gap);
+    window.scrollBy({ top: Math.min(wanted - roomBelow, maxScroll), behavior: "instant" });
+    trigger = cuisineTrigger.getBoundingClientRect();
+    roomBelow = window.innerHeight - trigger.bottom - gap - gutter;
+  }
+
+  cuisinePanel.classList.remove("open-up");
+  cuisineList.style.maxHeight = `${Math.max(CUISINE_LIST_MIN, Math.min(CUISINE_LIST_MAX, roomBelow - chrome))}px`;
+}
+
+function openCuisinePanel() {
+  if (!cuisinePanel || !cuisinePanel.hidden) return;
+  cuisinePanel.hidden = false;
+  cuisineTrigger?.setAttribute("aria-expanded", "true");
+  if (cuisineSearch) cuisineSearch.value = "";
+  renderCuisineOptions(); // fill first, so placement measures the real list height
+  placeCuisinePanel({ makeRoom: true });
+  renderCuisineOptions(); // again, so the current cuisine is scrolled into view at the new height
+  if (!cuisineAreas) loadCuisines();
+  // On touch screens, focusing the search box would pop the keyboard over the list.
+  if (window.matchMedia?.("(pointer: fine)").matches) {
+    cuisineSearch?.focus({ preventScroll: true });
+  }
+}
+
+function closeCuisinePanel({ returnFocus = false } = {}) {
+  if (!cuisinePanel || cuisinePanel.hidden) return;
+  cuisinePanel.hidden = true;
+  cuisineTrigger?.setAttribute("aria-expanded", "false");
+  cuisineSearch?.removeAttribute("aria-activedescendant");
+  if (returnFocus) cuisineTrigger?.focus();
+}
+
+function chooseCuisine(value, { returnFocus = true } = {}) {
+  closeCuisinePanel({ returnFocus });
+  if (!returnFocus && document.activeElement?.id === "cuisine-clear") document.activeElement.blur();
+  if (value === activeCuisine) return;
+  activeCuisine = value;
+  syncCuisineTrigger();
+  updateUrlParams();
+  syncFilterUI();
+  runActiveFilter();
+  document.getElementById("recipes-section")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+if (cuisinePicker && cuisineTrigger && cuisinePanel && cuisineList) {
+  cuisineTrigger.addEventListener("click", () => {
+    if (cuisinePanel.hidden) openCuisinePanel();
+    else closeCuisinePanel();
+  });
+
+  cuisineSearch?.addEventListener("input", renderCuisineOptions);
+
+  // The × inside the pill removes just the cuisine (search and category stay).
+  document.getElementById("cuisine-clear")?.addEventListener("click", (event) => {
+    chooseCuisine("", { returnFocus: event.detail === 0 });
+  });
+
+  cuisineList.addEventListener("click", (event) => {
+    const option = event.target.closest(".rp-cuisine-option");
+    if (option) chooseCuisine(option.dataset.value || "");
+  });
+  cuisineList.addEventListener("mousemove", (event) => {
+    const option = event.target.closest(".rp-cuisine-option");
+    const index = cuisineOptions().indexOf(option);
+    if (index >= 0 && index !== cuisineFocusIndex) setCuisineFocus(index, { scroll: false });
+  });
+
+  cuisinePicker.addEventListener("keydown", (event) => {
+    const open = !cuisinePanel.hidden;
+    if (!open) {
+      if (event.target === cuisineTrigger && (event.key === "ArrowDown" || event.key === "ArrowUp")) {
+        event.preventDefault();
+        openCuisinePanel();
+      }
+      return;
+    }
+    const options = cuisineOptions();
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        setCuisineFocus(cuisineFocusIndex + 1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        setCuisineFocus(cuisineFocusIndex - 1);
+        break;
+      case "PageDown":
+        event.preventDefault();
+        setCuisineFocus(cuisineFocusIndex + 7);
+        break;
+      case "PageUp":
+        event.preventDefault();
+        setCuisineFocus(cuisineFocusIndex - 7);
+        break;
+      case "Enter":
+        if (options[cuisineFocusIndex]) {
+          event.preventDefault();
+          chooseCuisine(options[cuisineFocusIndex].dataset.value || "");
+        }
+        break;
+      case "Escape":
+        event.preventDefault();
+        closeCuisinePanel({ returnFocus: true });
+        break;
+      case "Tab":
+        closeCuisinePanel();
+        break;
+    }
+  });
+
+  // Close when clicking or tapping anywhere else.
+  document.addEventListener("pointerdown", (event) => {
+    if (!cuisinePanel.hidden && !cuisinePicker.contains(event.target)) closeCuisinePanel();
+  });
+  window.addEventListener("resize", () => {
+    if (!cuisinePanel.hidden) placeCuisinePanel();
+  });
+  // The page can scroll while the panel is open, so keep it fitting the screen.
+  window.addEventListener("scroll", () => {
+    if (!cuisinePanel.hidden) placeCuisinePanel();
+  }, { passive: true });
+}
+
+// Empty state for a filter combination that has no recipes, with a button to reset.
+function showNoFilterMatches(heading, text) {
+  if (!results) return;
+  results.innerHTML = "";
+  clearResultsPaging();
+  if (!message) return;
+  message.className = "py-12 sm:py-16 text-center max-w-xl mx-auto";
+  message.innerHTML = `
+    <div class="w-16 h-16 mx-auto rounded-full bg-[#fbf2ec] text-[#ca5c2e] flex items-center justify-center border border-[#ca5c2e]/15 shadow-2xs mb-4">
+      <svg class="w-8 h-8" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
+      </svg>
+    </div>
+    <h3 class="text-xl sm:text-2xl font-bold text-stone-900 tracking-tight">${escapeHtml(heading)}</h3>
+    <p class="text-sm sm:text-base text-stone-500 mt-2 max-w-lg mx-auto leading-relaxed">${escapeHtml(text)}</p>
+    <div class="pt-6">
+      <button type="button" id="empty-clear-filter-btn" class="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-[#ca5c2e] hover:bg-[#b34d23] text-white text-sm font-semibold transition shadow-sm cursor-pointer">
+        Clear all filters
+      </button>
+    </div>
+  `;
+  document.getElementById("empty-clear-filter-btn")?.addEventListener("click", clearAllFilters);
+}
+
+function hideResultsMessage() {
+  if (message) {
+    message.innerHTML = "";
+    message.className = "hidden";
+  }
+}
+
+// Runs whatever the search box, category chip and cuisine menu currently ask for.
+async function runActiveFilter() {
+  if (!results) return;
+  syncFilterUI();
+  const query = searchForm?.query?.value?.trim() || "";
+
+  // Plain search, no filters: runSearch keeps the "did you mean" suggestions.
+  if (query && !activeCategory && !activeCuisine) {
+    await runSearch(query, `Recipes matching "${query}"`);
+    return;
+  }
+
+  // Category only: unchanged behaviour.
+  if (!query && activeCategory && !activeCuisine) {
+    await runCategoryFilter(activeCategory);
+    return;
+  }
+
+  // Nothing selected: latest recipes.
+  if (!query && !activeCategory && !activeCuisine) {
+    await runSearch("a", "Latest Recipes");
+    return;
+  }
+
+  // Any combination with a cuisine, or a search plus a category.
+  // Each part gives a list, and the results are the recipes in all of them.
+  const token = ++renderToken;
+  const where = [activeCuisine, activeCategory].filter(Boolean).join(" ");
+  const title = query ? `"${query}" in ${where}` : `${where} Recipes`;
+  lastSearchQuery = query;
+  lastSearchTitle = title;
+  if (sectionTitle) {
+    sectionTitle.innerHTML = /[^\u0000-\u007f]/.test(query)
+      ? `<span translate="no" class="notranslate">"${escapeHtml(query)}"</span><span> in ${escapeHtml(where)}</span>`
+      : `<span>${escapeHtml(title)}</span>`;
+  }
+  renderRecipesLoading(query ? "Loading matching recipes..." : `Loading ${where.toLowerCase()} recipes...`);
+
+  try {
+    const [searchList, categoryList, cuisineList] = await Promise.all([
+      query ? searchRecipesWide(query) : null,
+      activeCategory ? filterByCategory(activeCategory) : null,
+      activeCuisine ? filterByArea(activeCuisine) : null,
+    ]);
+    if (token !== renderToken) return;
+
+    // Search keeps its own order (name matches first); otherwise use the category or cuisine order.
+    const lists = [searchList, categoryList, cuisineList].filter(Boolean);
+    const [base, ...others] = lists;
+    const idSets = others.map((list) => new Set(list.map((r) => String(r.id))));
+    const combined = base
+      .filter((r) => idSets.every((ids) => ids.has(String(r.id))))
+      .map((r) => ({
+        ...r,
+        // Cuisine results come without a category, and the card would then say "Main"
+        // for everything (even desserts), so tag them with the cuisine instead.
+        category: r.category || activeCategory || activeCuisine || "",
+        area: r.area || activeCuisine || "",
+      }));
+
+    if (combined.length === 0) {
+      const parts = [];
+      if (activeCuisine) parts.push(`${activeCuisine} cuisine`);
+      if (activeCategory) parts.push(`the ${activeCategory} category`);
+      const text = query
+        ? `No recipes matched "${query}" in ${parts.join(" and ")}.`
+        : activeCategory
+          ? `We couldn't find any ${activeCuisine} dishes in the ${activeCategory} category.`
+          : `No recipes found for ${activeCuisine} cuisine.`;
+      showNoFilterMatches(query ? "No recipes found" : "No matching recipes", text);
+      return;
+    }
+    hideResultsMessage();
+    await showResults(combined);
+  } catch (err) {
+    if (token !== renderToken) return;
+    console.warn("Filter failed:", err);
+    showLoadError();
+  }
+}
 
 if (searchForm) {
   searchForm.addEventListener("submit", (event) => {
     event.preventDefault();
-    const query = searchForm.query.value.trim();
-    if (query) {
-      activeCategory = null;
-      categoryChips.forEach((c) => c.classList.remove("active"));
-      window.history.replaceState(null, "", `?search=${encodeURIComponent(query)}`);
-      runSearch(query, `Recipes matching "${query}"`);
-      const recipesSection = document.getElementById("recipes-section");
-      if (recipesSection) {
-        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
-    } else {
-      activeCategory = null;
-      categoryChips.forEach((c) => c.classList.remove("active"));
-      window.history.replaceState(null, "", window.location.pathname);
-      runSearch("a", "Latest Recipes");
-      const recipesSection = document.getElementById("recipes-section");
-      if (recipesSection) {
-        recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
-      }
+    updateUrlParams();
+    syncFilterUI();
+    runActiveFilter();
+    const recipesSection = document.getElementById("recipes-section");
+    if (recipesSection) {
+      recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
     }
   });
 
@@ -833,14 +1279,20 @@ if (searchForm) {
     clearBtn?.classList.toggle("hidden", !show);
     clearBtn?.classList.toggle("inline-flex", show);
   };
-  queryInput?.addEventListener("input", syncClearButton);
+  queryInput?.addEventListener("input", () => {
+    syncClearButton();
+    syncFilterUI();
+  });
   clearBtn?.addEventListener("click", () => {
     if (!queryInput) return;
     queryInput.value = "";
     syncClearButton();
+    updateUrlParams();
+    syncFilterUI();
+    runActiveFilter();
     queryInput.focus();
   });
-  window.addEventListener("pageshow", syncClearButton); // e.g. a value restored by Back
+  window.addEventListener("pageshow", syncClearButton);
 
   // Category buttons: toggle active selection, unclick, and scroll to recipes
   categoryChips.forEach((chip) => {
@@ -848,35 +1300,31 @@ if (searchForm) {
       const cat = chip.dataset.category;
       if (!cat) return;
 
-      // If user clicks the already active category, unclick and reset to Latest Recipes
       if (activeCategory === cat) {
         activeCategory = null;
         chip.classList.remove("active");
-        window.history.replaceState(null, "", window.location.pathname);
-        runSearch("", "Latest Recipes");
-        return;
+      } else {
+        activeCategory = cat;
+        categoryChips.forEach((c) => {
+          c.classList.toggle("active", c === chip);
+        });
       }
 
-      // Mark this category as active and unmark others
-      activeCategory = cat;
-      categoryChips.forEach((c) => {
-        if (c === chip) {
-          c.classList.add("active");
-        } else {
-          c.classList.remove("active");
-        }
-      });
+      updateUrlParams();
+      syncFilterUI();
+      runActiveFilter();
 
-      window.history.replaceState(null, "", `?category=${encodeURIComponent(cat)}`);
-      runCategoryFilter(cat);
-
-      // Scroll smoothly down to the recipes section
       const recipesSection = document.getElementById("recipes-section");
       if (recipesSection) {
         recipesSection.scrollIntoView({ behavior: "smooth", block: "start" });
       }
     });
   });
+
+  // Clear filters button
+  if (clearFiltersBtn) {
+    clearFiltersBtn.addEventListener("click", clearAllFilters);
+  }
 
   // Pagination buttons (‹ Prev, page numbers, Next ›)
   const pagination = document.getElementById("results-pagination");
@@ -891,7 +1339,6 @@ if (searchForm) {
 
   if (hideToggle) {
     hideToggle.addEventListener("change", async () => {
-      // savePreferences updates localStorage synchronously, so animate right away
       const saving = savePreferences({ hideFlagged: hideToggle.checked });
       if (applyHideFilterAnimated(hideToggle.checked)) {
         await saving;
@@ -899,11 +1346,7 @@ if (searchForm) {
       }
       await saving;
       pendingPage = currentPage; // stay on the same page after the re-run
-      if (activeCategory) {
-        runCategoryFilter(activeCategory);
-      } else {
-        runSearch(lastSearchQuery, lastSearchTitle);
-      }
+      runActiveFilter();
     });
   }
 
@@ -912,26 +1355,41 @@ if (searchForm) {
   });
   syncHideToggle();
 
-  // Handle URL query parameters (e.g. from index.html search bar)
+  // Handle URL query parameters (e.g. from index.html search bar or external links)
   const urlParams = new URLSearchParams(window.location.search);
-  pendingPage = parseInt(urlParams.get("page"), 10) || 0; // e.g. coming Back from a recipe
+  pendingPage = parseInt(urlParams.get("page"), 10) || 0;
   const searchParam = urlParams.get("search") || urlParams.get("query") || urlParams.get("q");
   const categoryParam = urlParams.get("category");
+  const cuisineParam = urlParams.get("cuisine") || urlParams.get("area");
 
   if (searchParam) {
     const queryInput = searchForm?.querySelector('input[name="query"]');
     if (queryInput) queryInput.value = searchParam;
-    runSearch(searchParam, `Search Results for "${searchParam}"`);
-  } else if (categoryParam) {
+    syncClearButton();
+  }
+
+  if (categoryParam) {
     const matchingChip = document.querySelector(`.category-chip[data-category="${categoryParam}"]`);
     if (matchingChip) {
       activeCategory = categoryParam;
       categoryChips.forEach((c) => c.classList.remove("active"));
       matchingChip.classList.add("active");
+    } else {
+      activeCategory = categoryParam;
     }
-    runCategoryFilter(categoryParam);
+  }
+
+  if (cuisineParam) {
+    activeCuisine = cuisineParam;
+  }
+
+  syncCuisineTrigger();
+  loadCuisines();
+
+  if (searchParam || categoryParam || cuisineParam) {
+    runActiveFilter();
   } else {
-    // Initial load: inspect preferences and pre-select matching diet category chip if present
+    // Initial load without params: check diet preferences for pre-selection
     const initialPrefs = getPreferences();
     let defaultCategory = null;
     if (initialPrefs.diets.includes("Vegetarian") || initialPrefs.diets.includes("Vegan")) {
@@ -946,14 +1404,10 @@ if (searchForm) {
         activeCategory = defaultCategory;
         categoryChips.forEach((c) => c.classList.remove("active"));
         matchingChip.classList.add("active");
-        runCategoryFilter(defaultCategory);
-      } else {
-        window.history.replaceState(null, "", window.location.pathname);
-        runSearch("", "Latest Recipes");
+        updateUrlParams();
       }
-    } else {
-      runSearch("", "Latest Recipes");
     }
+    runActiveFilter();
   }
 }
 
@@ -1262,35 +1716,56 @@ async function showRecipe(id) {
         : `${first} A short ingredient list that keeps things simple.`;
     }
 
-    const ingredientsHtml = (recipe.ingredients || [])
-      .map((ing) => {
-        const flaggedLabels = result.byIngredient?.[ing.name.toLowerCase()] || [];
-        const isFlagged = flaggedLabels.length > 0;
-        const chipsHtml = isFlagged
-          ? `<div class="mt-1.5 flex flex-wrap gap-1.5">
-              ${flaggedLabels
-            .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
-            .join("")}
-            </div>`
-          : "";
-
-        return `
-          <li class="flex items-start gap-3 rounded-xl px-3.5 py-2.5 ${isFlagged ? "bg-red-50/70 border border-red-200/80" : "border border-transparent hover:bg-white/70 transition"}">
-            <span class="mt-[6px] sm:mt-[8px] w-2 h-2 rounded-full flex-shrink-0 ${isFlagged ? "bg-red-500" : "bg-[#ca5c2e]/50"}" aria-hidden="true"></span>
-            <div class="flex-1 min-w-0">
-              <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
-                <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
-                <span class="text-sm text-stone-500">${escapeHtml(ing.measure)}</span>
-              </div>
-              ${chipsHtml}
-            </div>
-          </li>
-        `;
-      })
-      .join("");
-
     // Rough nutrition estimate (TheMealDB has no nutrition data; checks author-stated servings first, then estimates from ingredients).
     const nutrition = estimateNutrition(recipe.ingredients || [], null, recipe.instructions);
+    const baseServings = Math.max(1, Math.round(Number(nutrition.servings) || 4));
+    let currentServings = baseServings;
+
+    // Subtitle under "Ingredients": what the recipe makes, or what it was scaled from + Reset.
+    function servingsNoteHtml(servings) {
+      if (servings === baseServings) {
+        return `Amounts for ${baseServings} serving${baseServings === 1 ? "" : "s"}`;
+      }
+      return `Scaled from ${baseServings} serving${baseServings === 1 ? "" : "s"}<span aria-hidden="true"> · </span><button id="serving-reset-btn" type="button" class="rp-servings-reset">Reset</button>`;
+    }
+
+    function renderIngredientsListHtml(servings) {
+      const scale = servings / baseServings;
+      return (recipe.ingredients || [])
+        .map((ing) => {
+          const flaggedLabels = result.byIngredient?.[ing.name.toLowerCase()] || [];
+          const isFlagged = flaggedLabels.length > 0;
+          // Allergen tags sit on the same line as the ingredient name.
+          const chipsHtml = flaggedLabels
+            .map((label) => `<span class="inline-flex items-center text-[11px] font-semibold leading-none px-2 py-1 rounded-full bg-white text-red-700 border border-red-200">${escapeHtml(label)}</span>`)
+            .join("");
+          const swapOptions = swapsByIngredient.get(ing.name.toLowerCase()) || [];
+          const swapHtml = swapOptions.length
+            ? `<p class="mt-1.5 text-xs text-stone-600 leading-snug">
+                <span class="font-semibold text-emerald-700">Try instead:</span> ${escapeHtml(swapOptions.join(", or "))}
+              </p>`
+            : "";
+
+          const scaledMeasure = scaleMeasure(ing.measure || "", scale);
+
+          return `
+            <li class="flex items-start gap-3 rounded-xl px-3.5 py-2.5 ${isFlagged ? "bg-red-50/70 border border-red-200/80" : "border border-transparent hover:bg-white/70 transition"}">
+              <span class="mt-[6px] sm:mt-[8px] w-2 h-2 rounded-full flex-shrink-0 ${isFlagged ? "bg-red-500" : "bg-[#ca5c2e]/50"}" aria-hidden="true"></span>
+              <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-0.5">
+                  <div class="flex flex-wrap items-center gap-1.5 min-w-0">
+                    <span class="font-semibold text-stone-900 text-sm sm:text-base">${escapeHtml(capitalizeIngredient(ing.name))}</span>
+                    ${chipsHtml}
+                  </div>
+                  <span class="text-sm font-medium text-stone-600 ingredient-measure">${escapeHtml(scaledMeasure)}</span>
+                </div>
+                ${swapHtml}
+              </div>
+            </li>
+          `;
+        })
+        .join("");
+    }
     const per = nutrition.perServing;
     const macroBox = (label, value) => `
       <div style="flex:1;min-width:0;text-align:center" class="rounded-xl bg-white border border-[#efe6dc] px-2 py-2.5">
@@ -1327,6 +1802,11 @@ async function showRecipe(id) {
     const ingredientText = `${ingredientCount} ingredient${ingredientCount === 1 ? "" : "s"}`;
     const stepText = `${stepCount} step${stepCount === 1 ? "" : "s"}`;
 
+    // "Try instead" ideas for the flagged ingredients (from preferences.js).
+    const swaps = getSwapSuggestions(result, prefs);
+    // Shown under each flagged ingredient in the ingredients list (lowercase name -> options).
+    const swapsByIngredient = new Map(swaps.map((s) => [s.ingredient.toLowerCase(), s.options]));
+
     const warningBannerHtml = (result.hasAllergen || result.hasDietConflict) ? `
       <div class="rounded-2xl p-4 sm:p-5 ${result.hasAllergen ? 'bg-red-50 border border-red-200 text-red-900' : 'bg-amber-50 border border-amber-200 text-amber-900'} flex items-start gap-3.5 mb-8 shadow-xs">
         <div class="p-2 rounded-xl ${result.hasAllergen ? 'bg-red-100 text-red-600' : 'bg-amber-100 text-amber-600'} flex-shrink-0 mt-0.5">
@@ -1337,7 +1817,9 @@ async function showRecipe(id) {
         <div class="space-y-1">
           <h4 class="font-bold text-sm sm:text-base">${result.hasAllergen ? `Allergen Warning: Contains ${result.allergens.map(a => escapeHtml(a.name)).join(', ')}` : 'Diet Preference Conflict'}</h4>
           <p class="text-xs sm:text-sm ${result.hasAllergen ? 'text-red-700' : 'text-amber-800'} leading-relaxed">
-            ${escapeHtml(describeResult(result))}. We've highlighted the relevant ingredients below so you can substitute or take caution.
+            ${escapeHtml(describeResult(result))}. ${swaps.length
+              ? "We've highlighted the relevant ingredients below, with swap ideas. Swaps can change the taste and texture, so always check the labels."
+              : "We've highlighted the relevant ingredients below so you can substitute or take caution."}
           </p>
         </div>
       </div>
@@ -1444,11 +1926,31 @@ async function showRecipe(id) {
           
           <!-- Ingredients Column -->
           <div class="md:col-span-5 space-y-4">
-            <h2 class="text-xl font-bold text-stone-900">Ingredients (about ${nutrition.servings} serving${nutrition.servings === 1 ? "" : "s"})</h2>
-            <ul class="space-y-2 list-none p-0 m-0">
-              ${ingredientsHtml}
-            </ul>            ${nutritionHtml}
+            <div class="rp-ing-head">
+              <div class="rp-ing-title">
+                <h2 class="text-xl font-bold text-stone-900">Ingredients</h2>
+                <p id="servings-note" class="rp-servings-note">${servingsNoteHtml(currentServings)}</p>
+              </div>
 
+              <!-- Serving size scaler -->
+              <div id="servings-stepper" class="rp-servings" role="group" aria-label="Servings">
+                <button id="serving-decrease-btn" type="button" class="rp-servings-btn" aria-label="Fewer servings" ${currentServings <= 1 ? "disabled" : ""}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+                <span class="rp-servings-value" aria-live="polite">
+                  <span id="current-servings-display" class="rp-servings-num">${currentServings}</span>
+                  <span id="current-servings-unit" class="rp-servings-unit">${currentServings === 1 ? "serving" : "servings"}</span>
+                </span>
+                <button id="serving-increase-btn" type="button" class="rp-servings-btn" aria-label="More servings" ${currentServings >= 30 ? "disabled" : ""}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24" aria-hidden="true"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                </button>
+              </div>
+            </div>
+
+            <ul id="ingredients-list" class="space-y-2 list-none p-0 m-0">
+              ${renderIngredientsListHtml(currentServings)}
+            </ul>
+            ${nutritionHtml}
           </div>
 
           <!-- Instructions Column -->
@@ -1576,6 +2078,51 @@ async function showRecipe(id) {
       }
     });
 
+    // Serving Size Scaler handling
+    const servingDecreaseBtn = document.getElementById("serving-decrease-btn");
+    const servingIncreaseBtn = document.getElementById("serving-increase-btn");
+    const servingsDisplay = document.getElementById("current-servings-display");
+    const servingsUnit = document.getElementById("current-servings-unit");
+    const servingsNote = document.getElementById("servings-note");
+    const servingsStepper = document.getElementById("servings-stepper");
+    const ingredientsListEl = document.getElementById("ingredients-list");
+
+    const updateServings = (newServings) => {
+      currentServings = Math.max(1, Math.min(30, Math.round(newServings)));
+      if (servingsDisplay) servingsDisplay.textContent = currentServings;
+      if (servingsUnit) servingsUnit.textContent = currentServings === 1 ? "serving" : "servings";
+      if (servingDecreaseBtn) servingDecreaseBtn.disabled = currentServings <= 1;
+      if (servingIncreaseBtn) servingIncreaseBtn.disabled = currentServings >= 30;
+      servingsStepper?.classList.toggle("is-scaled", currentServings !== baseServings);
+      if (servingsNote) servingsNote.innerHTML = servingsNoteHtml(currentServings);
+      if (ingredientsListEl) {
+        ingredientsListEl.innerHTML = renderIngredientsListHtml(currentServings);
+      }
+    };
+
+    servingDecreaseBtn?.addEventListener("click", () => updateServings(currentServings - 1));
+    servingIncreaseBtn?.addEventListener("click", () => updateServings(currentServings + 1));
+    // Reset lives in the subtitle, which is re-rendered, so listen on the subtitle itself.
+    servingsNote?.addEventListener("click", (event) => {
+      if (!event.target.closest("#serving-reset-btn")) return;
+      updateServings(baseServings);
+      servingIncreaseBtn?.focus();
+    });
+
+    // Helper to get recipe ingredients scaled to currentServings
+    const getScaledRecipe = () => {
+      const scale = currentServings / baseServings;
+      const scaledIngredients = (recipe.ingredients || []).map((ing) => ({
+        ...ing,
+        measure: scaleMeasure(ing.measure || "", scale),
+      }));
+      return {
+        ...recipe,
+        ingredients: scaledIngredients,
+        servings: currentServings,
+      };
+    };
+
     // Add to meal plan quick action
     const addPlanBtn = document.getElementById("add-plan-btn");
     if (addPlanBtn) {
@@ -1596,7 +2143,8 @@ async function showRecipe(id) {
         // already there, and saves to this week's plan on the account (Firestore).
         try {
           const { openAddToPlanDialog } = await import("./planner.js");
-          const slot = await openAddToPlanDialog(recipe, { skipAllergenCheck: true });
+          const recipeToAdd = getScaledRecipe();
+          const slot = await openAddToPlanDialog(recipeToAdd, { skipAllergenCheck: true });
           if (slot && !slot.unchanged) {
             showToast(`Added "${toTitleCase(recipe.name)}" to ${slot.day} ${slot.meal}!`, {
               action: { label: "View plan", onClick: () => (window.location.href = "planner.html") }
@@ -1612,7 +2160,7 @@ async function showRecipe(id) {
     // Launch Cooking Mode (Dedicated step-by-step view with progress, timers, and checklist)
     const launchCookingMode = () => {
       openCookingMode({
-        recipe,
+        recipe: getScaledRecipe(),
         parsedItems,
         allergenResult: result,
         onSwitchTab: switchRecipeTab,

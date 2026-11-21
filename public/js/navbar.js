@@ -298,3 +298,40 @@ document.addEventListener("click", (e) => {
     }
   }
 });
+
+// ---------- Placeholder for recipe photos that fail to load ----------
+// Recipe photos come from TheMealDB. If it can't be reached (or one photo is missing),
+// show a neutral plate picture instead of the browser's broken-image icon.
+// "error" events don't bubble, so we listen in the capture phase for the whole page.
+const PHOTO_PLACEHOLDER =
+  "data:image/svg+xml," +
+  encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 300" preserveAspectRatio="xMidYMid slice">` +
+      `<rect width="400" height="300" fill="#f3eee8"/>` +
+      `<g fill="none" stroke="#d6c9bb" stroke-width="6" stroke-linecap="round">` +
+      `<circle cx="200" cy="150" r="52"/><circle cx="200" cy="150" r="34"/>` +
+      `<path d="M118 108v30a10 10 0 0 0 20 0v-30M128 108v84"/>` +
+      `<path d="M282 108c-12 8-14 30-2 40v44"/>` +
+      `</g></svg>`
+  );
+
+function usePhotoPlaceholder(img) {
+  if (!img || img.dataset.photoFallback || !/^https?:/i.test(img.currentSrc || img.src || "")) return;
+  if (img.closest(".skiptranslate")) return; // Google Translate's own images
+  img.dataset.photoFallback = "1";
+  img.removeAttribute("srcset");
+  img.src = PHOTO_PLACEHOLDER;
+}
+
+document.addEventListener(
+  "error",
+  (e) => {
+    if (e.target instanceof HTMLImageElement) usePhotoPlaceholder(e.target);
+  },
+  true
+);
+
+// Photos that already failed before this file loaded.
+document.querySelectorAll("img").forEach((img) => {
+  if (img.complete && img.naturalWidth === 0) usePhotoPlaceholder(img);
+});

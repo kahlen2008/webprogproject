@@ -945,6 +945,85 @@ function formatSinglePart(part) {
   return part.modifier ? `${base} ${part.modifier}` : base;
 }
 
+// Scales a measure string by a scale factor.
+// Only scales amounts that start with a number (integers, fractions, decimals, ranges),
+// leaving values like "a pinch", "to taste", "dash", etc. unchanged.
+export function scaleMeasure(measureStr, scaleFactor) {
+  if (!measureStr || typeof measureStr !== "string") return "";
+  const str = measureStr.trim();
+  if (!str) return "";
+  if (scaleFactor === 1 || isNaN(scaleFactor) || scaleFactor <= 0) return str;
+
+  // "½ cup" becomes " 1/2 cup", so trim the space the fraction swap adds.
+  const normalized = normalizeUnicodeFractions(str).replace(/\s+/g, " ").trim();
+
+  // Check if it starts with a number or fraction
+  if (!/^\d/.test(normalized)) {
+    return str; // Leaves "a pinch", "to taste", "dash", etc. unchanged
+  }
+
+  const NUM = String.raw`\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?`;
+
+  // Grams and millilitres read better as whole numbers ("44g", not "43 3/4g"),
+  // and kilos and litres as decimals ("1.25kg").
+  const formatFor = (value, unitText) => {
+    const unit = (unitText || "").trim().toLowerCase().match(/^[a-z]+/)?.[0] || "";
+    if (/^(g|gr|grams?|ml|millilitres?|milliliters?)$/.test(unit)) {
+      return String(Math.max(1, Math.round(value)));
+    }
+    if (/^(kg|kilos?|kilograms?|l|litres?|liters?)$/.test(unit)) {
+      return String(Math.round(value * 100) / 100);
+    }
+    // Cups, spoons and counts: snap to a fraction you can measure ("3/8 cup", not
+    // "0.42 cup"), and round to whole numbers from 10 up.
+    if (value >= 10) return String(Math.round(value));
+    const whole = Math.floor(value);
+    const KITCHEN_FRACTIONS = [0, 1 / 8, 1 / 4, 1 / 3, 3 / 8, 1 / 2, 5 / 8, 2 / 3, 3 / 4, 7 / 8, 1];
+    const part = value - whole;
+    const snapped = KITCHEN_FRACTIONS.reduce((best, f) => (Math.abs(f - part) < Math.abs(best - part) ? f : best), 0);
+    return formatQuantity(Math.max(1 / 8, whole + snapped));
+  };
+
+  // A second amount after a slash ("400g/14oz") is scaled too. Brackets are left alone,
+  // since "1 tin (400g)" gives the size of each tin.
+  const scaleExtraAmounts = (rest) =>
+    rest.replace(/(\/\s*)(\d+(?:\.\d+)?)(\s*)([a-zA-Z]+)/g, (m, lead, num, gap, unit) => {
+      const scaled = formatFor(Number(num) * scaleFactor, unit);
+      return `${lead}${scaled}${gap}${unit}`;
+    });
+
+  // Handle ranges like "1-2 tbsp", "1 - 2 cups" or "1/2-1 tsp"
+  const rangeMatch = normalized.match(new RegExp(`^(${NUM})\\s*(?:-|–|to)\\s*(${NUM})\\s*(.*)$`));
+  if (rangeMatch) {
+    const min = parseQuantity(rangeMatch[1]);
+    const max = parseQuantity(rangeMatch[2]);
+    if (min != null && max != null) {
+      const rest = scaleExtraAmounts((rangeMatch[3] || "").trim());
+      const scaledMin = formatFor(min * scaleFactor, rest);
+      const scaledMax = formatFor(max * scaleFactor, rest);
+      return rest ? `${scaledMin}-${scaledMax} ${rest}` : `${scaledMin}-${scaledMax}`;
+    }
+  }
+
+  // Handle mixed fraction "1 1/2 cups", fraction "1/2 cup", or decimal/integer "2 cups", "200g"
+  const qtyMatch = normalized.match(new RegExp(`^(${NUM})\\s*(.*)$`));
+  if (!qtyMatch) return str;
+
+  const qty = parseQuantity(qtyMatch[1]);
+  if (qty == null || isNaN(qty)) return str;
+
+  const rest = scaleExtraAmounts((qtyMatch[2] || "").trim());
+  const scaledQty = formatFor(qty * scaleFactor, rest);
+
+  // If there was no space originally between number and unit (e.g. "200g", "50ml")
+  const originalHadNoSpace = /^\d+(?:\.\d+)?[a-zA-Z]/.test(normalized);
+  if (originalHadNoSpace && rest) {
+    return `${scaledQty}${rest}`;
+  }
+
+  return rest ? `${scaledQty} ${rest}` : scaledQty;
+}
+
 export function combineMeasures(measureList) {
   const cleanList = (measureList || [])
     .map((m) => (typeof m === "string" ? m.trim() : ""))
