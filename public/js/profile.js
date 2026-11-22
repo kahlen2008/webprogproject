@@ -400,6 +400,10 @@ async function saveProfile(updatedFields) {
     hasLocalNameEdit = true;
     updatedFields.photoURL = buildAvatarUrl(updatedFields.displayName, currentProfile.photoURL);
   }
+  // Setting diet or allergies here covers what onboarding asks for, so don't send them back to it.
+  if (updatedFields.diets !== undefined || updatedFields.allergies !== undefined) {
+    updatedFields.onboardingComplete = true;
+  }
   currentProfile = { ...currentProfile, ...updatedFields };
 
   const uid = activeUser?.uid || auth?.currentUser?.uid;
@@ -429,6 +433,7 @@ async function saveProfile(updatedFields) {
         diets: currentProfile.diets,
         allergies: currentProfile.allergies,
         hideFlagged: currentProfile.hideFlagged,
+        ...(updatedFields.onboardingComplete ? { onboardingComplete: true } : {}),
       });
     } catch (e) {}
   }
