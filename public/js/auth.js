@@ -80,8 +80,9 @@ export async function signup(name, email, password) {
       onboardingStep: 1
     }));
 
-    // Update profile and create initial firestore record in parallel
-    Promise.all([
+    // Update profile and create initial firestore record in parallel.
+    // Awaited so the write finishes before the caller redirects away.
+    await Promise.all([
       updateProfile(credential.user, { displayName: name }).catch(console.warn),
       setDoc(doc(db, "users", credential.user.uid), {
         displayName: name,
@@ -131,15 +132,31 @@ export async function login(email, password) {
           photoURL: userObj.photoURL
         }));
       } else {
+        // No profile doc (e.g. the signup write never landed) - create it now.
+        await setDoc(doc(db, "users", credential.user.uid), {
+          displayName: displayName,
+          email: credential.user.email,
+          diets: [],
+          allergies: [],
+          hideFlagged: false,
+          onboardingComplete: false,
+          onboardingStep: 1,
+          createdAt: serverTimestamp(),
+        });
         localStorage.setItem("recipeplan_profile", JSON.stringify({
           displayName: displayName,
           email: credential.user.email,
           photoURL: userObj.photoURL,
           diets: [],
-          allergies: []
+          allergies: [],
+          hideFlagged: false,
+          onboardingComplete: false,
+          onboardingStep: 1
         }));
       }
-    } catch (e) {}
+    } catch (e) {
+      console.warn("Could not load or create user profile:", e);
+    }
 
     return credential.user;
   } catch (err) {
