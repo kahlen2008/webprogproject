@@ -33,6 +33,16 @@ service cloud.firestore {
       allow delete: if signedInAs(uid);
     }
 
+    // Lets deleteUserData search every review at once (a collection group query
+    // on "ratings") to find all of a deleted user's reviews. Reviews are public
+    // anyway. It also matches leftover users/{uid}/ratings/{recipeId} entries
+    // from the old "recipes I reviewed" list, which only hold a recipe id that
+    // the user's public review already shows. Read only: writes still follow
+    // the rules above.
+    match /{path=**}/ratings/{ratingId} {
+      allow read: if true;
+    }
+
     // Anything not matched above is denied by default.
   }
 }

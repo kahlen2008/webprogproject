@@ -40,10 +40,14 @@ export function safeRedirect(value) {
 }
 
 // Where to send someone right after they sign up or log in.
+// Onboarding always comes first; the redirect is passed along so onboarding
+// sends the user on to it when they finish or skip.
 function postAuthDestination() {
   const redirect = safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
-  if (redirect) return redirect;
-  return needsOnboarding() ? "onboarding.html" : "index.html";
+  if (needsOnboarding()) {
+    return redirect ? `onboarding.html?redirect=${encodeURIComponent(redirect)}` : "onboarding.html";
+  }
+  return redirect || "index.html";
 }
 
 // Cached copies of the account kept in localStorage so pages can draw the
@@ -265,7 +269,30 @@ export async function loginWithGoogle() {
   }
 }
 
+// Removes the copies other pages keep per user in this browser: the planner's
+// meal plans and shopping lists (planner.js) and the navbar's favourites flag.
+function clearUserBrowserData(uid) {
+  if (!uid) return;
+  try {
+    localStorage.removeItem(`recipeplan_meal_plans_${uid}`);
+    localStorage.removeItem(`recipeplan_shopping_${uid}`);
+  } catch (e) {}
+  try {
+    sessionStorage.removeItem(`recipeplan_favs_loaded_${uid}`);
+  } catch (e) {}
+}
+
+function currentUidForCleanup() {
+  if (auth?.currentUser) return auth.currentUser.uid;
+  try {
+    return JSON.parse(localStorage.getItem("recipeplan_user") || "null")?.uid || null;
+  } catch (e) {
+    return null;
+  }
+}
+
 export async function logout() {
+  clearUserBrowserData(currentUidForCleanup());
   localStorage.removeItem("recipeplan_user");
   localStorage.removeItem("recipeplan_profile");
   localStorage.removeItem("recipeplan_favourites");
@@ -277,22 +304,33 @@ export async function logout() {
 }
 
 // Firebase only deletes an account within about 5 minutes of signing in.
-const RECENT_LOGIN_MS = 5 * 60 * 1000;
+// We stop at 4, leaving time for the data to be deleted before deleteUser runs.
+const RECENT_LOGIN_LIMIT_MS = 4 * 60 * 1000;
 
 export async function deleteAccount() {
   const user = auth.currentUser;
   if (user) {
     // Check for a recent sign-in first, so the data is never wiped while the
-    // account itself survives because deleteUser refused.
-    const { authTime } = await user.getIdTokenResult();
-    if (Date.now() - new Date(authTime).getTime() > RECENT_LOGIN_MS) {
+    // account itself survives because deleteUser refused. Both times come from
+    // Firebase's servers (a fresh token is issued "now"), so a wrong clock on
+    // this computer can't fool the check.
+    const { authTime, issuedAtTime } = await user.getIdTokenResult(true);
+    if (new Date(issuedAtTime).getTime() - new Date(authTime).getTime() > RECENT_LOGIN_LIMIT_MS) {
       const err = new Error("Please log in again before deleting your account.");
       err.code = "auth/requires-recent-login";
       throw err;
     }
     // Reviews, favourites, meal plans, shopping lists and the profile document.
     await deleteUserData(user.uid);
-    await deleteUser(user);
+    try {
+      await deleteUser(user);
+    } catch (err) {
+      // Very unlikely after the check above (e.g. the connection dropped), but
+      // say exactly what happened: the data is gone, the login still exists.
+      err.dataDeleted = true;
+      throw err;
+    }
+    clearUserBrowserData(user.uid);
   }
   clearLocalAccount();
   window.dispatchEvent(new CustomEvent("favourites-changed"));
@@ -573,6 +611,8 @@ if (forgotPasswordLink) {
       } else if (loginForm) {
         // Real failures (bad email format, no connection, too many tries) say what went wrong.
         showFormError(loginForm, friendlyAuthError(err));
+      } else {
+        showToast(friendlyAuthError(err), 5000);
       }
     }
   });

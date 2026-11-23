@@ -73,7 +73,7 @@ Both deploy on every push to `main`. The GitHub Pages link (<https://kahlen2008.
 Use these functions instead of rewriting them. If you change a signature, tell the team first.
 
 **`js/auth.js` (Person 1)**
-`getCurrentUser()`, `onAuthChange(cb)`, `signup(name, email, password)`, `login(email, password)`, `loginWithGoogle()`, `logout()`, `deleteAccount()`, `resetPassword(email)`, `validatePasswordRequirements(password)` (returns an error string or `null`), `friendlyAuthError(error)`, `safeRedirect(value)` (turns a `?redirect=` value into a path on this site, or `null`; always use it before navigating to a redirect). `deleteAccount()` checks for a recent login first, then removes all the user's data with `deleteUserData(uid)` from `schema.js`.
+`getCurrentUser()`, `onAuthChange(cb)`, `signup(name, email, password)`, `login(email, password)`, `loginWithGoogle()`, `logout()`, `deleteAccount()`, `resetPassword(email)`, `validatePasswordRequirements(password)` (returns an error string or `null`), `friendlyAuthError(error)`, `safeRedirect(value)` (turns a `?redirect=` value into a path on this site, or `null`; always use it before navigating to a redirect). `deleteAccount()` checks for a recent login first, then removes all the user's data with `deleteUserData(uid)` from `schema.js` (every review they wrote, favourites, meal plans, shopping lists, profile) and this browser's copies of their plans. Both logout and delete clear `recipeplan_meal_plans_{uid}` and `recipeplan_shopping_{uid}`. After login, a user who hasn't finished onboarding always goes to onboarding first, and the `?redirect=` page is passed on to it.
 
 **`js/preferences.js` (Person 1)**
 `getPreferences()` returns `{ diets, allergies, hideFlagged, onboardingComplete, onboardingStep }`.
@@ -128,13 +128,12 @@ users/{uid}
   favourites/{recipeId}     { id, name, image, category, area, ingredientNames, savedAt }
   mealPlan/{weekId}         { Mon: { Breakfast, Lunch, Dinner }, ... }
   shoppingList/{weekId}     { items: [{ name, measure, checked }] }
-  ratings/{recipeId}        { recipeId, ratedAt }  private list of reviewed recipes, used to delete reviews with the account
 
 recipes/{recipeId}/ratings/{uid}   (Person 3)
   stars (whole number 1 to 5), comment (max 300), displayName (1 to 60), createdAt (server time)
 ```
 
-Rules (`firestore.rules`): everything under `users/{uid}` is readable and writable only by that user. Ratings are readable by anyone and writable only by their author, and the rules reject a rating with other fields, stars outside 1 to 5, a comment over 300 characters or a display name over 60. Rules are not deployed by the workflows: after changing them run `firebase deploy --only firestore:rules`.
+Rules (`firestore.rules`): everything under `users/{uid}` is readable and writable only by that user. Ratings are readable by anyone (also as a collection group query on `ratings`, which `deleteUserData` uses to find all of a user's reviews) and writable only by their author, and the rules reject a rating with other fields, stars outside 1 to 5, a comment over 300 characters or a display name over 60. Rules are not deployed by the workflows: after changing them run `firebase deploy --only firestore:rules`.
 
 Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to `login.html`. `onboardingComplete` true goes to `index.html`. Step 1 is diet, step 2 is allergies. Next on step 1 saves diets straight away. Skip and Finish both set `onboardingComplete`.
 

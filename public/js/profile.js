@@ -588,7 +588,11 @@ async function handleDeleteAccount() {
     window.location.replace("index.html");
   } catch (err) {
     deletingAccount = false;
-    if (err.code === "auth/requires-recent-login") {
+    if (err.dataDeleted) {
+      // Data is already gone; only the login itself is left to remove.
+      showToast("Your data was deleted, but the account itself couldn't be. Log in again and delete it to finish.", 6000);
+      setTimeout(() => (window.location.href = "login.html?redirect=profile.html%23account"), 2500);
+    } else if (err.code === "auth/requires-recent-login") {
       showToast("For security, please log in again before deleting your account.", 4000);
       setTimeout(() => (window.location.href = "login.html?redirect=profile.html%23account"), 1200);
     } else {
