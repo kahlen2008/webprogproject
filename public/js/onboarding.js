@@ -3,7 +3,7 @@
 // - Finish / Skip (step 2) marks onboarding complete.
 // - Not logged in -> login.html. Already finished -> index.html.
 
-import { onAuthChange } from "./auth.js";
+import { onAuthChange, safeRedirect } from "./auth.js";
 import {
   DIET_OPTIONS,
   ALLERGEN_OPTIONS,
@@ -284,13 +284,8 @@ els.customChips.addEventListener("click", (e) => {
 
 // ---------- Navigation ----------
 function goHome() {
-  const params = new URLSearchParams(window.location.search);
-  const redirect = params.get("redirect");
-  if (redirect && !redirect.startsWith("http://") && !redirect.startsWith("https://") && !redirect.startsWith("//")) {
-    window.location.replace(redirect);
-    return;
-  }
-  window.location.replace("index.html");
+  const redirect = safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
+  window.location.replace(redirect || "index.html");
 }
 
 els.next.addEventListener("click", async () => {

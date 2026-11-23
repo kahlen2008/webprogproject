@@ -73,7 +73,7 @@ Both deploy on every push to `main`. The GitHub Pages link (<https://kahlen2008.
 Use these functions instead of rewriting them. If you change a signature, tell the team first.
 
 **`js/auth.js` (Person 1)**
-`getCurrentUser()`, `onAuthChange(cb)`, `signup(name, email, password)`, `login(email, password)`, `loginWithGoogle()`, `logout()`, `deleteAccount()`, `resetPassword(email)`, `validatePasswordRequirements(password)` (returns an error string or `null`), `friendlyAuthError(error)`.
+`getCurrentUser()`, `onAuthChange(cb)`, `signup(name, email, password)`, `login(email, password)`, `loginWithGoogle()`, `logout()`, `deleteAccount()`, `resetPassword(email)`, `validatePasswordRequirements(password)` (returns an error string or `null`), `friendlyAuthError(error)`, `safeRedirect(value)` (turns a `?redirect=` value into a path on this site, or `null`; always use it before navigating to a redirect). `deleteAccount()` checks for a recent login first, then removes all the user's data with `deleteUserData(uid)` from `schema.js`.
 
 **`js/preferences.js` (Person 1)**
 `getPreferences()` returns `{ diets, allergies, hideFlagged, onboardingComplete, onboardingStep }`.
@@ -86,7 +86,7 @@ Swaps: `getSwapSuggestions(result, prefs)` takes a `checkRecipe` result and retu
 `LANGUAGES`, `getCurrentLanguage()`, `setLanguage(code)`, `translateQueryToEnglish(query)` (used by `searchRecipes`), `translatePlaceholders()`, `createLanguageSwitcherHtml()`, `bindLanguageSwitcher()`, `ensureStandaloneLanguageSwitcher()`. Wrap text that must not be translated (recipe search terms, the brand name) in `translate="no" class="notranslate"`.
 
 **`js/schema.js` (Person 1)**
-Firestore path helpers (`SchemaPaths`), document builders (`createUserDoc`, `createFavouriteDoc`, `createMealPlanDoc`, `createShoppingListDoc`, `createRatingDoc`) and read/write helpers (`saveUserFavourite`, `fetchUserFavourites`, `saveUserMealPlan`, `fetchUserMealPlan`, `saveUserShoppingList`, `fetchUserShoppingList`, `saveRecipeRating`, `fetchRecipeRatings`, ...). Persons 3 and 4 should call these instead of writing Firestore code themselves.
+Firestore path helpers (`SchemaPaths`), document builders (`createUserDoc`, `createFavouriteDoc`, `createMealPlanDoc`, `createShoppingListDoc`, `createRatingDoc`) and read/write helpers (`deleteUserData`, `saveUserFavourite`, `fetchUserFavourites`, `saveUserMealPlan`, `fetchUserMealPlan`, `saveUserShoppingList`, `fetchUserShoppingList`, `saveRecipeRating`, `fetchRecipeRatings`, ...). Persons 3 and 4 should call these instead of writing Firestore code themselves.
 
 **`js/api.js` (Person 2)**
 `searchRecipes(query)`, `getRecipeById(id)`, `listCategories()`, `filterByCategory(category)`, `normalizeRecipe(meal)`.
@@ -111,7 +111,7 @@ Recipe object used everywhere:
 `openAddToPlanDialog(recipe, { skipAllergenCheck, day, meal })` is the shared day and meal dialog: it shows this week's days and the three meals, says what is already in the chosen slot, saves through `addToPlan`, and resolves `{ day, meal }` (plus `unchanged: true` if that recipe was already there) or `null` if cancelled.
 
 **`js/utils.js` (shared)**
-`escapeHtml`, `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText` (fixes TheMealDB scraping typos such as missing first letters, common misspellings and doubled small words like "the the"), `showConfirmModal({ title, message, confirmText, cancelText, confirmColor, icon })` (resolves `true` or `false`), `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
+`escapeHtml` (escapes `& < > " '`, so it is safe in text and in quoted attributes), `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText` (fixes TheMealDB scraping typos such as missing first letters, common misspellings and doubled small words like "the the"), `showConfirmModal({ title, message, confirmText, cancelText, confirmColor, icon })` (resolves `true` or `false`), `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
 
 **`js/firebase-config.js`** exports `app`, `auth`, `db`. Import these, never call `initializeApp` again.
 
@@ -128,12 +128,13 @@ users/{uid}
   favourites/{recipeId}     { id, name, image, category, area, ingredientNames, savedAt }
   mealPlan/{weekId}         { Mon: { Breakfast, Lunch, Dinner }, ... }
   shoppingList/{weekId}     { items: [{ name, measure, checked }] }
+  ratings/{recipeId}        { recipeId, ratedAt }  private list of reviewed recipes, used to delete reviews with the account
 
 recipes/{recipeId}/ratings/{uid}   (Person 3)
-  stars (1 to 5), comment, displayName, createdAt
+  stars (whole number 1 to 5), comment (max 300), displayName (1 to 60), createdAt (server time)
 ```
 
-Rules (`firestore.rules`): everything under `users/{uid}` is readable and writable only by that user. Ratings are readable by anyone and writable only by their author.
+Rules (`firestore.rules`): everything under `users/{uid}` is readable and writable only by that user. Ratings are readable by anyone and writable only by their author, and the rules reject a rating with other fields, stars outside 1 to 5, a comment over 300 characters or a display name over 60. Rules are not deployed by the workflows: after changing them run `firebase deploy --only firestore:rules`.
 
 Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to `login.html`. `onboardingComplete` true goes to `index.html`. Step 1 is diet, step 2 is allergies. Next on step 1 saves diets straight away. Skip and Finish both set `onboardingComplete`.
 

@@ -5,7 +5,7 @@
 // from what is saved, and Reset puts the draft back. Unsaved sections get a dot on
 // their tab, and leaving the page with unsaved changes asks first.
 
-import { onAuthChange, logout, deleteAccount, resetPassword } from "./auth.js";
+import { onAuthChange, logout, deleteAccount, resetPassword, friendlyAuthError } from "./auth.js";
 import { showToast, escapeHtml } from "./utils.js";
 import { auth, db } from "./firebase-config.js";
 import { doc, getDoc, setDoc } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
@@ -316,8 +316,13 @@ function hydrateFromCache() {
   } catch (e) {}
 }
 
+// True while the account is being deleted, so the sign-out that deletion causes
+// doesn't bounce the page to the login screen before the delete flow finishes.
+let deletingAccount = false;
+
 async function loadProfileForUser(user) {
   if (!user) {
+    if (deletingAccount) return;
     if (!localStorage.getItem("recipeplan_user")) window.location.href = "login.html?redirect=profile.html";
     return;
   }
@@ -573,16 +578,21 @@ function showDeleteAccountModal() {
 
 async function handleDeleteAccount() {
   if (!(await showDeleteAccountModal())) return;
+  deletingAccount = true;
   try {
     await deleteAccount();
-    showToast("Your account has been deleted.");
-    setTimeout(() => (window.location.href = "index.html"), 500);
+    // Shown by navbar.js on the home page, so it isn't lost in the page change.
+    try {
+      sessionStorage.setItem("recipeplan_flash", "Your account has been deleted.");
+    } catch (e) {}
+    window.location.replace("index.html");
   } catch (err) {
+    deletingAccount = false;
     if (err.code === "auth/requires-recent-login") {
       showToast("For security, please log in again before deleting your account.", 4000);
       setTimeout(() => (window.location.href = "login.html?redirect=profile.html%23account"), 1200);
     } else {
-      showToast("Could not delete your account. " + (err.message || "Please try again."), 4000);
+      showToast("Could not delete your account. " + friendlyAuthError(err), 4000);
     }
   }
 }

@@ -12,8 +12,11 @@
 //   mealPlan/{weekId}         { Mon: { Breakfast, Lunch, Dinner }, ... }
 //   shoppingList/{weekId}     { items: [{ name, measure, checked }] }
 //
+//   ratings/{recipeId}        { recipeId, ratedAt }  private list of the recipes this user rated,
+//                             so deleting the account can find and remove their reviews
+//
 // recipes/{recipeId}/ratings/{uid}   (Person 3)
-//   stars (1 to 5), comment, displayName, createdAt
+//   stars (1 to 5), comment (max 300), displayName (max 60), createdAt
 
 import { db } from "./firebase-config.js";
 import {
@@ -40,6 +43,8 @@ export const SchemaPaths = {
   mealPlan: (uid, weekId) => `users/${uid}/mealPlan/${weekId}`,
   shoppingLists: (uid) => `users/${uid}/shoppingList`,
   shoppingList: (uid, weekId) => `users/${uid}/shoppingList/${weekId}`,
+  userRatings: (uid) => `users/${uid}/ratings`,
+  userRating: (uid, recipeId) => `users/${uid}/ratings/${recipeId}`,
   ratings: (recipeId) => `recipes/${recipeId}/ratings`,
   rating: (recipeId, uid) => `recipes/${recipeId}/ratings/${uid}`,
 };
@@ -152,10 +157,11 @@ export function createShoppingListDoc(items = []) {
  */
 export function createRatingDoc({ stars, comment = "", displayName = "" }) {
   const numStars = Math.max(1, Math.min(5, Math.round(Number(stars) || 5)));
+  // Same limits as firestore.rules, which rejects anything longer.
   return {
     stars: numStars,
-    comment: String(comment || "").trim(),
-    displayName: String(displayName || "Anonymous").trim(),
+    comment: String(comment || "").trim().slice(0, 300),
+    displayName: String(displayName || "").trim().slice(0, 60) || "Anonymous",
     createdAt: serverTimestamp(),
   };
 }
@@ -238,6 +244,11 @@ export async function saveRecipeRating(recipeId, uid, { stars, comment, displayN
   const docRef = doc(db, SchemaPaths.rating(recipeId, uid));
   const data = createRatingDoc({ stars, comment, displayName });
   await setDoc(docRef, data);
+  // Remember the recipe on the user's own (private) list, so deleteUserData can find this review.
+  await setDoc(doc(db, SchemaPaths.userRating(uid, recipeId)), {
+    recipeId: String(recipeId),
+    ratedAt: serverTimestamp(),
+  }).catch((e) => console.warn("Could not record rated recipe:", e));
   return data;
 }
 
@@ -264,5 +275,40 @@ export async function deleteRecipeRating(recipeId, uid) {
   if (!recipeId || !uid) throw new Error("recipeId and uid are required to delete rating");
   const docRef = doc(db, SchemaPaths.rating(recipeId, uid));
   await deleteDoc(docRef);
+  await deleteDoc(doc(db, SchemaPaths.userRating(uid, recipeId))).catch(() => {});
   return true;
+}
+
+// --- Account deletion ---
+// Firestore does not delete subcollections with their parent, so remove every
+// document the user owns: their reviews, favourites, meal plans, shopping lists
+// and finally users/{uid}.
+export async function deleteUserData(uid) {
+  if (!uid) return;
+  const listIds = async (path) => {
+    const snap = await getDocs(collection(db, path));
+    return snap.docs.map((d) => d.id);
+  };
+  const [ratedIds, favouriteIds, planIds, listIdsShopping] = await Promise.all([
+    listIds(SchemaPaths.userRatings(uid)),
+    listIds(SchemaPaths.favourites(uid)),
+    listIds(SchemaPaths.mealPlans(uid)),
+    listIds(SchemaPaths.shoppingLists(uid)),
+  ]);
+
+  // Reviews written before the rated list existed are not on it, so also try
+  // every favourite (a missing review is simply a no-op delete).
+  const reviewRecipeIds = [...new Set([...ratedIds, ...favouriteIds])];
+  await Promise.all(
+    reviewRecipeIds.map((recipeId) => deleteDoc(doc(db, SchemaPaths.rating(recipeId, uid))).catch(() => {}))
+  );
+
+  const userDocs = [
+    ...ratedIds.map((id) => SchemaPaths.userRating(uid, id)),
+    ...favouriteIds.map((id) => SchemaPaths.favourite(uid, id)),
+    ...planIds.map((id) => SchemaPaths.mealPlan(uid, id)),
+    ...listIdsShopping.map((id) => SchemaPaths.shoppingList(uid, id)),
+  ];
+  await Promise.all(userDocs.map((path) => deleteDoc(doc(db, path))));
+  await deleteDoc(doc(db, SchemaPaths.user(uid)));
 }

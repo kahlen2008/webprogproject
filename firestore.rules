@@ -2,16 +2,37 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Everything under users/{uid} (profile, favourites, meal plan, shopping list)
-    // can only be read and written by that user.
-    match /users/{userId}/{document=**} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+    function signedInAs(uid) {
+      return request.auth != null && request.auth.uid == uid;
     }
 
-    // Optional ratings: anyone can read, only the author can write their own.
+    // Everything under users/{uid} (profile, favourites, meal plan, shopping list,
+    // rated-recipes list) can only be read and written by that user.
+    match /users/{userId}/{document=**} {
+      allow read, write: if signedInAs(userId);
+    }
+
+    // A review must look exactly like createRatingDoc in js/schema.js:
+    // whole-number stars 1 to 5, a comment of at most 300 characters,
+    // a display name of 1 to 60 characters, and a server timestamp.
+    function isValidRating() {
+      let data = request.resource.data;
+      return data.keys().hasOnly(['stars', 'comment', 'displayName', 'createdAt'])
+        && data.keys().hasAll(['stars', 'comment', 'displayName', 'createdAt'])
+        && data.stars is int && data.stars >= 1 && data.stars <= 5
+        && data.comment is string && data.comment.size() <= 300
+        && data.displayName is string
+        && data.displayName.size() >= 1 && data.displayName.size() <= 60
+        && data.createdAt == request.time;
+    }
+
+    // Ratings: anyone can read, only the author can write their own.
     match /recipes/{recipeId}/ratings/{uid} {
       allow read: if true;
-      allow write: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if signedInAs(uid) && isValidRating();
+      allow delete: if signedInAs(uid);
     }
+
+    // Anything not matched above is denied by default.
   }
 }

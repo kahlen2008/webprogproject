@@ -3,6 +3,7 @@
 
 
 import { createLanguageSwitcherHtml, bindLanguageSwitcher } from "./i18n.js";
+import { escapeHtml, showToast } from "./utils.js";
 
 const LINKS = [
   ["index.html", "Home"],
@@ -31,6 +32,14 @@ async function loadFavouritesOnce(user) {
 function currentPage() {
   const path = window.location.pathname.split("/").pop();
   return path || "index.html";
+}
+
+// Login / Sign Up links carry the current page, so the user comes back to it.
+const NO_RETURN_PAGES = ["index.html", "login.html", "signup.html", "onboarding.html", "404.html"];
+function authLinkHref(target) {
+  const page = currentPage();
+  if (NO_RETURN_PAGES.includes(page)) return target;
+  return `${target}?redirect=${encodeURIComponent(page + window.location.search + window.location.hash)}`;
 }
 
 export function renderNavbar(user) {
@@ -111,14 +120,14 @@ export function renderNavbar(user) {
     userDisplayHtml = `
       <div class="relative group flex-shrink-0">
         <button id="user-menu-btn" type="button" class="flex items-center gap-1.5 sm:gap-2.5 pl-1.5 sm:pl-2 pr-1 py-1 rounded-full hover:bg-stone-100 transition focus:outline-none" aria-haspopup="true">
-          <img class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-stone-200 flex-shrink-0" src="${avatarUrl}" alt="${displayName}">
-          <span class="text-sm font-semibold text-stone-800 hidden sm:inline" id="navbar-name">${displayName}</span>
+          <img class="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover border border-stone-200 flex-shrink-0" src="${escapeHtml(avatarUrl)}" alt="${escapeHtml(displayName)}">
+          <span class="text-sm font-semibold text-stone-800 hidden sm:inline" id="navbar-name">${escapeHtml(displayName)}</span>
           ${chevronDownSvg}
         </button>
         <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-lg border border-stone-100 py-2 z-50 transition-all">
           <div class="px-4 py-2 border-b border-stone-100">
             <p class="text-xs text-stone-400">Signed in as</p>
-            <p class="text-sm font-semibold text-stone-800 truncate">${activeUser.email || displayName}</p>
+            <p class="text-sm font-semibold text-stone-800 truncate">${escapeHtml(activeUser.email || displayName)}</p>
           </div>
           <a href="profile.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
             Profile Settings
@@ -139,8 +148,8 @@ export function renderNavbar(user) {
   } else {
     userDisplayHtml = `
       <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-        <a href="login.html" class="text-xs sm:text-sm font-semibold text-stone-700 hover:text-[#ca5c2e] px-1.5 sm:px-2 py-1.5 transition">Login</a>
-        <a href="signup.html" class="text-xs sm:text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b34d23] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl transition shadow-sm whitespace-nowrap">Sign Up</a>
+        <a href="${authLinkHref("login.html")}" class="text-xs sm:text-sm font-semibold text-stone-700 hover:text-[#ca5c2e] px-1.5 sm:px-2 py-1.5 transition">Login</a>
+        <a href="${authLinkHref("signup.html")}" class="text-xs sm:text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b34d23] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl transition shadow-sm whitespace-nowrap">Sign Up</a>
       </div>
     `;
   }
@@ -257,6 +266,16 @@ export function renderFooter() {
 }
 
 renderFooter();
+
+// A message left by the previous page just before it navigated away
+// (e.g. "Your account has been deleted."), shown once here.
+try {
+  const flash = sessionStorage.getItem("recipeplan_flash");
+  if (flash) {
+    sessionStorage.removeItem("recipeplan_flash");
+    showToast(flash, 4000);
+  }
+} catch (e) {}
 
 // Initial render with potential demo fallback
 renderNavbar(null);
