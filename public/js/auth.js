@@ -13,26 +13,73 @@ import {
   sendPasswordResetEmail,
   deleteUser,
 } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-auth.js";
-import { doc, getDoc, setDoc, deleteDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
+import {
+  doc,
+  getDoc,
+  setDoc,
+  serverTimestamp,
+} from "https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore.js";
 import { showToast } from "./utils.js";
+import { deleteUserData } from "./schema.js";
 import { needsOnboarding } from "./preferences.js";
 import "./i18n.js";
 
+// Turns a ?redirect= value into a path on this site, or null if it points anywhere else.
+// Resolving it as a URL and comparing origins blocks "javascript:", "/\evil.com",
+// "HTTPS://evil.com" and every other trick a prefix check misses.
+export function safeRedirect(value) {
+  if (!value) return null;
+  try {
+    const url = new URL(value, window.location.href);
+    if (url.origin !== window.location.origin) return null;
+    if (url.protocol !== "http:" && url.protocol !== "https:") return null;
+    return url.pathname + url.search + url.hash;
+  } catch (e) {
+    return null;
+  }
+}
+
 // Where to send someone right after they sign up or log in.
 function postAuthDestination() {
-  const params = new URLSearchParams(window.location.search);
-  const redirect = params.get("redirect");
-  if (redirect) {
-    if (!redirect.startsWith("http://") && !redirect.startsWith("https://") && !redirect.startsWith("//")) {
-      return redirect;
-    }
-  }
+  const redirect = safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
+  if (redirect) return redirect;
   return needsOnboarding() ? "onboarding.html" : "index.html";
 }
+
+// Cached copies of the account kept in localStorage so pages can draw the
+// logged-in UI before Firebase has restored the session.
+const LOCAL_ACCOUNT_KEYS = ["recipeplan_user", "recipeplan_profile", "recipeplan_favourites"];
+
+// Only runs when a cached account exists, so a guest's own local favourites are kept.
+function clearLocalAccount() {
+  try {
+    if (!localStorage.getItem("recipeplan_user")) return;
+  } catch (e) {
+    return;
+  }
+  LOCAL_ACCOUNT_KEYS.forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {}
+  });
+}
+
+// True once Firebase has said whether a session exists. Before that, the
+// localStorage copy is the best guess; after it, Firebase is the only truth.
+let authResolved = false;
+try {
+  onAuthStateChanged(auth, (user) => {
+    authResolved = true;
+    // Signed out (token expired, signed out in another tab, account deleted):
+    // drop the cached copy so no page keeps showing the old account.
+    if (!user) clearLocalAccount();
+  });
+} catch (e) {}
 
 // Returns the logged-in user, or null.
 export function getCurrentUser() {
   if (auth && auth.currentUser) return auth.currentUser;
+  if (authResolved) return null;
   try {
     const raw = localStorage.getItem("recipeplan_user");
     return raw ? JSON.parse(raw) : null;
@@ -42,19 +89,15 @@ export function getCurrentUser() {
 }
 
 // Calls callback(user) now and every time the login state changes.
+// Firebase's answer is final: a signed-out session gives null, never the cached copy.
 export function onAuthChange(callback) {
   try {
     return onAuthStateChanged(auth, (user) => {
-      if (user) {
-        callback(user);
-      } else {
-        const local = getCurrentUser();
-        callback(local);
-      }
+      if (!user) clearLocalAccount();
+      callback(user || null);
     });
   } catch (err) {
-    const local = getCurrentUser();
-    callback(local);
+    callback(getCurrentUser());
     return () => {};
   }
 }
@@ -233,20 +276,27 @@ export async function logout() {
   } catch (e) {}
 }
 
+// Firebase only deletes an account within about 5 minutes of signing in.
+const RECENT_LOGIN_MS = 5 * 60 * 1000;
+
 export async function deleteAccount() {
   const user = auth.currentUser;
   if (user) {
-    // Delete user's Firestore document
-    try {
-      await deleteDoc(doc(db, "users", user.uid));
-    } catch (e) {
-      console.warn("Could not delete user firestore record:", e);
+    // Check for a recent sign-in first, so the data is never wiped while the
+    // account itself survives because deleteUser refused.
+    const { authTime } = await user.getIdTokenResult();
+    if (Date.now() - new Date(authTime).getTime() > RECENT_LOGIN_MS) {
+      const err = new Error("Please log in again before deleting your account.");
+      err.code = "auth/requires-recent-login";
+      throw err;
     }
-    // Delete authentication account
+    // Reviews, favourites, meal plans, shopping lists and the profile document.
+    await deleteUserData(user.uid);
     await deleteUser(user);
   }
-  localStorage.removeItem("recipeplan_user");
-  localStorage.removeItem("recipeplan_profile");
+  clearLocalAccount();
+  window.dispatchEvent(new CustomEvent("favourites-changed"));
+  window.dispatchEvent(new CustomEvent("auth-changed"));
 }
 
 // Turns a Firebase error into a human-readable message.
@@ -264,16 +314,30 @@ export function friendlyAuthError(error) {
     case "auth/wrong-password":
     case "auth/user-not-found":
       return "Email or password is incorrect.";
-    case "auth/operation-not-allowed":
-      return "Google sign-in is not enabled yet in your Firebase console under Authentication > Sign-in method.";
+    case "auth/password-does-not-meet-requirements":
+      return "Password must be at least 8 characters, and include at least 1 number and 1 special character.";
+    case "auth/too-many-requests":
+      return "Too many attempts. Please wait a few minutes and try again.";
+    case "auth/network-request-failed":
+      return "Could not reach the server. Check your connection and try again.";
+    case "auth/user-disabled":
+      return "This account has been disabled.";
+    case "auth/requires-recent-login":
+      return "For security, please log in again and then retry.";
     case "auth/popup-closed-by-user":
-      return "Google sign-in popup was closed before finishing.";
+    case "auth/cancelled-popup-request":
+      return "Google sign-in was closed before it finished.";
     case "auth/popup-blocked":
-      return "Popup was blocked by your browser. Please allow popups for localhost.";
+      return "Your browser blocked the Google sign-in window. Please allow popups for this site and try again.";
+    case "auth/account-exists-with-different-credential":
+      return "An account with this email already exists. Log in with your password instead.";
+    case "auth/operation-not-allowed":
     case "auth/unauthorized-domain":
-      return "Domain not authorized. Please check Authentication > Settings > Authorized domains in Firebase.";
+      // Setup problems: the details are in the console above, not for users.
+      return "This sign-in option isn't available right now. Please try another way.";
     default:
-      return error.message || "Something went wrong. Please try again.";
+      // Never show Firebase's raw message, it can include internal details.
+      return "Something went wrong. Please try again.";
   }
 }
 
@@ -368,15 +432,47 @@ if (pwInput && pwRequirementsList) {
   evaluatePasswordRequirements();
 }
 
+// Shows a spinner on a button while a request runs, and stops double clicks.
+// Returns a function that puts the button back.
+const SPINNER_SVG = `<svg class="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24" aria-hidden="true"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path></svg>`;
+const authButtons = () => document.querySelectorAll('#login-form button[type="submit"], #signup-form button[type="submit"], #google-login-btn, #google-signup-btn');
+
+function setButtonLoading(btn, label) {
+  if (!btn) return () => {};
+  const originalHtml = btn.innerHTML;
+  // Disable every sign-in button on the page, so a second request can't start.
+  const others = [...authButtons()].filter((b) => !b.disabled);
+  others.forEach((b) => (b.disabled = true));
+  btn.setAttribute("aria-busy", "true");
+  btn.classList.add("opacity-75", "cursor-wait");
+  btn.innerHTML = `<span class="inline-flex items-center gap-2">${SPINNER_SVG}${label}</span>`;
+  return () => {
+    others.forEach((b) => (b.disabled = false));
+    btn.removeAttribute("aria-busy");
+    btn.classList.remove("opacity-75", "cursor-wait");
+    btn.innerHTML = originalHtml;
+  };
+}
+
 const loginForm = document.getElementById("login-form");
 if (loginForm) {
   loginForm.addEventListener("submit", async (event) => {
     event.preventDefault();
     showFormError(loginForm, "");
+
+    const emailVal = loginForm.email.value.trim();
+    if (!emailVal || !loginForm.password.value) {
+      showFormError(loginForm, "Please enter your email and password.");
+      (emailVal ? loginForm.password : loginForm.email).focus();
+      return;
+    }
+
+    const restore = setButtonLoading(loginForm.querySelector('button[type="submit"]'), "Logging in...");
     try {
-      await login(loginForm.email.value, loginForm.password.value);
+      await login(emailVal, loginForm.password.value);
       window.location.href = postAuthDestination();
     } catch (error) {
+      restore();
       showFormError(loginForm, friendlyAuthError(error));
     }
   });
@@ -417,33 +513,13 @@ if (signupForm) {
       return;
     }
 
-    const submitBtn = signupForm.querySelector('button[type="submit"]');
-    const originalText = submitBtn ? submitBtn.innerHTML : "";
-    if (submitBtn) {
-      submitBtn.disabled = true;
-      submitBtn.classList.add("opacity-75", "cursor-wait");
-      submitBtn.innerHTML = `
-        <span class="inline-flex items-center gap-2">
-          <svg class="animate-spin w-4 h-4 text-white" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-          </svg>
-          Creating account...
-        </span>
-      `;
-    }
-
+    const restore = setButtonLoading(signupForm.querySelector('button[type="submit"]'), "Creating account...");
     try {
-      await signup(signupForm.name.value, signupForm.email.value, passwordVal);
-      const params = new URLSearchParams(window.location.search);
-      const redirect = params.get("redirect");
+      await signup(nameVal, emailVal, passwordVal);
+      const redirect = safeRedirect(new URLSearchParams(window.location.search).get("redirect"));
       window.location.href = redirect ? `onboarding.html?redirect=${encodeURIComponent(redirect)}` : "onboarding.html";
     } catch (error) {
-      if (submitBtn) {
-        submitBtn.disabled = false;
-        submitBtn.classList.remove("opacity-75", "cursor-wait");
-        submitBtn.innerHTML = originalText;
-      }
+      restore();
       showFormError(signupForm, friendlyAuthError(error));
     }
   });
@@ -454,30 +530,23 @@ export async function resetPassword(email) {
   return sendPasswordResetEmail(auth, email);
 }
 
-// Google Sign-In button handlers
-const googleLoginBtn = document.getElementById("google-login-btn");
-if (googleLoginBtn) {
-  googleLoginBtn.addEventListener("click", async () => {
+// Google Sign-In button handlers (same flow on the login and signup pages)
+function bindGoogleButton(btn, form) {
+  if (!btn) return;
+  btn.addEventListener("click", async () => {
+    if (form) showFormError(form, "");
+    const restore = setButtonLoading(btn, "Connecting to Google...");
     try {
       await loginWithGoogle();
       window.location.href = postAuthDestination();
     } catch (error) {
-      if (loginForm) showFormError(loginForm, friendlyAuthError(error));
+      restore();
+      if (form) showFormError(form, friendlyAuthError(error));
     }
   });
 }
-
-const googleSignupBtn = document.getElementById("google-signup-btn");
-if (googleSignupBtn) {
-  googleSignupBtn.addEventListener("click", async () => {
-    try {
-      await loginWithGoogle();
-      window.location.href = postAuthDestination();
-    } catch (error) {
-      if (signupForm) showFormError(signupForm, friendlyAuthError(error));
-    }
-  });
-}
+bindGoogleButton(document.getElementById("google-login-btn"), loginForm);
+bindGoogleButton(document.getElementById("google-signup-btn"), signupForm);
 
 // Forgot password reset link handler
 const forgotPasswordLink = document.getElementById("forgot-password-link");
@@ -491,13 +560,20 @@ if (forgotPasswordLink) {
       return;
     }
 
+    // One message whether or not the account exists, so this can't be used
+    // to find out which emails are registered.
+    const sentMessage = `If an account exists for ${email}, a reset link is on its way. Check your inbox.`;
     try {
       await resetPassword(email);
-      showToast(`Password reset link sent to ${email}! Check your inbox.`);
+      showToast(sentMessage, 5000);
       if (loginForm) showFormError(loginForm, "");
     } catch (err) {
-      showToast(`Password reset email sent to ${email}! Check your inbox.`);
+      if (err?.code === "auth/user-not-found") {
+        showToast(sentMessage, 5000);
+      } else if (loginForm) {
+        // Real failures (bad email format, no connection, too many tries) say what went wrong.
+        showFormError(loginForm, friendlyAuthError(err));
+      }
     }
   });
 }
-

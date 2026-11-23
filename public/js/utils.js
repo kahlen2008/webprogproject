@@ -9,10 +9,10 @@ function getCurrentUser() {
 }
 
 // Makes text safe to put inside HTML (stops a recipe name from breaking the page).
+// Safe in element text and in quoted attributes (escapes both kinds of quote).
+const HTML_ESCAPES = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 export function escapeHtml(text) {
-  const div = document.createElement("div");
-  div.textContent = text == null ? "" : String(text);
-  return div.innerHTML;
+  return (text == null ? "" : String(text)).replace(/[&<>"']/g, (ch) => HTML_ESCAPES[ch]);
 }
 
 // Shows an elegant toast message at the top right of the screen with smooth spring transitions.
