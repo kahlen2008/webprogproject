@@ -598,7 +598,7 @@
   align-items: center;
   gap: 6px;
   padding: 0 6px;
-  color: #ca5c2e;
+  color: #b34d23;
   font: 600 12px/1 Inter, system-ui, sans-serif;
   transition: transform 0.2s;
 }
@@ -725,7 +725,7 @@
 }
 .rp-demo-days {
   margin-bottom: 6px;
-  color: #a8a29e;
+  color: #57534e;
   font: 600 10px/1 Inter, system-ui, sans-serif;
   text-align: center;
 }

@@ -463,6 +463,20 @@ export function playHeartEffect(btnEl, isSaved = true) {
   }
 }
 
+// TheMealDB serves smaller copies of each photo at <url>/medium (350px) and
+// <url>/large (500px); the original is 700px. Cards show the photo at ~300px or
+// less, so let the browser pick the smallest copy that is sharp enough instead of
+// always downloading the full ~100-200 KB original.
+const MEALDB_IMAGE = /^https:\/\/www\.themealdb\.com\/images\/media\/meals\/[^/?#]+\.(?:jpe?g|png)$/i;
+const CARD_IMAGE_SIZES =
+  "(min-width: 1280px) 296px, (min-width: 1024px) 23vw, (min-width: 640px) 46vw, calc(100vw - 32px)";
+
+export function cardImageSrcsetAttrs(url) {
+  if (!url || !MEALDB_IMAGE.test(url)) return "";
+  const safe = escapeHtml(url);
+  return `srcset="${safe}/medium 350w, ${safe}/large 500w, ${safe} 700w" sizes="${CARD_IMAGE_SIZES}"`;
+}
+
 export function createRecipeCard(recipe, options = {}) {
   const item = document.createElement("li");
   item.className = "recipe-card bg-white rounded-2xl border border-[#efe6dc] shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden group flex flex-col";
@@ -501,7 +515,7 @@ export function createRecipeCard(recipe, options = {}) {
   item.innerHTML = `
     <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
       <a href="recipe.html?id=${encodeURIComponent(recipe.id)}" class="block w-full h-full overflow-hidden">
-        <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="${recipeImage}" alt="${recipeName}" ${imgLoadingAttrs}>
+        <img class="w-full h-full aspect-[4/3] object-cover group-hover:scale-105 transition duration-500" src="${recipeImage}" ${cardImageSrcsetAttrs(recipe.image)} alt="${recipeName}" ${imgLoadingAttrs}>
       </a>
       <div class="card-heart-slot absolute top-3 right-3" data-recipe-id="${recipeId}"></div>
     </div>
@@ -515,7 +529,7 @@ export function createRecipeCard(recipe, options = {}) {
           <span class="recipe-card-rating hidden items-center gap-1 text-stone-700" data-recipe-id="${recipeId}" style="font-size:13px;line-height:18px">
             <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
             <span class="rating-avg font-bold"></span>
-            <span class="rating-count text-stone-400 font-normal"></span>
+            <span class="rating-count text-stone-600 font-normal"></span>
           </span>
         </div>
         <div class="card-action-slot flex items-center">

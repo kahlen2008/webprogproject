@@ -61,36 +61,44 @@
     .hero-fan-card[data-fan-pos="left"] {
       transform: translate3d(-68px, 12px, 0) rotate(-12deg) scale(0.88);
       z-index: 15;
-      opacity: 0.92;
+      opacity: 1;
       box-shadow: 0 12px 24px -8px rgba(87, 53, 34, 0.14);
       cursor: pointer;
     }
     .hero-fan-card[data-fan-pos="right"] {
       transform: translate3d(68px, 12px, 0) rotate(12deg) scale(0.88);
       z-index: 20;
-      opacity: 0.92;
+      opacity: 1;
       box-shadow: 0 12px 24px -8px rgba(87, 53, 34, 0.14);
       cursor: pointer;
     }
     .hero-fan-card[data-fan-pos="left"]:hover {
       transform: translate3d(-72px, 4px, 0) rotate(-13deg) scale(0.91);
-      opacity: 0.98;
     }
     .hero-fan-card[data-fan-pos="right"]:hover {
       transform: translate3d(72px, 4px, 0) rotate(13deg) scale(0.91);
-      opacity: 0.98;
     }
     .hero-fan-dot {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      background: transparent;
+      cursor: pointer;
+      border: none;
+      padding: 0 4px;
+      border-radius: 9999px;
+    }
+    .hero-fan-dot::before {
+      content: "";
       width: 7px;
       height: 7px;
       border-radius: 9999px;
       background: #dfd3c7;
       transition: all 0.35s ease;
-      cursor: pointer;
-      border: none;
-      padding: 0;
     }
-    .hero-fan-dot[aria-current="true"] {
+    .hero-fan-dot[aria-current="true"]::before {
       width: 22px;
       background: #ca5c2e;
     }
@@ -163,7 +171,8 @@
 
       <!-- Hero Rotating Recipe Card Fan -->
       <div class="lg:col-span-5 flex flex-col items-center justify-center">
-        <div id="hero-fan-stage" class="hero-fan-stage" aria-label="Featured recipes carousel">
+        <h2 class="visually-hidden">Featured recipes</h2>
+        <div id="hero-fan-stage" class="hero-fan-stage" role="group" aria-label="Featured recipes carousel">
           <!-- Card 0: Big Mac -->
           <article class="hero-fan-card recipe-card group flex flex-col" data-fan-index="0" data-fan-pos="center" data-recipe-id="53013">
             <div class="relative overflow-hidden bg-stone-100 aspect-[4/3]">
@@ -181,7 +190,7 @@
                   <span class="recipe-card-rating inline-flex items-center gap-1 text-stone-700" data-recipe-id="53013" style="font-size:13px;line-height:18px">
                     <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
                     <span class="rating-avg font-bold">5.0</span>
-                    <span class="rating-count text-stone-400 font-normal">(2)</span>
+                    <span class="rating-count text-stone-600 font-normal">(2)</span>
                   </span>
                 </div>
                 <div class="card-action-slot flex items-center">
@@ -212,7 +221,7 @@
                   <span class="recipe-card-rating inline-flex items-center gap-1 text-stone-700" data-recipe-id="52854" style="font-size:13px;line-height:18px">
                     <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
                     <span class="rating-avg font-bold">5.0</span>
-                    <span class="rating-count text-stone-400 font-normal">(2)</span>
+                    <span class="rating-count text-stone-600 font-normal">(2)</span>
                   </span>
                 </div>
                 <div class="card-action-slot flex items-center">
@@ -243,7 +252,7 @@
                   <span class="recipe-card-rating inline-flex items-center gap-1 text-stone-700" data-recipe-id="52829" style="font-size:13px;line-height:18px">
                     <span class="text-amber-500 inline-flex items-center justify-center leading-none" style="font-size:15px;transform:translateY(-0.5px)" aria-hidden="true">★</span>
                     <span class="rating-avg font-bold">4.5</span>
-                    <span class="rating-count text-stone-400 font-normal">(2)</span>
+                    <span class="rating-count text-stone-600 font-normal">(2)</span>
                   </span>
                 </div>
                 <div class="card-action-slot flex items-center">
@@ -259,7 +268,7 @@
         </div>
 
         <!-- Fan Carousel Dots -->
-        <div class="flex items-center justify-center gap-2 mt-1" role="tablist" aria-label="Featured recipe cards">
+        <div class="flex items-center justify-center gap-1 mt-1" role="group" aria-label="Featured recipe cards">
           <button type="button" class="hero-fan-dot" data-fan-dot="0" aria-current="true" aria-label="Show Big Mac"></button>
           <button type="button" class="hero-fan-dot" data-fan-dot="1" aria-current="false" aria-label="Show Pancakes"></button>
           <button type="button" class="hero-fan-dot" data-fan-dot="2" aria-current="false" aria-label="Show Grilled Mac and Cheese Sandwich"></button>
@@ -270,7 +279,7 @@
     <!-- Quick Access Feature Pillars -->
     <section class="space-y-4">
       <div class="flex items-center gap-3">
-        <span class="text-xs font-semibold tracking-wider uppercase text-stone-600">How RecipePlan works</span>
+        <h2 class="text-xs font-semibold tracking-wider uppercase text-stone-600 font-sans">How RecipePlan works</h2>
         <span class="h-px bg-[#ede4da] flex-1"></span>
       </div>
 
@@ -292,7 +301,7 @@
             </div>
           </div>
           <div class="rp-pillar-body">
-            <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Explore Recipes</h2>
+            <h3 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Explore Recipes</h3>
             <p class="text-sm text-stone-600 leading-relaxed">
               Search hundreds of meals by name, category or cuisine, each with step-by-step instructions.
             </p>
@@ -311,7 +320,7 @@
             </div>
           </div>
           <div class="rp-pillar-body">
-            <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Weekly Planner</h2>
+            <h3 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Weekly Planner</h3>
             <p class="text-sm text-stone-600 leading-relaxed">
               Plan breakfast, lunch and dinner for the week, with calorie estimates and one shopping list.
             </p>
@@ -340,7 +349,7 @@
             </ul>
           </div>
           <div class="rp-pillar-body">
-            <h2 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Allergy Safeguards</h2>
+            <h3 class="text-lg font-bold text-stone-900 group-hover:text-[#ca5c2e] transition font-heading">Allergy Safeguards</h3>
             <p class="text-sm text-stone-600 leading-relaxed">
               Set your diet and allergies once, and recipes with peanuts, gluten or dairy get flagged.
             </p>

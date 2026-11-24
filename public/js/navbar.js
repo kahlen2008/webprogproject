@@ -65,8 +65,8 @@ export function renderNavbar(user) {
     const isCurrent = page === href || (href === "index.html" && page === "");
     return `<a href="${href}" class="relative py-1 text-sm font-semibold transition-colors duration-200 ${
       isCurrent
-        ? "text-[#ca5c2e]"
-        : "text-stone-600 hover:text-[#ca5c2e]"
+        ? "text-[#b34d23]"
+        : "text-stone-600 hover:text-[#b34d23]"
     }" ${isCurrent ? 'aria-current="page"' : ""}>
       ${label}
       ${isCurrent ? '<span class="absolute bottom-0 left-0 w-full h-0.5 bg-[#ca5c2e] rounded-full transition-all duration-300"></span>' : ''}
@@ -126,16 +126,16 @@ export function renderNavbar(user) {
         </button>
         <div id="user-dropdown" class="hidden absolute right-0 mt-2 w-48 bg-white rounded-2xl shadow-lg border border-stone-100 py-2 z-50 transition-all">
           <div class="px-4 py-2 border-b border-stone-100">
-            <p class="text-xs text-stone-400">Signed in as</p>
+            <p class="text-xs text-stone-500">Signed in as</p>
             <p class="text-sm font-semibold text-stone-800 truncate">${escapeHtml(activeUser.email || displayName)}</p>
           </div>
-          <a href="profile.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
+          <a href="profile.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#b34d23]">
             Profile Settings
           </a>
-          <a href="favourites.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
+          <a href="favourites.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#b34d23]">
             My Favourites
           </a>
-          <a href="planner.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#ca5c2e]">
+          <a href="planner.html" class="flex items-center gap-2 px-4 py-2 text-sm text-stone-700 hover:bg-stone-50 hover:text-[#b34d23]">
             Meal Planner
           </a>
           <div class="border-t border-stone-100 my-1"></div>
@@ -148,8 +148,8 @@ export function renderNavbar(user) {
   } else {
     userDisplayHtml = `
       <div class="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-        <a href="${authLinkHref("login.html")}" class="text-xs sm:text-sm font-semibold text-stone-700 hover:text-[#ca5c2e] px-1.5 sm:px-2 py-1.5 transition">Login</a>
-        <a href="${authLinkHref("signup.html")}" class="text-xs sm:text-sm font-semibold text-white bg-[#ca5c2e] hover:bg-[#b34d23] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl transition shadow-sm whitespace-nowrap">Sign Up</a>
+        <a href="${authLinkHref("login.html")}" class="text-xs sm:text-sm font-semibold text-stone-700 hover:text-[#b34d23] px-1.5 sm:px-2 py-1.5 transition">Login</a>
+        <a href="${authLinkHref("signup.html")}" class="text-xs sm:text-sm font-semibold text-white bg-[#b34d23] hover:bg-[#9a4220] px-2.5 sm:px-4 py-1.5 sm:py-2 rounded-xl transition shadow-sm whitespace-nowrap">Sign Up</a>
       </div>
     `;
   }
@@ -186,7 +186,7 @@ export function renderNavbar(user) {
         <nav class="flex flex-col space-y-2">
           ${LINKS.map(([href, label]) => {
             const active = page === href || (href === "index.html" && page === "");
-            return `<a href="${href}" class="px-3 py-2 rounded-xl text-base font-medium ${active ? "bg-[#f5ebe4] text-[#ca5c2e] font-semibold" : "text-stone-700 hover:bg-stone-100"}">${label}</a>`;
+            return `<a href="${href}" class="px-3 py-2 rounded-xl text-base font-medium ${active ? "bg-[#f5ebe4] text-[#b34d23] font-semibold" : "text-stone-700 hover:bg-stone-100"}">${label}</a>`;
           }).join("")}
           ${activeUser ? '<a href="profile.html" class="px-3 py-2 rounded-xl text-base font-medium text-stone-700 hover:bg-stone-100">Profile Settings</a>' : ""}
         </nav>
@@ -243,7 +243,7 @@ export function renderFooter() {
     else document.body.appendChild(host);
   }
 
-  host.className = "mt-auto border-t border-[#ede4da] bg-[#faf7f2] py-4 sm:py-5 text-xs text-stone-500";
+  host.className = "mt-auto border-t border-[#ede4da] bg-[#faf7f2] py-4 sm:py-5 text-xs text-stone-600";
   const year = new Date().getFullYear();
   const links = [
     ["recipes.html", "Browse Recipes"],
@@ -258,7 +258,7 @@ export function renderFooter() {
       <p>&copy; ${year} RecipePlan. Eat better, cook smarter.</p>
       <nav class="flex flex-wrap items-center justify-center gap-x-5 gap-y-1 font-medium" aria-label="Footer">
         ${links
-          .map(([href, label]) => `<a href="${href}" class="${page === href ? "text-[#ca5c2e]" : "text-stone-600 hover:text-[#ca5c2e]"} transition" ${page === href ? 'aria-current="page"' : ""}>${label}</a>`)
+          .map(([href, label]) => `<a href="${href}" class="${page === href ? "text-[#b34d23]" : "text-stone-600 hover:text-[#b34d23]"} transition" ${page === href ? 'aria-current="page"' : ""}>${label}</a>`)
           .join("")}
       </nav>
     </div>
