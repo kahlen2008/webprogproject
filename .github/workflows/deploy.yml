@@ -18,10 +18,10 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+  # Upload and deploy run as separate jobs so the (large) artifact is fully
+  # finalized before deploy-pages looks it up; in one job this raced and
+  # failed with "No artifacts named github-pages were found".
+  build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -35,6 +35,13 @@ jobs:
         with:
           path: './public'
 
+  deploy:
+    needs: build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
