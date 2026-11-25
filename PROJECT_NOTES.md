@@ -111,7 +111,7 @@ Recipe object used everywhere:
 `openAddToPlanDialog(recipe, { skipAllergenCheck, day, meal })` is the shared day and meal dialog: it shows this week's days and the three meals, says what is already in the chosen slot, saves through `addToPlan`, and resolves `{ day, meal }` (plus `unchanged: true` if that recipe was already there) or `null` if cancelled.
 
 **`js/utils.js` (shared)**
-`escapeHtml` (escapes `& < > " '`, so it is safe in text and in quoted attributes), `showToast`, `toTitleCase`, `createRecipeCard(recipe, options)`, `cleanInstructionText` (fixes TheMealDB scraping typos such as missing first letters, common misspellings and doubled small words like "the the"), `showConfirmModal({ title, message, confirmText, cancelText, confirmColor, icon })` (resolves `true` or `false`), `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
+`escapeHtml` (escapes `& < > " '`, so it is safe in text and in quoted attributes), `showToast`, `showAuthPromptModal({ title, description, redirectUrl, icon })` (log in / sign up prompt for logged-out users), `toTitleCase`, `createRecipeCard(recipe, options)`, `cardImageSrcsetAttrs(url)` (returns `srcset`/`sizes` attributes so TheMealDB photos load their smaller `/medium` (350px) or `/large` (500px) copies; empty string for other URLs, use it on any new card image), `syncAllCardHearts()` (refreshes every card heart on the page from the saved favourites), `cleanInstructionText` (fixes TheMealDB scraping typos such as missing first letters, common misspellings and doubled small words like "the the"), `showConfirmModal({ title, message, confirmText, cancelText, confirmColor, icon })` (resolves `true` or `false`), `capitalizeIngredient`, `combineMeasures`, `combineIngredients` (the last two merge shopping list items), `sumShoppingMeasures(measures)` (adds amounts up per unit for the shopping list, e.g. "170g + 6 tbsp").
 
 **`js/firebase-config.js`** exports `app`, `auth`, `db`. Import these, never call `initializeApp` again.
 
@@ -155,13 +155,18 @@ Onboarding routing: after signup go to `onboarding.html`. Not logged in goes to 
 - The demo plan is gone. An old browser-only plan is moved to the current week on the account once (an unedited demo plan is dropped).
 - "Fill from favourites" (in the planner's ⋯ menu, next to Clear week) is an extra we added.
 - Nutrition estimates are an extra we added (`nutrition.js`): rough calories, protein, carbs and fat per serving on the recipe page, and a daily calorie total on the planner. TheMealDB has no nutrition data, so they come from a small per-100 g table and the ingredient amounts, and the UI calls them a rough guide.
+- Recipe photos that fail to load (TheMealDB down or a missing photo) show a plate-and-cutlery placeholder instead of a broken image. One capture-phase `error` listener in `navbar.js` handles this on every page, so new pages that load the navbar get it for free.
+- Recipe cards load smaller photo copies through `cardImageSrcsetAttrs` (see `utils.js`).
 - Translation is machine translation, so wording can be imperfect. Allergen matching always runs on the English ingredient names from TheMealDB.
 
 ## Shared UI/UX rules
 
 - Use the `brand` Tailwind colours and the Inter / Outfit fonts. Cream page background, white rounded cards, orange main button.
 - Mobile first. Check every page at phone width.
-- Buttons and inputs must have labels and visible focus. Images need `alt` text.
+- Buttons and inputs must have labels and visible focus. Images need `alt` text (use `alt=""` when a nearby label already names the image, e.g. the category chips).
+- Contrast: brand-coloured text and links use `#b34d23` (not `#ca5c2e`, which is too light for text on cream or white). Small grey text is `stone-500` or darker, never `stone-400`.
+- Touch targets are at least 24×24px, even when the visible part is smaller (e.g. carousel dots draw the dot inside a bigger hit area).
+- Headings go in order (h1 > h2 > h3) on every page; use a visually hidden heading if a section needs one but shouldn't show it.
 - Show toasts (`showToast`) for success and errors, not `alert()`.
 - Allergen and diet warnings use the same badge and modal from `preferences.js` on every page.
 

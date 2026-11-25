@@ -121,7 +121,9 @@ Deciding what to cook every day is time-consuming and often fragmented across bo
 | 📖 **Dynamic Recipe Details**         | Full instructions, ingredient quantities, YouTube video tutorials, and interactive serving-size scaling.                             |
 | 👩‍🍳 **Cooking Mode**                  | Full-screen, one step at a time, sized to fit the screen, with Next/Back (or arrow keys), progress, an ingredient checklist and section headings. Kitchen timers start from times found in a step and keep running across steps, several at once. The screen stays awake while cooking. |
 | 🛡️ **Dietary & Allergen Detection** | Real-time keyword scanning on recipe cards and detail views alerting users of matching allergen risks.                               |
-| 📅 **Weekly Meal Planner**            | 7-day schedule (Breakfast, Lunch, Dinner) saved per week to your account. Drag meals between slots, switch weeks, clear a week with Undo, and use day tabs on phones. |
+| 🔄 **Ingredient Swaps**               | Flagged recipes show "Try instead" ideas in the warning banner (up to 3 per ingredient), skipping swaps that clash with something else the user avoids. |
+| 🥗 **Nutrition Estimates**            | Rough calories, protein, carbs and fat per serving on the recipe page and a daily calorie total on the planner, worked out from ingredient amounts and labelled as a rough guide. |
+| 📅 **Weekly Meal Planner**            | 7-day schedule (Breakfast, Lunch, Dinner) saved per week to your account. Drag meals between slots, switch weeks, clear a week with Undo, fill a week from your favourites, and use day tabs on phones. |
 | 🛒 **Smart Shopping List**            | Combines the ingredients from every planned recipe into one list (same units added up), with ticks saved to your account, checked items moved to the bottom, a print view and a Copy list button. |
 | ⭐ **Ratings & Reviews**              | Star ratings and written reviews on every recipe, with the average and review count shown at the top of the recipe page.            |
 | 🌐 **Language Switcher**              | Use the site in 130+ languages; searches typed in another language are translated to English before they query TheMealDB.          |
@@ -138,7 +140,7 @@ RecipePlan was developed collaboratively by a 4-person team. Each member holds e
 | Member                       | Role & Module                              | Responsibilities                                                                                                                                                   | Key Files                                                                                                            |
 | ---------------------------- | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
 | **Kahlen Ong - 202699471** | **Accounts, Profile & Security**     | User authentication (Email/Password, Google OAuth), 2-step onboarding questionnaire, profile and settings page, diet and allergy checker, password security rules, language switcher, and the Firestore schema and security rules. Also gave some help with integration and small fixes across the other modules. | `login.html`, `signup.html`, `onboarding.html`, `profile.html`, `js/auth.js`, `js/onboarding.js`, `js/profile.js`, `js/preferences.js`, `js/navbar.js`, `js/i18n.js`, `js/schema.js`, `js/firebase-config.js`, `firestore.rules` |
-| **Shrestha Puja - 202537250** | **Recipe Discovery & Design System** | Homepage search, category filtering, recipe detail views, serving-size scaler, cooking mode, TheMealDB API integration, and core Tailwind/CSS design system. | `index.html`, `recipes.html`, `recipe.html`, `css/base.css`, `css/components.css`, `css/recipes.css`, `js/api.js`, `js/recipes.js`, `js/cooking-mode.js`, `js/search-cta.js` |
+| **Shrestha Puja - 202537250** | **Recipe Discovery & Design System** | Homepage search, category filtering, recipe detail views, serving-size scaler, cooking mode, TheMealDB API integration, and core Tailwind/CSS design system. | `index.html`, `recipes.html`, `recipe.html`, `css/base.css`, `css/components.css`, `css/recipes.css`, `js/api.js`, `js/recipes.js`, `js/cooking-mode.js`, `js/search-cta.js`, `js/home-demos.js` |
 | **Sunar Roshani - 202537197** | **Favourites & Quality Assurance**   | Favourites collection view, heart toggles, star ratings/feedback, cross-device Firestore data sync, and responsive layout testing.                                 | `favourites.html`, `css/favourites.css`, `js/favourites.js`, `js/ratings.js` |
 | **Aale Aaditi - 202537195** | **Meal Planner & Deployment**        | Weekly meal calendar interface, automated ingredient consolidation for grocery lists, print formatting, the cuisine filter on the recipes page, deployment (GitHub Pages and Firebase Hosting), and documentation.            | `planner.html`, `css/planner.css`, `js/planner.js`, `firebase.json`, `.github/workflows/`, `README.md` |
 
@@ -208,6 +210,7 @@ webprogproject/
     │   ├── recipes.js          # Search, filters and the recipe detail page
     │   ├── cooking-mode.js     # Full-screen cooking mode: steps, timers, ingredient checklist, wake lock
     │   ├── search-cta.js       # Home page: rotating search placeholder and featured recipe cards
+    │   ├── home-demos.js       # Home page: interactive feature demos
     │   ├── nutrition.js        # Rough calorie and servings estimates from ingredients
     │   ├── ratings.js          # Star ratings and reviews
     │   ├── favourites.js       # Favourites: live Firestore sync, sort and filter
@@ -318,7 +321,7 @@ firebase deploy
 ## 🎨 Design System & Aesthetic Guidelines
 
 - **Harmonious Warm Palette:**
-  - **Primary Brand:** Terracotta (`#ca5c2e` / Dark: `#b34d23`)
+  - **Primary Brand:** Terracotta (`#ca5c2e` / Dark: `#b34d23`). Use the dark shade for brand-coloured text, links and the Sign Up button (hover `#9a4220`) so they meet WCAG AA contrast; keep `#ca5c2e` for backgrounds, underlines and accents.
   - **Background Surfaces:** Warm Cream (`#faf7f2`), Pure White (`#ffffff`), Muted Sand (`#fdf8f4`)
   - **Border & Dividers:** Warm Stone (`#ede4da` / `#efe6dc`)
   - **Pill Accents:** Soft Almond (`#f5ebe4` with `#a04e28` typography)
