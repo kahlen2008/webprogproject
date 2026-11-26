@@ -103,6 +103,21 @@ export function shownWeekId() {
   return getCurrentWeekId(weekStart());
 }
 
+// A day before today. Past days keep their meals (greyed out) but take no new ones,
+// and their ingredients are left off the shopping list.
+function isPastDay(day, offset = weekOffset) {
+  const i = DAYS.indexOf(day);
+  if (i < 0) return false;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return getWeekDates(offset)[i] < today;
+}
+
+// Days of the shown week that can still be planned (today onwards).
+function openDays(offset = weekOffset) {
+  return DAYS.filter((day) => !isPastDay(day, offset));
+}
+
 function cacheKey(uid) {
   return `recipeplan_meal_plans_${uid}`;
 }
@@ -209,6 +224,10 @@ export async function savePlan(plan, weekId = shownWeekId()) {
  */
 export async function addToPlan(day, meal, recipe, options = {}) {
   const opts = typeof options === "boolean" ? { skipConfirm: options } : options || {};
+  if (isPastDay(day)) {
+    showToast(`${day} has already passed. Pick today or a later day.`);
+    return false;
+  }
   const plan = await getPlan();
   const existingMeal = plan[day]?.[meal];
 
@@ -269,6 +288,7 @@ export async function removeFromPlan(day, meal, options = {}) {
 // Moves a meal to another slot in the shown week. If that slot is filled, the two swap.
 export async function moveInPlan(fromDay, fromMeal, toDay, toMeal) {
   if (fromDay === toDay && fromMeal === toMeal) return;
+  if (isPastDay(fromDay) || isPastDay(toDay)) return; // past days are read-only
   const plan = await getPlan();
   const moving = plan[fromDay]?.[fromMeal];
   if (!moving) return;
@@ -325,10 +345,16 @@ export async function generateFromFavourites() {
     return;
   }
 
+  const days = openDays();
+  if (days.length === 0) {
+    showToast("This week is over. Go to this week or a later one to plan meals.");
+    return;
+  }
+
   const plan = await getPlan();
   let favIndex = 0;
 
-  DAYS.forEach((day) => {
+  days.forEach((day) => {
     MEALS.forEach((meal) => {
       if (!plan[day][meal]) {
         const picked = favs[favIndex % favs.length];
@@ -534,20 +560,26 @@ function isToday(d) {
 
 // One filled meal: photo, name on up to two lines, remove button in the corner.
 // On larger screens the tile can be dragged to another slot.
+// A meal on a past day is greyed out and can't be dragged, but still opens and can be removed.
 function mealTileHtml(item, day, meal, compact = false) {
   const hasLink = item.id && item.id !== "0";
   const link = hasLink ? `recipe.html?id=${encodeURIComponent(item.id)}` : "#";
   const name = escapeHtml(toTitleCase(item.name || ""));
   const img = escapeHtml(item.image || FALLBACK_MEAL_IMG);
   const size = compact ? "w-12 h-12" : "w-16 h-16";
-  const dragAttrs = compact
-    ? ""
-    : `draggable="true" data-drag-day="${day}" data-drag-meal="${meal}" title="Drag to move, or click to view the recipe"`;
+  const past = isPastDay(day);
+  const draggable = !compact && !past;
+  const dragAttrs = draggable
+    ? `draggable="true" data-drag-day="${day}" data-drag-meal="${meal}" title="Drag to move, or click to view the recipe"`
+    : "";
+  const cardClass = past
+    ? "bg-stone-50 border-stone-200 hover:border-stone-300"
+    : "bg-white border-[#efe6dc] shadow-xs hover:border-[#ca5c2e]/50 hover:shadow-sm";
   return `
-    <div class="plan-tile relative group h-full ${compact ? "" : "cursor-grab active:cursor-grabbing"}" ${dragAttrs}>
-      <a href="${link}" draggable="false" class="flex items-center gap-3 h-full bg-white border border-[#efe6dc] rounded-2xl p-2 pr-7 shadow-xs hover:border-[#ca5c2e]/50 hover:shadow-sm transition">
-        <img src="${img}" alt="${name}" loading="lazy" draggable="false" class="${size} rounded-xl object-cover flex-shrink-0 bg-stone-100">
-        <span class="text-sm font-semibold text-stone-800 group-hover:text-[#ca5c2e] leading-snug line-clamp-2">${name}</span>
+    <div class="plan-tile relative group h-full ${draggable ? "cursor-grab active:cursor-grabbing" : ""}" ${dragAttrs}>
+      <a href="${link}" draggable="false" class="flex items-center gap-3 h-full border rounded-2xl p-2 pr-7 transition ${cardClass}">
+        <img src="${img}" alt="${name}" loading="lazy" draggable="false" class="${size} rounded-xl object-cover flex-shrink-0 bg-stone-100 ${past ? "grayscale opacity-70" : ""}">
+        <span class="text-sm font-semibold ${past ? "text-stone-500" : "text-stone-800 group-hover:text-[#ca5c2e]"} leading-snug line-clamp-2">${name}</span>
       </a>
       <button type="button" class="remove-plan-item absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/90 border border-stone-200 text-stone-400 hover:text-red-500 hover:border-red-200 flex items-center justify-center text-sm leading-none shadow-xs opacity-100 sm:opacity-0 sm:group-hover:opacity-100 focus:opacity-100 transition" data-day="${day}" data-meal="${meal}" title="Remove meal" aria-label="Remove ${name} from ${day} ${meal}">&times;</button>
     </div>
@@ -555,14 +587,22 @@ function mealTileHtml(item, day, meal, compact = false) {
 }
 
 // Empty slot: same size as a filled tile, dashed, clearly clickable.
+// On a past day it is a plain grey "Past" box with nothing to click.
 function emptySlotHtml(day, meal, compact = false) {
   const height = compact ? "min-h-[64px]" : "min-h-[82px]";
+  if (isPastDay(day)) {
+    return `
+    <div class="w-full h-full ${height} flex items-center justify-center rounded-2xl border border-stone-100 bg-stone-50 text-stone-400 text-xs font-medium select-none" aria-label="${day} ${meal}: day has passed">Past</div>
+  `;
+  }
   return `
     <button type="button" class="add-slot-btn w-full h-full ${height} flex items-center justify-center gap-1.5 rounded-2xl border-2 border-dashed border-stone-200 text-stone-400 text-sm font-medium hover:border-[#ca5c2e]/50 hover:text-[#ca5c2e] hover:bg-[#fbf2ec] transition" data-day="${day}" data-meal="${meal}">
       <span class="text-lg leading-none">+</span> Add ${meal.toLowerCase()}
     </button>
   `;
 }
+
+const PAST_BADGE = `<span class="ml-1.5 align-middle text-[10px] font-semibold uppercase tracking-wide px-1.5 py-px rounded-md bg-stone-100 text-stone-500 border border-stone-200">Past</span>`;
 
 // Phones show one day at a time. Defaults to today when the shown week is this week.
 let mobileDay = null;
@@ -578,19 +618,22 @@ function dayTabsHtml(plan, dates) {
       ${DAYS.map((day, i) => {
         const selected = day === mobileDay;
         const today = isToday(dates[i]);
+        const past = isPastDay(day);
         const planned = MEALS.filter((meal) => plan[day]?.[meal]).length;
         const dots = MEALS.map((_, m) =>
-          `<span class="w-1 h-1 rounded-full ${m < planned ? (selected ? "bg-white" : "bg-[#ca5c2e]") : selected ? "bg-white/35" : "bg-stone-200"}"></span>`
+          `<span class="w-1 h-1 rounded-full ${m < planned ? (selected ? "bg-white" : past ? "bg-stone-300" : "bg-[#ca5c2e]") : selected ? "bg-white/35" : "bg-stone-200"}"></span>`
         ).join("");
         const stateClass = selected
-          ? "bg-[#ca5c2e] text-white shadow-sm"
+          ? past ? "bg-stone-500 text-white shadow-sm" : "bg-[#ca5c2e] text-white shadow-sm"
           : today
             ? "text-[#ca5c2e] bg-[#fbf2ec]"
-            : "text-stone-600 hover:bg-stone-50";
+            : past
+              ? "text-stone-400 bg-stone-50 hover:bg-stone-100"
+              : "text-stone-600 hover:bg-stone-50";
         return `
           <button type="button" role="tab" id="day-tab-${day}" data-day="${day}"
             aria-selected="${selected}" aria-controls="day-panel" tabindex="${selected ? "0" : "-1"}"
-            aria-label="${day}${today ? ", today" : ""}, ${planned} of 3 meals planned"
+            aria-label="${day}${today ? ", today" : past ? ", past" : ""}, ${planned} of 3 meals planned"
             class="day-tab flex flex-col items-center gap-0.5 py-1.5 rounded-xl transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#ca5c2e]/40 ${stateClass}">
             <span class="text-[11px] font-semibold uppercase tracking-wide">${day}</span>
             <span class="text-base font-bold leading-none">${dates[i].getDate()}</span>
@@ -618,6 +661,7 @@ function dayPanelHtml(plan, dates) {
       <div class="flex items-baseline justify-between gap-2">
         <h3 class="font-bold ${today ? "text-[#ca5c2e]" : "text-stone-900"}">
           ${mobileDay} <span class="text-sm font-medium ${today ? "text-[#ca5c2e]/80" : "text-stone-400"}">· ${today ? "Today" : formatShortDate(dates[i])}</span>
+          ${isPastDay(mobileDay) ? PAST_BADGE : ""}
         </h3>
         <span class="day-kcal-total text-xs font-semibold text-stone-400" data-day="${mobileDay}">–</span>
       </div>
@@ -650,19 +694,20 @@ export async function renderPlannerTable() {
     host.innerHTML = "";
     DAYS.forEach((day, i) => {
       const today = isToday(dates[i]);
+      const past = isPastDay(day);
       const row = document.createElement("tr");
-      row.className = today ? "bg-[#fbf2ec]/60" : "hover:bg-[#faf7f2]/50 transition";
+      row.className = today ? "bg-[#fbf2ec]/60" : past ? "bg-stone-50/70" : "hover:bg-[#faf7f2]/50 transition";
 
       let cellsHtml = `
         <td class="py-3 px-4 align-middle whitespace-nowrap ${today ? "border-l-4 border-[#ca5c2e]" : "border-l-4 border-transparent"}">
-          <div class="font-bold text-sm ${today ? "text-[#ca5c2e]" : "text-stone-800"}">${day}</div>
+          <div class="font-bold text-sm ${today ? "text-[#ca5c2e]" : past ? "text-stone-500" : "text-stone-800"}">${day}${past ? PAST_BADGE : ""}</div>
           <div class="text-xs ${today ? "text-[#ca5c2e]/80 font-semibold" : "text-stone-400"}">${today ? "Today" : formatShortDate(dates[i])}</div>
         </td>
       `;
 
       MEALS.forEach((meal) => {
         const item = plan[day]?.[meal];
-        cellsHtml += `<td class="plan-slot py-2.5 px-2 align-middle" data-day="${day}" data-meal="${meal}"><div class="plan-slot-inner rounded-2xl transition">${item ? mealTileHtml(item, day, meal) : emptySlotHtml(day, meal)}</div></td>`;
+        cellsHtml += `<td class="plan-slot py-2.5 px-2 align-middle" data-day="${day}" data-meal="${meal}"${past ? ' data-past="true"' : ""}><div class="plan-slot-inner rounded-2xl transition">${item ? mealTileHtml(item, day, meal) : emptySlotHtml(day, meal)}</div></td>`;
       });
 
       cellsHtml += `
@@ -791,9 +836,10 @@ function saveShoppingChecks() {
   );
 }
 
+// Meals still to shop for: past days are left out.
 function plannedMeals(plan) {
   const meals = [];
-  DAYS.forEach((day) =>
+  openDays().forEach((day) =>
     MEALS.forEach((meal) => {
       const item = plan?.[day]?.[meal];
       if (item && item.id && item.id !== "0") meals.push(item);
@@ -889,14 +935,20 @@ function paintShoppingState(state) {
       </div>`;
   } else if (state === "empty" || state === "no-ingredients") {
     if (subtitle) subtitle.textContent = `Ingredients for ${weekRangeText()}`;
-    const message = state === "empty"
-      ? "Plan some meals and their ingredients will show up here, added together."
-      : "The planned recipes don't list any ingredients.";
+    const canPlan = openDays().length > 0;
+    const title = state !== "empty"
+      ? "Nothing to buy yet"
+      : canPlan ? `No meals planned for ${week}` : "This week is over";
+    const message = state !== "empty"
+      ? "The planned recipes don't list any ingredients."
+      : canPlan
+        ? "Plan some meals and their ingredients will show up here, added together. Past days aren't included."
+        : "Meals on past days aren't added to the shopping list.";
     status.innerHTML = `
       <div class="py-8 px-4 text-center space-y-3 rounded-2xl border-2 border-dashed border-stone-200">
-        <p class="text-sm font-semibold text-stone-700">${state === "empty" ? `No meals planned for ${week}` : "Nothing to buy yet"}</p>
+        <p class="text-sm font-semibold text-stone-700">${title}</p>
         <p class="text-xs text-stone-500 max-w-xs mx-auto">${message}</p>
-        ${state === "empty" ? `<button type="button" id="shopping-add-meal-btn" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-[#ca5c2e] text-white hover:bg-[#b34d23] transition shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ca5c2e]/50">+ Add a meal</button>` : ""}
+        ${state === "empty" && canPlan ? `<button type="button" id="shopping-add-meal-btn" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-semibold rounded-xl bg-[#ca5c2e] text-white hover:bg-[#b34d23] transition shadow-xs focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#ca5c2e]/50">+ Add a meal</button>` : ""}
       </div>`;
   } else if (state === "error") {
     if (subtitle) subtitle.textContent = `Ingredients for ${weekRangeText()}`;
@@ -1062,7 +1114,8 @@ function paintShoppingList(focusKey = null) {
 
   const subtitle = document.getElementById("shopping-subtitle");
   if (subtitle) {
-    subtitle.textContent = `${total} item${total === 1 ? "" : "s"} from ${mealCount} planned meal${mealCount === 1 ? "" : "s"} · ${weekRangeText()}`;
+    const pastNote = openDays().length < DAYS.length ? " · past days not included" : "";
+    subtitle.textContent = `${total} item${total === 1 ? "" : "s"} from ${mealCount} planned meal${mealCount === 1 ? "" : "s"} · ${weekRangeText()}${pastNote}`;
   }
   const tabCount = document.getElementById("view-tab-shopping-count");
   if (tabCount) tabCount.textContent = todoCount ? `(${todoCount})` : "✓";
@@ -1357,8 +1410,13 @@ export async function openAddToPlanDialog(recipe, options = {}) {
   const weekId = shownWeekId();
   const plan = await getPlan(weekId);
   const dates = getWeekDates();
-  const todayIndex = dates.findIndex(isToday);
-  let day = DAYS.includes(options.day) ? options.day : DAYS[todayIndex >= 0 ? todayIndex : 0];
+  // Only today and later days are offered; the first one (today, in this week) is picked.
+  const days = openDays();
+  if (days.length === 0) {
+    showToast("This week is over. Go to this week or a later one to plan meals.");
+    return null;
+  }
+  let day = days.includes(options.day) ? options.day : days[0];
   let meal = MEALS.includes(options.meal) ? options.meal : suggestedMeal();
   const recipeName = toTitleCase(recipe.name || "this recipe");
   const relative = weekOffset === 0 ? "This week" : "Shown week";
@@ -1366,7 +1424,7 @@ export async function openAddToPlanDialog(recipe, options = {}) {
 
   ensurePlanSlotDialogStyles();
 
-  const dayChips = DAYS.map((d, i) => `
+  const dayChips = DAYS.map((d, i) => isPastDay(d) ? "" : `
     <label class="psd-option">
       <input type="radio" name="plan-slot-day" value="${d}" ${d === day ? "checked" : ""}>
       <span class="psd-chip${isToday(dates[i]) ? " is-today" : ""}">
@@ -1604,7 +1662,7 @@ function initDragAndDrop() {
   host.addEventListener("dragover", (e) => {
     if (!dragSource) return;
     const slot = e.target.closest(".plan-slot");
-    if (!slot) return;
+    if (!slot || slot.dataset.past === "true") return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "move";
     const inner = slot.querySelector(".plan-slot-inner");
@@ -1625,7 +1683,7 @@ function initDragAndDrop() {
   host.addEventListener("drop", (e) => {
     if (!dragSource) return;
     const slot = e.target.closest(".plan-slot");
-    if (!slot) return;
+    if (!slot || slot.dataset.past === "true") return;
     e.preventDefault();
     clearDropHighlights(host);
     const from = dragSource;
@@ -1671,6 +1729,17 @@ export async function openMealDrawer(day = "Mon", meal = "Breakfast", { fromSlot
   const clearSearchBtn = document.getElementById("drawer-search-clear");
 
   if (!drawer || !backdrop || !panel) return;
+
+  // Past days can't be picked: hide their pills and move the target to the first open day.
+  const days = openDays();
+  if (days.length === 0) {
+    showToast("This week is over. Go to this week or a later one to plan meals.");
+    return;
+  }
+  document.querySelectorAll('input[name="drawer-day"]').forEach((input) => {
+    input.closest("label")?.classList.toggle("hidden", isPastDay(input.value));
+  });
+  if (!days.includes(day)) day = days[0];
 
   setDrawerTarget(day, meal);
   setDrawerPickerOpen(!fromSlot);

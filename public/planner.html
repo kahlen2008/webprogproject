@@ -114,14 +114,15 @@
     <!-- Weekly Planner Table Card (tablet and desktop) -->
     <div class="hidden sm:block bg-white rounded-3xl border border-[#efe6dc] shadow-sm overflow-hidden">
       <div class="overflow-x-auto">
-        <table class="w-full text-left border-collapse min-w-[720px]">
+        <!-- table-fixed: Day and Total have set widths, the three meal columns share the rest equally -->
+        <table class="w-full table-fixed text-left border-collapse min-w-[720px]">
           <thead>
             <tr class="border-b border-[#ede4da] bg-stone-50/75 text-xs uppercase tracking-wider text-stone-500 font-bold">
-              <th scope="col" class="py-3 px-4 w-20">Day</th>
+              <th scope="col" class="py-3 px-4 w-28">Day</th>
               <th scope="col" class="py-3 px-4">Breakfast</th>
               <th scope="col" class="py-3 px-4">Lunch</th>
               <th scope="col" class="py-3 px-4">Dinner</th>
-              <th scope="col" class="py-3 px-4 whitespace-nowrap" title="Estimated from ingredient amounts">Total (est.)</th>
+              <th scope="col" class="py-3 px-4 w-32 whitespace-nowrap" title="Estimated from ingredient amounts">Total (est.)</th>
             </tr>
           </thead>
           <tbody id="planner-table-body" class="divide-y divide-stone-100">
